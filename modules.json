@@ -5,9 +5,20 @@
         "https://github.com/nf-core/modules.git": {
             "modules": {
                 "nf-core": {
+                    "bowtie2/build": {
+                        "branch": "master",
+                        "git_sha": "6a24fbe314bb2e6fe6306c29a63076ea87e8eb3c",
+                        "installed_by": ["modules"],
+                        "patch": "modules/nf-core/bowtie2/build/bowtie2-build.diff"
+                    },
                     "custom/dumpsoftwareversions": {
                         "branch": "master",
                         "git_sha": "911696ea0b62df80e900ef244d7867d177971f73",
+                        "installed_by": ["modules"]
+                    },
+                    "cutadapt": {
+                        "branch": "master",
+                        "git_sha": "0efbaeb95c58da5a1096c99b5e919bc0c99cc952",
                         "installed_by": ["modules"]
                     },
                     "fastqc": {
