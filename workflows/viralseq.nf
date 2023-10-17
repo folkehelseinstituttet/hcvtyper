@@ -46,7 +46,9 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check'
 //
 // MODULE: Installed directly from nf-core/modules
 //
+include { BOWTIE2_BUILD               } from '../modules/nf-core/bowtie2/build/main'
 include { FASTQC                      } from '../modules/nf-core/fastqc/main'
+include { CUTADAPT                    } from '../modules/nf-core/cutadapt/main'
 include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
@@ -75,12 +77,29 @@ workflow VIRALSEQ {
     // ! There is currently no tooling to help you write a sample sheet schema
 
     //
+    // MODULE: Run Bowtie2_build to create a reference index
+    //
+    ch_bowtie2_build = // Mix val(meta) with the reference fasta file
+    BOWTIE2_BUILD (
+        file(params.references)
+    )
+    ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions)
+
+    //
     // MODULE: Run FastQC
     //
     FASTQC (
         INPUT_CHECK.out.reads
     )
     ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+
+    //
+    // MODULE: Trim reads with Cutadapt
+    //
+    CUTADAPT(
+        INPUT_CHECK.out.reads
+    )
+    ch_versions = ch_versions.mix(CUTADAPT.out.versions)
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
