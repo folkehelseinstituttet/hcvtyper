@@ -1,6 +1,6 @@
 process FASTQC {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_low' // process_medium
 
     conda "bioconda::fastqc=0.11.9"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -33,7 +33,7 @@ process FASTQC {
     fastqc \\
         $args \\
         --threads $task.cpus \\
-        $renamed_files
+        $reads
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

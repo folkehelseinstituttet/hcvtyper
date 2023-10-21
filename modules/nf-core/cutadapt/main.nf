@@ -1,6 +1,6 @@
 process CUTADAPT {
     tag "$meta.id"
-    label 'process_medium'
+    label 'process_low' // process_medium
 
     conda "bioconda::cutadapt=3.4"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
