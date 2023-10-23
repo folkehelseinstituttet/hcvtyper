@@ -46,11 +46,19 @@ include { INPUT_CHECK } from '../subworkflows/local/input_check'
 //
 // MODULE: Installed directly from nf-core/modules
 //
-include { BOWTIE2_BUILD               } from '../modules/nf-core/bowtie2/build/main'
-include { FASTQC                      } from '../modules/nf-core/fastqc/main'
-include { CUTADAPT                    } from '../modules/nf-core/cutadapt/main'
-include { MULTIQC                     } from '../modules/nf-core/multiqc/main'
-include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
+include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
+include { FASTQC                             } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
+include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
+include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
+include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
+include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
+include { SPADES                             } from '../modules/nf-core/spades/main'
+include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
+include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
+include { BOWTIE2_ALIGN as BOWTIE2_ALL_REF   } from '../modules/nf-core/bowtie2/align/main' 
+include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,11 +87,18 @@ workflow VIRALSEQ {
     //
     // MODULE: Run Bowtie2_build to create a reference index
     //
-    ch_bowtie2_build = // Mix val(meta) with the reference fasta file
     BOWTIE2_BUILD (
         file(params.references)
     )
     ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions)
+
+    //
+    // MODULE: Create Blast database from reference sequences
+    //
+    BLAST_MAKEBLASTDB (
+        file(params.references)
+    )
+    ch_versions = ch_versions.mix(BLAST_MAKEBLASTDB.out.versions)
 
     //
     // MODULE: Run FastQC
@@ -100,6 +115,88 @@ workflow VIRALSEQ {
         INPUT_CHECK.out.reads
     )
     ch_versions = ch_versions.mix(CUTADAPT.out.versions)
+
+    //
+    // MODULE: Run FastQC on trimmed reads
+    //
+    FASTQC_TRIM (
+        CUTADAPT.out.reads
+    )
+
+    //
+    // MODULE: Run Kraken2 to classify reads
+    //
+    //Channel.value(file(params.kraken_all_db)).view()
+    KRAKEN2_KRAKEN2 (
+        CUTADAPT.out.reads,
+        Channel.value(file(params.kraken_all_db)),
+        false,
+        false
+    )
+    ch_versions = ch_versions.mix(KRAKEN2_KRAKEN2.out.versions.first().ifEmpty(null))
+
+    //
+    // MODULE: Run Kraken2 to identify target viral reads
+    //
+    KRAKEN2_FOCUSED (
+        CUTADAPT.out.reads,
+        Channel.value(file(params.kraken_focused)),
+        params.save_output_fastqs,
+        params.save_reads_assignment
+    )
+
+    //
+    // MODULE: Run Spades to assemble classified reads
+    //
+
+    // Create input read channel for SPADES. 
+    // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
+    ch_reads = CUTADAPT.out.reads.map { meta, fastq -> [ meta, fastq, [], [] ] }
+    SPADES (
+        ch_reads,
+        [], // Empty input channel. Can be used to specify hmm profile
+        []  // Empty input channel. Placeholder for separate speficication of reads. 
+    )
+    ch_versions = ch_versions.mix(SPADES.out.versions.first())
+
+    //
+    // MODULE: Blast assembled scaffolds against viral references.
+    //
+    BLAST_BLASTN (
+        SPADES.out.scaffolds,
+        BLAST_MAKEBLASTDB.out.db
+    )
+    ch_versions  = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+
+    //
+    // MODULE: Parse blast output
+    //
+    BLASTPARSE (
+        BLAST_BLASTN.out.txt,
+        SPADES.out.scaffolds,
+        file(params.references),
+        params.agens
+    )
+    // Does not with the R-sessions output:
+    ch_versions  = ch_versions.mix(BLASTPARSE.out.versions.first())
+
+    //
+    // MODULE: Map classified reads against all references
+    //
+    if (params.mapper == "bowtie2") {
+        BOWTIE2_ALL_REF (
+            CUTADAPT.out.reads,
+            BOWTIE2_BUILD.out.index,
+            false, // Do not save unmapped reads
+            true // Sort bam file
+        )
+         //BOWTIE2_ALIGN ( ch_reads, ch_index, save_unaligned, sort_bam )
+        ch_versions = ch_versions.mix(BOWTIE2_ALL_REF.out.versions.first())
+    } 
+    // else if (params.mapper == "tanoti") {
+
+    // }
+
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
