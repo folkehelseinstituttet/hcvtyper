@@ -6,3 +6,5 @@ results/
 testing/
 testing*
 *.pyc
+nf-core_local_test/
+
