@@ -6,7 +6,7 @@
     "parameter_file": "params.json",
     "//parameter_file_comment": "The name of this file. Used for copying inside the workflow",
     "spades_mode": "rnaviral",
-    "mapper": "tanoti",
+    "mapper": "bowtie2",
     "//mapper_comment": "Parameter can be either: tanoti or bowtie2",
     "tanoti_stringency_1": "85",
     "//tanoti_stringency_1_comment": "Mapping stringency to use in the first mapping against all references",
