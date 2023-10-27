@@ -58,6 +58,7 @@ include { SPADES                             } from '../modules/nf-core/spades/m
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
 include { BOWTIE2_ALIGN as BOWTIE2_ALL_REF   } from '../modules/nf-core/bowtie2/align/main' 
+include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 /*
@@ -197,6 +198,19 @@ workflow VIRALSEQ {
 
     // }
 
+    //
+    // MODULE: Identify the two references with most mapped reads
+    //
+    PARSEFIRSTMAPPING (
+        BOWTIE2_ALL_REF.out.idxstats,
+        BOWTIE2_ALL_REF.out.depth
+    )
+
+    // Next step: choose whether to map against the two references with most mapped reads,
+    // or to map against the references with the "best" blast hits.
+    // I guess I should make an input channel that can be used for the same bowtie process as above.
+    // Either use Nextflow/groovy code here, or create a local process that spits out the 
+    // correct channel and takes a paramter that specifies which strategy to use.
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
