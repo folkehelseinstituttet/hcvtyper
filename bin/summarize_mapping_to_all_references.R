@@ -1,15 +1,23 @@
 #!/usr/bin/env Rscript
 
 library(tidyverse)
+library(seqinr)
 
 args = commandArgs(trailingOnly=TRUE)
-if (length(args) < 3) {
-  stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name>", call.=FALSE)
+if (length(args) < 4) {
+  stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name> <references>", call.=FALSE)
 }
 
 idxstats   <- args[1]
 depth      <- args[2]
 sampleName <- args[3]
+references <- args[4]
+
+# Create empty dataframe to populate
+df_final <- as.data.frame(matrix(nrow = 1, ncol = 7))
+colnames(df_final) <- c("sample", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
+
+df_final$sample[1] <- sampleName
 
 # Read the summary of the first mapping
 df <- read_tsv(idxstats, col_names = FALSE) %>% 
@@ -32,6 +40,36 @@ major_ref <- df %>%
   head(n = 1) %>% 
   pull(X1)
 
+df_final$major_ref[1] <- major_ref
+
+# How many reads mapped to the minor subtype
+major_reads <- summary %>% 
+  filter(Subtype == major_tmp) %>% 
+  pull(reads)
+
+df_final$major_reads[1] <- major_reads
+
+# Read the depth file from the first mapping
+cov <- read_tsv(depth, col_names = FALSE) %>% 
+  # Filter out the minority subtype
+  filter(X1 == major_ref) 
+
+# Reference length
+ref_length <- nrow(cov)
+
+# Calculate percentage of positions with a coverage of 5 or more
+# Nr. of positions with coverage >= 5
+pos <- nrow(
+  cov %>% 
+    filter(X3 > 4)
+)
+
+# Coverage breadth. Convert to integer to be used in a bash if statement later
+breadth <- round(pos / ref_length * 100, digits = 2)
+breadth_int <- as.integer(pos / ref_length * 100)
+
+df_final$major_cov[1] <- breadth_int
+
 ## Minor
 minor_tmp <- summary$Subtype[2] 
 minor_ref <- df %>% 
@@ -41,10 +79,14 @@ minor_ref <- df %>%
   head(n = 1) %>% 
   pull(X1)
 
+df_final$minor_ref[1] <- minor_ref
+
 # How many reads mapped to the minor subtype
 minor_reads <- summary %>% 
   filter(Subtype == minor_tmp) %>% 
   pull(reads)
+
+df_final$minor_reads[1] <- minor_reads
 
 # Read the depth file from the first mapping
 cov <- read_tsv(depth, col_names = FALSE) %>% 
@@ -65,10 +107,19 @@ pos <- nrow(
 breadth <- round(pos / ref_length * 100, digits = 2)
 breadth_int <- as.integer(pos / ref_length * 100)
 
-# Write files
-write_lines(major_ref                         , file = paste0(sampleName, ".major_ref.txt"))
-write_lines(c(minor_ref, minor_reads, breadth_int, breadth), file = paste0(sampleName, ".minor_ref.txt"))
+df_final$minor_cov[1] <- breadth_int
+
+# Write results
+write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
+#write_lines(major_ref                         , file = paste0(sampleName, ".major_ref.txt"))
+#write_lines(c(minor_ref, minor_reads, breadth_int, breadth), file = paste0(sampleName, ".minor_ref.txt"))
+
+# Write out the fasta sequences
+# Read the reference fasta file
+fasta <- read.fasta(file = references)
+write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
+write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
 
 # Write out sessionInfo() to track versions
-session <- capture.output(sessionInfo())
-write_lines(session, file = "R_versions.txt")
+# session <- capture.output(sessionInfo())
+# write_lines(session, file = "R_versions.txt")
