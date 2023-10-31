@@ -35,7 +35,8 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK } from '../subworkflows/local/input_check'
+include { INPUT_CHECK   } from '../subworkflows/local/input_check'
+include { MAJOR_MAPPING } from '../subworkflows/local/major_mapping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,6 +68,8 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+// TODO: Make subworkflows for all refs, major and minor
+
 // Info required for completion email and summary
 def multiqc_report = []
 
@@ -88,7 +91,7 @@ workflow VIRALSEQ {
     //
     // MODULE: Run Bowtie2_build to create a reference index
     //
-    BOWTIE2_BUILD (
+    BOWTIE2_BUILD(
         file(params.references)
     )
     ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions)
@@ -116,7 +119,7 @@ workflow VIRALSEQ {
         INPUT_CHECK.out.reads
     )
     ch_versions = ch_versions.mix(CUTADAPT.out.versions)
-
+    
     //
     // MODULE: Run FastQC on trimmed reads
     //
@@ -178,8 +181,7 @@ workflow VIRALSEQ {
         file(params.references),
         params.agens
     )
-    // Does not with the R-sessions output:
-    ch_versions  = ch_versions.mix(BLASTPARSE.out.versions.first())
+    ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
 
     //
     // MODULE: Map classified reads against all references
@@ -191,11 +193,10 @@ workflow VIRALSEQ {
             false, // Do not save unmapped reads
             true // Sort bam file
         )
-         //BOWTIE2_ALIGN ( ch_reads, ch_index, save_unaligned, sort_bam )
         ch_versions = ch_versions.mix(BOWTIE2_ALL_REF.out.versions.first())
     } 
     // else if (params.mapper == "tanoti") {
-
+        //TANOTI_ALL_REF ()
     // }
 
     //
@@ -203,14 +204,105 @@ workflow VIRALSEQ {
     //
     PARSEFIRSTMAPPING (
         BOWTIE2_ALL_REF.out.idxstats,
-        BOWTIE2_ALL_REF.out.depth
+        BOWTIE2_ALL_REF.out.depth,
+        file(params.references)
     )
+
+    // Create input channel for BOWTIE2_BUILD in the major map channel
+    ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
+
+    //
+    // SUBWORKFLOW: Map reads against the majority reference
+    //
+    // MAJOR_MAPPING (
+    //     ch_build_major,
+    //     ch_map_major,
+    // )
+
+    // Create input channel for mapping against a subset of the references    
+    
+    //PARSEFIRSTMAPPING.out.csv.view()
+    def one = PARSEFIRSTMAPPING.out.csv.map { it[0] }
+    println one
+    // ch_one = PARSEFIRSTMAPPING.out.csv.map { it[0] }
+    // //ch_one.view()
+
+    // def two = PARSEFIRSTMAPPING.out.csv
+    //     .map { it[1]}
+    //     .splitCsv ( header:true, sep:',')
+    // ch_two = PARSEFIRSTMAPPING.out.csv
+    //     .map { it[1]}
+    //     .splitCsv ( header:true, sep:',')
+    // //ch_two.view()
+    
+    // def combined = one + two
+    // println combined
+    // ch_combined = ch_one.mix(ch_two).collect()
+    //ch_combined.view()
+
+
+
+    // ch_map_major_minor = PARSEFIRSTMAPPING.out.csv
+    //     .map { row ->
+    //     def elements = row[1].splitCsv( header:true, sep:',' ) // Split the second element (csv file) 
+    //     // Create a new structure with the first element and the elements from the CSV file
+    //     return [row[0], elements]
+    // }
+    // ch_map_major_minor.view()
+
+    //PARSEFIRSTMAPPING.out.csv
+        //.map { it[1] }
+       // .splitCsv ( header:true, sep:',')
+        //[meta, dummy]
+        //.view()
+        // .map { it[1] } // Extract the csv file
+        // .splitCsv ( header:true, sep:',' )
+        // .view()
+
+    //     SAMPLESHEET_CHECK ( samplesheet )
+    //     .csv
+    //     .splitCsv ( header:true, sep:',' )
+    //     .map { create_fastq_channel(it) }
+    //     .set { reads }
+
+    // emit:
+    // reads                                     // channel: [ val(meta), [ reads ] ]
+    // versions = SAMPLESHEET_CHECK.out.versions // channel: [ versions.yml ]
 
     // Next step: choose whether to map against the two references with most mapped reads,
     // or to map against the references with the "best" blast hits.
     // I guess I should make an input channel that can be used for the same bowtie process as above.
     // Either use Nextflow/groovy code here, or create a local process that spits out the 
-    // correct channel and takes a paramter that specifies which strategy to use.
+    // correct channel and takes a parameter that specifies which strategy to use.
+    // Should I identify minority also with de novo? The problem is that there are very often several
+    // good blast hits. 
+
+    // if (params.mapping_based) {
+    //     ch_map_major = // Input to bowtie2 or tanoti. 
+    // } else {
+    //     ch_map_major =
+    // }
+
+    //
+    // MODULE: Map classified reads against the dominant reference
+    //
+    // if (params.mapper == "bowtie2") {
+    //     BOWTIE2_MAJOR (
+    //         ch_map_major,
+    //         BOWTIE2_BUILD_ALL_REF.out.index,
+    //         false,
+    //         true
+    //     )
+    // } 
+    // else if (params.mapper == "tanoti") {
+    //  TANOTI_MAJOR (
+    //    ch_map_major
+    //  )
+    // }
+
+    //
+    // MODULE: Map classified reads against a potential minority strain
+    //
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')

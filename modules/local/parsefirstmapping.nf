@@ -19,12 +19,16 @@ process PARSEFIRSTMAPPING {
     // TODO nf-core: Where applicable please provide/convert compressed files as input/output
     //               e.g. "*.fastq.gz" and NOT "*.fastq", "*.bam" and NOT "*.sam" etc.
     tuple val(meta) , path(idxstats)
-    tuple val(meta2), path(depth) 
+    tuple val(meta2), path(depth)
+    path(references)
 
     output:
-    tuple val(meta), path("*.major_ref.txt"), emit: major_ref // Output value with the name of the major ref instead?
-    tuple val(meta), path("*.minor_ref.txt"), emit: minor_ref
-    path "versions.yml"                     , emit: versions
+    tuple val(meta), path("*.csv")    , emit: csv
+    tuple val(meta), path("*major.fa"), emit: major_fasta
+    tuple val(meta), path("*minor.fa"), emit: minor_fasta
+    //tuple val(meta), path("*.major_ref.txt"), emit: major_ref // Output value with the name of the major ref instead?
+    //tuple val(meta), path("*.minor_ref.txt"), emit: minor_ref
+    path "versions.yml"               , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -34,7 +38,7 @@ process PARSEFIRSTMAPPING {
     def prefix = task.ext.prefix ?: "${meta.id}"
 
     """
-    summarize_mapping_to_all_references.R ${idxstats} ${depth} ${prefix}
+    summarize_mapping_to_all_references.R ${idxstats} ${depth} ${prefix} ${references}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
