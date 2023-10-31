@@ -17,7 +17,7 @@
     "kraken_all": "true",
     "//kraken_all_comment": "set to 'false' if skip kraken against entire NCBI database",
     "kraken_all_db": "data\/kraken_db\/db_hepacivirus", 
-    "//kraken_all_comment": "PlusPFP database compiled by Ben Langmead on 9. December 2022",
+    "//kraken_all_comment2": "PlusPFP database compiled by Ben Langmead on 9. December 2022",
     "kraken_focused": "data\/kraken_db\/db_hepacivirus\/",  
     "//kraken_focused_comment": "NCBI Hepacivirus genomes with HCV genotypes from NCBI added|",
     "save_output_fastqs": "true",
