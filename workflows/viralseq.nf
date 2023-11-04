@@ -58,7 +58,7 @@ include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/
 include { SPADES                             } from '../modules/nf-core/spades/main'
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
-include { BOWTIE2_ALIGN as BOWTIE2_ALL_REF   } from '../modules/nf-core/bowtie2/align/main' 
+include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main' 
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
@@ -187,24 +187,25 @@ workflow VIRALSEQ {
     // MODULE: Map classified reads against all references
     //
     if (params.mapper == "bowtie2") {
-        BOWTIE2_ALL_REF (
+        BOWTIE2_ALIGN (
             CUTADAPT.out.reads,
             BOWTIE2_BUILD.out.index,
             false, // Do not save unmapped reads
-            true // Sort bam file
+            true, // Sort bam file
+            "first_mapping" // name for output files
         )
-        ch_versions = ch_versions.mix(BOWTIE2_ALL_REF.out.versions.first())
+        ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
     } 
-    // else if (params.mapper == "tanoti") {
-        //TANOTI_ALL_REF ()
-    // }
+    else if (params.mapper == "tanoti") {
+        TANOTI ()
+    }
 
     //
     // MODULE: Identify the two references with most mapped reads
     //
     PARSEFIRSTMAPPING (
-        BOWTIE2_ALL_REF.out.idxstats,
-        BOWTIE2_ALL_REF.out.depth,
+        BOWTIE2_ALIGN.out.idxstats,
+        BOWTIE2_ALIGN.out.depth,
         file(params.references)
     )
 
@@ -220,7 +221,7 @@ workflow VIRALSEQ {
 
     // Create a new channel with the structure tuple val(meta), path(reads)
     // The meta will contain all the elements from meta and the csv file
-    ch_map_major = ch_join
+    ch_map_focused = ch_join
         .map { meta, reads, csv -> 
         def elements = csv.splitCsv( header: true, sep:',')
         return [meta + elements[0], reads] 
@@ -231,8 +232,10 @@ workflow VIRALSEQ {
     //
     MAJOR_MAPPING (
         ch_build_major,
-        ch_map_major
+        CUTADAPT.out.reads,
+        "majority"
     )
+    ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
 
 
     
