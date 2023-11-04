@@ -12,6 +12,7 @@ process BOWTIE2_ALIGN {
     path (index)
     val   save_unaligned
     val   sort_bam
+    val (prefix2)
 
     output:
     tuple val(meta), path("*.{bam,sam}")      , emit: aligned
@@ -54,14 +55,14 @@ process BOWTIE2_ALIGN {
         --threads $task.cpus \\
         $unaligned \\
         $args \\
-        2> ${prefix}.bowtie2.log \\
-        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${extension} -
+        2> ${prefix}.${prefix2}.bowtie2.log \\
+        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${prefix2}.${extension} -
 
     # Creating file with coverage per site
-    samtools depth -aa -d 1000000 ${prefix}.${extension} | gzip > ${prefix}.coverage.txt.gz
+    samtools depth -aa -d 1000000 ${prefix}.${prefix2}.${extension} | gzip > ${prefix}.${prefix2}.coverage.txt.gz
 
     # Summarize reads mapped per reference
-    samtools idxstats ${prefix}.${extension} > ${prefix}.idxstats
+    samtools idxstats ${prefix}.${prefix2}.${extension} > ${prefix}.${prefix2}.idxstats
 
     if [ -f ${prefix}.unmapped.fastq.1.gz ]; then
         mv ${prefix}.unmapped.fastq.1.gz ${prefix}.unmapped_1.fastq.gz
