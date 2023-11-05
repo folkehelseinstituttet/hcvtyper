@@ -171,14 +171,15 @@ workflow VIRALSEQ {
         SPADES.out.scaffolds,
         BLAST_MAKEBLASTDB.out.db
     )
-    ch_versions  = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+    ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
 
     //
     // MODULE: Parse blast output
     //
+    // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
+    ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
     BLASTPARSE (
-        BLAST_BLASTN.out.txt,
-        SPADES.out.scaffolds,
+        ch_blastparse,
         file(params.references),
         params.agens
     )
@@ -205,24 +206,26 @@ workflow VIRALSEQ {
     // MODULE: Identify the two references with most mapped reads
     //
     // Join idxstats and depth on the meta to ensure no sample mixup
+    ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
     PARSEFIRSTMAPPING (
         ch_parse,
         file(params.references)
     )
 
-    // Create input channel for BOWTIE2_BUILD in the major map channel
-    ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
-
     //
     // SUBWORKFLOW: Map reads against the majority reference
     //
+    // Create input channel for BOWTIE2_BUILD in the major map channel
+    //ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
+    ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(CUTADAPT.out.reads)
+    ch_major_mapping.view()
     MAJOR_MAPPING (
-        ch_build_major,
+        ch_major_mapping,
         CUTADAPT.out.reads,
         "majority"
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
-
+/*
     //
     // SUBWORKFLOW: Map reads against a potential minority reference
     //
@@ -271,7 +274,7 @@ workflow VIRALSEQ {
     // correct channel and takes a parameter that specifies which strategy to use.
     // Should I identify minority also with de novo? The problem is that there are very often several
     // good blast hits. 
-
+*/
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
     )

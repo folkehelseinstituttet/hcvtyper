@@ -21,8 +21,7 @@ process BLASTPARSE {
         'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
-    tuple val(meta) , path(blast_out)
-    tuple val(meta2), path(scaffolds)
+    tuple val(meta), path(blast_out), path(scaffolds)
     path(references)
     val(agens)
 
