@@ -218,10 +218,9 @@ workflow VIRALSEQ {
     // Create input channel for BOWTIE2_BUILD in the major map channel
     //ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
     ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(CUTADAPT.out.reads)
-    ch_major_mapping.view()
+    //ch_major_mapping.view()
     MAJOR_MAPPING (
         ch_major_mapping,
-        CUTADAPT.out.reads,
         "majority"
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
