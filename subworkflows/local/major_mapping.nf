@@ -3,11 +3,19 @@ include { BOWTIE2_ALIGN } from '../../modules/nf-core/bowtie2/align/main'
 
 workflow MAJOR_MAPPING {
     take:
-    ch_build
-    ch_align
+    ch_major_mapping    //tuple val(meta), path(fasta), path(reads)
     prefix2
 
     main:
+    // Extract the path(fasta)
+    ch_build = ch_major_mapping.map { it[1] }
+ 
+    // Extract val(meta), path(reads)
+    ch_align = ch_major_mapping
+        .map { meta, fasta, reads ->
+        return [meta, reads]
+        }
+
     if (params.mapper == "bowtie2") {
             BOWTIE2_BUILD (
             ch_build
