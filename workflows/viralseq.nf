@@ -35,8 +35,9 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK   } from '../subworkflows/local/input_check'
-include { MAJOR_MAPPING } from '../subworkflows/local/major_mapping'
+include { INPUT_CHECK                    } from '../subworkflows/local/input_check'
+include { MAJOR_MAPPING                  } from '../subworkflows/local/major_mapping'
+include { MAJOR_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_mapping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -203,29 +204,14 @@ workflow VIRALSEQ {
     //
     // MODULE: Identify the two references with most mapped reads
     //
+    // Join idxstats and depth on the meta to ensure no sample mixup
     PARSEFIRSTMAPPING (
-        BOWTIE2_ALIGN.out.idxstats,
-        BOWTIE2_ALIGN.out.depth,
+        ch_parse,
         file(params.references)
     )
 
     // Create input channel for BOWTIE2_BUILD in the major map channel
     ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
-
-    // Create input channel for mapping against a subset of the references    
-    
-
-    // Join the two channels, which will join on the meta. 
-    // This will now have the structure: [ meta ], [ reads ], [ csv ]
-    ch_join = CUTADAPT.out.reads.join(PARSEFIRSTMAPPING.out.csv)
-
-    // Create a new channel with the structure tuple val(meta), path(reads)
-    // The meta will contain all the elements from meta and the csv file
-    ch_map_focused = ch_join
-        .map { meta, reads, csv -> 
-        def elements = csv.splitCsv( header: true, sep:',')
-        return [meta + elements[0], reads] 
-        }
 
     //
     // SUBWORKFLOW: Map reads against the majority reference
@@ -237,6 +223,44 @@ workflow VIRALSEQ {
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
 
+    //
+    // SUBWORKFLOW: Map reads against a potential minority reference
+    //
+
+    // Create input channel for mapping against a subset of the references    
+    
+    // The thing is that I need to ensure that the nr of reads mapped and the coverage 
+    // comes from the same sample as the reads that will be mapped against the minority.
+    // I.e., that the the meta of the values is the same as the meta of the reads.
+    // Join the two channels, which will join on the meta. 
+    // This will now have the structure: [ meta ], [ reads ], [ csv ]
+    ch_join = CUTADAPT.out.reads.join(PARSEFIRSTMAPPING.out.csv)
+
+    // Create a new channel with the structure tuple val(meta), path(reads)
+    // The meta will contain all the elements from meta and the csv file
+    ch_map_minor = ch_join
+        .map { meta, reads, csv -> 
+        def elements = csv.splitCsv( header: true, sep:',')
+        return [meta + elements[0], reads] 
+        }
+    
+    // This will extract the minor_reads and minor_cov keys
+    ch_map_minor.map { meta, reads -> [ meta.subMap( ['minor_reads','minor_cov'] ) ] }.view()
+    ch_map_minor.map { meta, reads -> [ meta.subMap( ['minor_reads'] ) ] }.view()
+    println ch_map_minor.meta.minor_reads
+    // if (ch_map_minor.map { meta, reads -> [ meta.subMap( ['minor_reads'] ) ] }.toInteger() > 50) {
+    //     println "HEI"
+    // }
+    // if (ch_map_minor.collect { list -> list[2]} > params.minAgensRead & yy > cov) {
+    //     MINOR_MAPPING (
+    //     ch_build_major,
+    //     ch_map_minor,
+    //     "minority"
+    // )
+    // }
+
+
+    
 
     
 
@@ -247,27 +271,6 @@ workflow VIRALSEQ {
     // correct channel and takes a parameter that specifies which strategy to use.
     // Should I identify minority also with de novo? The problem is that there are very often several
     // good blast hits. 
-
-    //
-    // MODULE: Map classified reads against the dominant reference
-    //
-    // if (params.mapper == "bowtie2") {
-    //     BOWTIE2_MAJOR (
-    //         ch_map_major,
-    //         BOWTIE2_BUILD_ALL_REF.out.index,
-    //         false,
-    //         true
-    //     )
-    // } 
-    // else if (params.mapper == "tanoti") {
-    //  TANOTI_MAJOR (
-    //    ch_map_major
-    //  )
-    // }
-
-    //
-    // MODULE: Map classified reads against a potential minority strain
-    //
 
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
