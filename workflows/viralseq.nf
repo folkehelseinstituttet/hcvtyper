@@ -156,7 +156,7 @@ workflow VIRALSEQ {
 
     // Create input read channel for SPADES. 
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
-    ch_reads = CUTADAPT.out.reads.map { meta, fastq -> [ meta, fastq, [], [] ] }
+    ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
     SPADES (
         ch_reads,
         [], // Empty input channel. Can be used to specify hmm profile
@@ -190,7 +190,7 @@ workflow VIRALSEQ {
     //
     if (params.mapper == "bowtie2") {
         BOWTIE2_ALIGN (
-            CUTADAPT.out.reads,
+            KRAKEN2_FOCUSED.out.classified_reads_fastq,
             BOWTIE2_BUILD.out.index,
             false, // Do not save unmapped reads
             true, // Sort bam file
@@ -199,7 +199,14 @@ workflow VIRALSEQ {
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
     } 
     else if (params.mapper == "tanoti") {
-        TANOTI ()
+        TANOTI (
+            KRAKEN2_FOCUSED.out.classified_reads_fastq,
+            [],
+            false, // Do not save unmapped reads
+            true, // Sort bam file
+            "first_mapping" // name for output files
+        )
+        ch_versions = ch_versions.mix(TANOTI.out.versions.first())
     }
 
     //
@@ -217,7 +224,7 @@ workflow VIRALSEQ {
     //
     // Create input channel for BOWTIE2_BUILD in the major map channel
     //ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
-    ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(CUTADAPT.out.reads)
+    ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     //ch_major_mapping.view()
     MAJOR_MAPPING (
         ch_major_mapping,
