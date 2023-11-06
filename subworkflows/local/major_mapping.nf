@@ -35,6 +35,7 @@ workflow MAJOR_MAPPING {
     else if (params.mapper == "tanoti") {
         TANOTI (
             ch_align,
+            [],
             false,
             true,
             prefix2
