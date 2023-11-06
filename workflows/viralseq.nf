@@ -231,19 +231,14 @@ workflow VIRALSEQ {
         "majority"
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
-/*
+    
     //
     // SUBWORKFLOW: Map reads against a potential minority reference
     //
 
     // Create input channel for mapping against a subset of the references    
-    
-    // The thing is that I need to ensure that the nr of reads mapped and the coverage 
-    // comes from the same sample as the reads that will be mapped against the minority.
-    // I.e., that the the meta of the values is the same as the meta of the reads.
-    // Join the two channels, which will join on the meta. 
-    // This will now have the structure: [ meta ], [ reads ], [ csv ]
-    ch_join = CUTADAPT.out.reads.join(PARSEFIRSTMAPPING.out.csv)
+   
+    ch_join = KRAKEN2_FOCUSED.out.classified_reads_fastq.join(PARSEFIRSTMAPPING.out.csv)
 
     // Create a new channel with the structure tuple val(meta), path(reads)
     // The meta will contain all the elements from meta and the csv file
@@ -253,34 +248,20 @@ workflow VIRALSEQ {
         return [meta + elements[0], reads] 
         }
     
-    // This will extract the minor_reads and minor_cov keys
-    ch_map_minor.map { meta, reads -> [ meta.subMap( ['minor_reads','minor_cov'] ) ] }.view()
-    ch_map_minor.map { meta, reads -> [ meta.subMap( ['minor_reads'] ) ] }.view()
-    println ch_map_minor.meta.minor_reads
-    // if (ch_map_minor.map { meta, reads -> [ meta.subMap( ['minor_reads'] ) ] }.toInteger() > 50) {
-    //     println "HEI"
-    // }
-    // if (ch_map_minor.collect { list -> list[2]} > params.minAgensRead & yy > cov) {
-    //     MINOR_MAPPING (
-    //     ch_build_major,
-    //     ch_map_minor,
-    //     "minority"
-    // )
-    // }
+    // This will result in a channel with values that meet the read nr and coverage criteria
+    ch_map_minor_filtered = ch_map_minor
+    .filter { entry ->
+        def minorReads = entry[0]['minor_reads'].toInteger()
+        def minorCov = entry[0]['minor_cov'].toInteger()
+        minorReads > params.minAgensRead && minorCov > params.minAgensCov
+    }
+    // Need this input channel:  tuple val(meta), path(fasta), path(reads)
+    ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+    MINOR_MAPPING (
+        ch_minor_mapping,
+        "minority"
+    )
 
-
-    
-
-    
-
-    // Next step: choose whether to map against the two references with most mapped reads,
-    // or to map against the references with the "best" blast hits.
-    // I guess I should make an input channel that can be used for the same bowtie process as above.
-    // Either use Nextflow/groovy code here, or create a local process that spits out the 
-    // correct channel and takes a parameter that specifies which strategy to use.
-    // Should I identify minority also with de novo? The problem is that there are very often several
-    // good blast hits. 
-*/
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
     )
