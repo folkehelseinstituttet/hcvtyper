@@ -177,6 +177,8 @@ workflow VIRALSEQ {
     // MODULE: Parse blast output
     //
     // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
+    // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
+    // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
     ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
     BLASTPARSE (
         ch_blastparse,
@@ -222,10 +224,11 @@ workflow VIRALSEQ {
     //
     // SUBWORKFLOW: Map reads against the majority reference
     //
-    // Create input channel for BOWTIE2_BUILD in the major map channel
-    //ch_build_major = PARSEFIRSTMAPPING.out.major_fasta.map { it[1] } // Extract the fasta file
+    // TODO: Add if (params.strategy == "mapping")... else if (params.strategy == "denovo")
+    // Then create the channels for major and minor mapping from the mapping or blast parsing respectively.
+    // The difference will be the reference that is used.
     ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
-    //ch_major_mapping.view()
+    
     MAJOR_MAPPING (
         ch_major_mapping,
         "majority"
