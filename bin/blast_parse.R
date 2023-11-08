@@ -85,6 +85,50 @@ for (i in 1:length(split)){
   write.fasta(sequences = geno_fa, names = names(geno_fa), file.out = paste0(prefix, ".", tmp$genotype[1], "_scaffolds.fa"))
 }
 
+# Identify major and minor reference
+
+# Simply take the best blast hit as determined by Blastn - the top hit - as the majority reference
+major_name <- scaf %>% 
+  head(n=1) %>% 
+  pull(sseqid)
+
+# write the fasta file
+write.fasta(sequences = fasta[major_name], names = major_name, file.out = paste0(prefix, ".", major_name, "_major.fa"))
+
+# For the minor, take the second best blast hit that belongs to a different genotype
+major_geno <- str_sub(major_name, 1, 1)
+minor_name <- scaf %>% 
+  filter(str_detect(genotype, paste0("^", major_geno), negate = T)) %>% # Genotype cannot begin with the major_geno
+  head(n=1) %>% 
+  pull(sseqid)
+
+# write the fasta file
+write.fasta(sequences = fasta[minor_name], names = minor_name, file.out = paste0(prefix, ".", minor_name, "_minor.fa"))
+
+# Create a csv file with info on major and minor references and blast hit length
+df <- matrix(nrow = 1, ncol = 5)
+colnames(df) <- c("sample", "major_ref", "major_length", "minor_ref", "minor_length")
+df <- as.data.frame(df)
+df$sample <- prefix
+df$major_ref <- major_name
+df$minor_ref <- minor_name
+
+major_length <- scaf %>% 
+  filter(sseqid == major_name) %>% 
+  arrange(desc(length)) %>% 
+  head(n=1) %>% 
+  pull(length)
+df$major_length <- major_length
+
+minor_length <- scaf %>% 
+  filter(sseqid == minor_name) %>% 
+  arrange(desc(length)) %>% 
+  head(n=1) %>% 
+  pull(length)
+df$minor_length <- minor_length
+
+write_csv(df, file = paste0(prefix, ".blastparse.csv"))
+
 # Write out sessionInfo() to track versions
 session <- capture.output(sessionInfo())
 write_lines(session, file = "R_versions.txt")
