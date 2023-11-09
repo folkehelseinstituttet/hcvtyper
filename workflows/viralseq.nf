@@ -58,10 +58,14 @@ include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
 include { SPADES                             } from '../modules/nf-core/spades/main'
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
-include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main' 
-include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+
+//
+// Local modules
+//
+include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
+include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,10 +228,11 @@ workflow VIRALSEQ {
     //
     // SUBWORKFLOW: Map reads against the majority reference
     //
-    // TODO: Add if (params.strategy == "mapping")... else if (params.strategy == "denovo")
-    // Then create the channels for major and minor mapping from the mapping or blast parsing respectively.
-    // The difference will be the reference that is used.
-    ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+    if (params.strategy == "mapping") {
+        ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+    } else if (params.strategy == "denovo") {
+        ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+    }    
     
     MAJOR_MAPPING (
         ch_major_mapping,
@@ -240,28 +245,54 @@ workflow VIRALSEQ {
     //
 
     // Create input channel for mapping against a subset of the references    
-   
-    ch_join = KRAKEN2_FOCUSED.out.classified_reads_fastq.join(PARSEFIRSTMAPPING.out.csv)
+    if (params.strategy == "mapping") {
+        ch_join = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
+        ch_join_2 = ch_join.join(PARSEFIRSTMAPPING.out.csv) // meta, fasta, reads, csv
 
-    // Create a new channel with the structure tuple val(meta), path(reads)
-    // The meta will contain all the elements from meta and the csv file
-    ch_map_minor = ch_join
-        .map { meta, reads, csv -> 
-        def elements = csv.splitCsv( header: true, sep:',')
-        return [meta + elements[0], reads] 
+        // Create a new channel with the structure tuple val(meta), path(fasta), path(reads)
+        // The meta will contain all the elements from meta and the csv file. meta, reads
+        ch_map_minor = ch_join_2
+            .map { meta, fasta, reads, csv -> 
+            def elements = csv.splitCsv( header: true, sep:',')
+            return [meta + elements[0], fasta, reads] 
+            }
+        
+        // Filter on read nr and coverage
+        // This will result in a channel with values that meet the read nr and coverage criteria
+        ch_map_minor_filtered = ch_map_minor
+        .filter { entry ->
+            def minorReads = entry[0]['minor_reads'].toInteger()
+            def minorCov = entry[0]['minor_cov'].toInteger()
+            minorReads > params.minAgensRead && minorCov > params.minAgensCov
         }
+        // Need this input channel:  tuple val(meta), path(fasta), path(reads)
+        //ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+    } else if (params.strategy == "denovo") {
+        ch_join = BLASTPARSE.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
+        ch_join_2 = ch_join.join(BLASTPARSE.out.csv) // meta, fasta, reads, csv
+
+        // Create a new channel with the structure tuple val(meta), path(reads)
+        // The meta will contain all the elements from meta and the csv file. meta, reads
+        ch_map_minor = ch_join_2
+            .map { meta, fasta, reads, csv -> 
+            def elements = csv.splitCsv( header: true, sep:',')
+            return [meta + elements[0], fasta, reads] 
+            }
     
-    // This will result in a channel with values that meet the read nr and coverage criteria
-    ch_map_minor_filtered = ch_map_minor
-    .filter { entry ->
-        def minorReads = entry[0]['minor_reads'].toInteger()
-        def minorCov = entry[0]['minor_cov'].toInteger()
-        minorReads > params.minAgensRead && minorCov > params.minAgensCov
-    }
-    // Need this input channel:  tuple val(meta), path(fasta), path(reads)
-    ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+        // Filter on read nr and coverage
+        // This will result in a channel with values that meet the read nr and coverage criteria
+        ch_map_minor_filtered = ch_map_minor
+        .filter { entry ->
+            def minorLength = entry[0]['minor_length'].toInteger()
+            minorLength > params.minDenovoLength
+        }
+        // Need this input channel:  tuple val(meta), path(fasta), path(reads)
+        //ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+        
+    }  
+
     MINOR_MAPPING (
-        ch_minor_mapping,
+        ch_map_minor_filtered,
         "minority"
     )
 
