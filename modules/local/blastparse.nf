@@ -1,20 +1,7 @@
-// TODO nf-core: A module file SHOULD only define input and output files as command-line parameters.
-//               All other parameters MUST be provided using the "task.ext" directive, see here:
-//               https://www.nextflow.io/docs/latest/process.html#ext
-//               where "task.ext" is a string.
-//               Any parameters that need to be evaluated in the context of a particular sample
-//               e.g. single-end/paired-end data MUST also be defined and evaluated appropriately.
-// TODO nf-core: Optional inputs are not currently supported by Nextflow. However, using an empty
-//               list (`[]`) instead of a file can be used to work around this issue.
-
 process BLASTPARSE {
     tag "$meta.id"
     label 'process_single'
 
-    // TODO nf-core: List required Conda package(s).
-    //               Software MUST be pinned to channel (i.e. "bioconda"), version (i.e. "1.10").
-    //               For Conda, the build (i.e. "h9402c20_2") must be EXCLUDED to support installation on different operating systems.
-    // TODO nf-core: See section in main README for further information regarding finding and adding container addresses to the section below.
     conda "r=2.4.4 r-tidyverse=1.3.1"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         '':
@@ -26,12 +13,13 @@ process BLASTPARSE {
     val(agens)
 
     output:
-    tuple val(meta), path("*ref.fa")          , emit: FOR_MAPPING
-    tuple val(meta), path('*.csv')                                                   , emit: blast_res
-    // path '*scaffolds.fa'                                                                   , emit: RESISTANCE_BLAST
-    // path "*.{log,sh}"
-    // path "blast_parse_versions.yml", emit: versions
-    path "versions.yml"           , emit: versions
+    tuple val(meta), path("*ref.fa")        , emit: FOR_MAPPING
+    tuple val(meta), path("*scaffolds.fa")  , emit: scaffolds
+    tuple val(meta), path('*blast_out.csv') , emit: blast_res
+    tuple val(meta), path("*major.fa")      , emit: major_fasta
+    tuple val(meta), path("*minor.fa")      , emit: minor_fasta
+    tuple val(meta), path("*blastparse.csv"), emit: csv
+    path "versions.yml"                     , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
