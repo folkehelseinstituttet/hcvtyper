@@ -66,6 +66,8 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
+include { HCVGLUE as HCVGLUE_MAJOR           } from '../modules/local/hcvglue'
+include { HCVGLUE as HCVGLUE_MINOR           } from '../modules/local/hcvglue'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -265,8 +267,6 @@ workflow VIRALSEQ {
             def minorCov = entry[0]['minor_cov'].toInteger()
             minorReads > params.minAgensRead && minorCov > params.minAgensCov
         }
-        // Need this input channel:  tuple val(meta), path(fasta), path(reads)
-        //ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     } else if (params.strategy == "denovo") {
         ch_join = BLASTPARSE.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
         ch_join_2 = ch_join.join(BLASTPARSE.out.csv) // meta, fasta, reads, csv
@@ -285,10 +285,7 @@ workflow VIRALSEQ {
         .filter { entry ->
             def minorLength = entry[0]['minor_length'].toInteger()
             minorLength > params.minDenovoLength
-        }
-        // Need this input channel:  tuple val(meta), path(fasta), path(reads)
-        //ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
-        
+        }       
     }  
 
     MINOR_MAPPING (
@@ -296,6 +293,21 @@ workflow VIRALSEQ {
         "minority"
     )
 
+    //
+    // MODULE: Run GLUE genotyping and resistance annotation for HCV
+    //
+    if (params.agens == "HCV") {
+        HCVGLUE_MAJOR (
+            MAJOR_MAPPING.out.aligned
+        )
+        HCVGLUE_MINOR (
+            MINOR_MAPPING.out.aligned
+        )
+    }
+
+    //
+    // MODULE: Dump software versions
+    //
     CUSTOM_DUMPSOFTWAREVERSIONS (
         ch_versions.unique().collectFile(name: 'collated_versions.yml')
     )
