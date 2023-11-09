@@ -1,6 +1,7 @@
 include { BOWTIE2_BUILD } from '../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN } from '../../modules/nf-core/bowtie2/align/main' 
 
+
 workflow MAJOR_MAPPING {
     take:
     ch_major_mapping    //tuple val(meta), path(fasta), path(reads)
