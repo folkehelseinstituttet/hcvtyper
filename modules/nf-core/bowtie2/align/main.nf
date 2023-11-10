@@ -19,6 +19,7 @@ process BOWTIE2_ALIGN {
     tuple val(meta), path("*.log")            , emit: log
     tuple val(meta), path("*fastq.gz")        , emit: fastq, optional:true
     tuple val(meta), path("*.idxstats")       , emit: idxstats
+    tuple val(meta), path("*.stats")          , emit: stats
     tuple val(meta), path("*.coverage.txt.gz"), emit: depth
     path  "versions.yml"                      , emit: versions
 
@@ -63,6 +64,9 @@ process BOWTIE2_ALIGN {
 
     # Summarize reads mapped per reference
     samtools idxstats ${prefix}.${prefix2}.${extension} > ${prefix}.${prefix2}.idxstats
+
+    # Create stats file for summary later
+    samtools stats ${prefix}.${prefix2}.${extension} > ${prefix}.${prefix2}.stats
 
     if [ -f ${prefix}.unmapped.fastq.1.gz ]; then
         mv ${prefix}.unmapped.fastq.1.gz ${prefix}.unmapped_1.fastq.gz
