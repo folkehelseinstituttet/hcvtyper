@@ -64,14 +64,15 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 // Local modules
 //
-include { BLASTPARSE                         } from '../modules/local/blastparse.nf'
-include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
-include { HCVGLUE as HCVGLUE_MAJOR           } from '../modules/local/hcvglue'
-include { HCVGLUE as HCVGLUE_MINOR           } from '../modules/local/hcvglue'
-include { GLUEPARSE as HCV_GLUE_PARSER_MAJOR } from '../modules/local/glueparse'
-include { GLUEPARSE as HCV_GLUE_PARSER_MINOR } from '../modules/local/glueparse'
+include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
+include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
+include { HCVGLUE as HCVGLUE_MAJOR            } from '../modules/local/hcvglue'
+include { HCVGLUE as HCVGLUE_MINOR            } from '../modules/local/hcvglue'
+include { GLUEPARSE as HCV_GLUE_PARSER_MAJOR  } from '../modules/local/glueparse'
+include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
+include { SUMMARIZE                           } from '../modules/local/summarize'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,7 +142,6 @@ workflow VIRALSEQ {
     //
     // MODULE: Run Kraken2 to classify reads
     //
-    //Channel.value(file(params.kraken_all_db)).view()
     KRAKEN2_KRAKEN2 (
         CUTADAPT.out.reads,
         Channel.value(file(params.kraken_all_db)),
@@ -332,9 +332,23 @@ workflow VIRALSEQ {
     //
     // MODULE: Summarize
     //
-    // SUMMARIZE (
-
-    // )
+    // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
+    // Collect all the files in separate channels for clarixty. Don't need the meta
+    ch_stats = MAJOR_MAPPING.out.stats.collect({it[1]}).mix(MINOR_MAPPING.out.stats.collect({it[1]}))
+    ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
+    ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
+    if (params.agens == "HCV") {
+        ch_json = HCV_GLUE_PARSER_MAJOR.out.GLUE_summary.collect({it[1]}).mix(HCV_GLUE_PARSER_MINOR.out.GLUE_summary.collect({it[1]}))
+    } else {
+        ch_json = Channel.empty()
+    }
+  
+    SUMMARIZE (
+        ch_stats,
+        ch_depth,
+        ch_blast,
+        ch_json 
+    )
 
     //
     // MODULE: Dump software versions
