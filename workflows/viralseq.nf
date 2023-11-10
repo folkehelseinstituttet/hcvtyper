@@ -68,6 +68,10 @@ include { BLASTPARSE                         } from '../modules/local/blastparse
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping.nf'
 include { HCVGLUE as HCVGLUE_MAJOR           } from '../modules/local/hcvglue'
 include { HCVGLUE as HCVGLUE_MINOR           } from '../modules/local/hcvglue'
+include { GLUEPARSE as HCV_GLUE_PARSER_MAJOR } from '../modules/local/glueparse'
+include { GLUEPARSE as HCV_GLUE_PARSER_MINOR } from '../modules/local/glueparse'
+include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
+include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,10 +304,37 @@ workflow VIRALSEQ {
         HCVGLUE_MAJOR (
             MAJOR_MAPPING.out.aligned
         )
+        HCV_GLUE_PARSER_MAJOR (
+            HCVGLUE_MAJOR.out.GLUE_json
+        )
+        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MAJOR.out.versions)
         HCVGLUE_MINOR (
             MINOR_MAPPING.out.aligned
         )
+        HCV_GLUE_PARSER_MINOR (
+            HCVGLUE_MINOR.out.GLUE_json            
+        )
+        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
     }
+    
+    //
+    // MODULE: Plot coverage from mapping
+    //
+    PLOT_COVERAGE_MAJOR (
+        MAJOR_MAPPING.out.depth
+    )
+    ch_versions = ch_versions.mix(PLOT_COVERAGE_MAJOR.out.versions)
+    PLOT_COVERAGE_MINOR (
+        MINOR_MAPPING.out.depth
+    )
+    ch_versions = ch_versions.mix(PLOT_COVERAGE_MINOR.out.versions)
+    
+    //
+    // MODULE: Summarize
+    //
+    // SUMMARIZE (
+
+    // )
 
     //
     // MODULE: Dump software versions
