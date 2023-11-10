@@ -49,5 +49,6 @@ workflow MAJOR_MAPPING {
     emit:
     aligned
     versions
+    depth
     
 }
