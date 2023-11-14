@@ -48,6 +48,7 @@ include { MAJOR_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_map
 //
 // MODULE: Installed directly from nf-core/modules
 //
+include { fromSamplesheet                    } from 'plugin/nf-validation'
 include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
 include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
 include { FASTQC                             } from '../modules/nf-core/fastqc/main'
@@ -92,6 +93,8 @@ workflow VIRALSEQ {
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
+    // ch_reads = Channel.fromSamplesheet(params.input)
+    // ch_reads.view()
     INPUT_CHECK (
         file(params.input)
     )
@@ -136,14 +139,14 @@ workflow VIRALSEQ {
     // MODULE: Run FastQC on trimmed reads
     //
     FASTQC_TRIM (
-        CUTADAPT.out.reads
+        INPUT_CHECK.out.reads
     )
 
     //
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2 (
-        CUTADAPT.out.reads,
+        INPUT_CHECK.out.reads,
         Channel.value(file(params.kraken_all_db)),
         false,
         false
@@ -154,7 +157,7 @@ workflow VIRALSEQ {
     // MODULE: Run Kraken2 to identify target viral reads
     //
     KRAKEN2_FOCUSED (
-        CUTADAPT.out.reads,
+        INPUT_CHECK.out.reads,
         Channel.value(file(params.kraken_focused)),
         params.save_output_fastqs,
         params.save_reads_assignment
