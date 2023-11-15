@@ -1,6 +1,6 @@
 process SPADES {
     tag "$meta.id"
-    label 'process_low' // process_high
+    label 'process_medium' // process_high
 
     conda "bioconda::spades=3.15.5"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?

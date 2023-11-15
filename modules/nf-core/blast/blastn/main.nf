@@ -1,6 +1,6 @@
 process BLAST_BLASTN {
     tag "$meta.id"
-    label 'process_low' // process_medium
+    label 'process_medium' // process_medium
 
     conda "bioconda::blast=2.14.1"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
