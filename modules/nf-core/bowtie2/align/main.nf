@@ -1,6 +1,6 @@
 process BOWTIE2_ALIGN {
     tag "$meta.id"
-    label "process_low" // process_high
+    label "process_medium" // process_high
 
     conda "bioconda::bowtie2=2.4.4 bioconda::samtools=1.16.1 conda-forge::pigz=2.6"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -12,7 +12,8 @@ process BOWTIE2_ALIGN {
     path (index)
     val   save_unaligned
     val   sort_bam
-    val (prefix2)
+    val reference
+    val prefix2
 
     output:
     tuple val(meta), path("*.{bam,sam}")      , emit: aligned
@@ -56,17 +57,17 @@ process BOWTIE2_ALIGN {
         --threads $task.cpus \\
         $unaligned \\
         $args \\
-        2> ${prefix}.${prefix2}.bowtie2.log \\
-        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${prefix2}.${extension} -
+        2> ${prefix}.${reference}.${prefix2}.bowtie2.log \\
+        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${reference}.${prefix2}.${extension} -
 
     # Creating file with coverage per site
-    samtools depth -aa -d 1000000 ${prefix}.${prefix2}.${extension} | gzip > ${prefix}.${prefix2}.coverage.txt.gz
+    samtools depth -aa -d 1000000 ${prefix}.${reference}.${prefix2}.${extension} | gzip > ${prefix}.${reference}.${prefix2}.coverage.txt.gz
 
     # Summarize reads mapped per reference
-    samtools idxstats ${prefix}.${prefix2}.${extension} > ${prefix}.${prefix2}.idxstats
+    samtools idxstats ${prefix}.${reference}.${prefix2}.${extension} > ${prefix}.${reference}.${prefix2}.idxstats
 
     # Create stats file for summary later
-    samtools stats ${prefix}.${prefix2}.${extension} > ${prefix}.${prefix2}.stats
+    samtools stats ${prefix}.${reference}.${prefix2}.${extension} > ${prefix}.${reference}.${prefix2}.stats
 
     if [ -f ${prefix}.unmapped.fastq.1.gz ]; then
         mv ${prefix}.unmapped.fastq.1.gz ${prefix}.unmapped_1.fastq.gz
