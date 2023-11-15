@@ -17,19 +17,25 @@ stats <- list.files(path = path_1, pattern = "\\.stats$", full.names = TRUE) %>%
   # The column name will be "sampleName"
   bind_rows(.id = "sampleName") %>% 
   # Clean up sampleName
-  mutate(sampleName = str_remove(sampleName, "stats//")) %>%
-  # Extract relevant info
-  filter(X2 == "reads mapped:") %>%
-  # Create a new column that keeps the sample name, reference for mapping and major/minor
-  mutate("Sample_ref" = str_remove(sampleName, "\\.markdup\\.bam\\.stats")) %>% 
-  # Keep the reference in a separate column
-  separate(sampleName, into = c("sampleName", "reference", "major_minor"), sep = "\\.") %>% 
+  mutate(sampleName = basename(sampleName)) %>%
+  separate(sampleName, into = c("sampleName", "reference", "first_major_minor"), sep = "\\.") %>% 
+  # Extract relevant mapping info and get it on one row
+  filter(X2 == "raw total sequences:" | X2 == "reads mapped:") %>% # Keep total reads in and reads mapped
+  mutate(X2 = str_remove(X2, ":")) %>% 
+  pivot_wider(names_from = X2, values_from = X3) %>% 
+  # Create a new column that keeps the sample name, reference for mapping and major/minor together
+  unite("Sample_ref", c("sampleName", "reference", "first_major_minor"), sep = "_", remove = FALSE) %>% 
   # Select relevant columns and rename
   select(sampleName,
          reference,
-         major_minor,
+         first_major_minor,
          Sample_ref,
-         "Reads_mapped" = X3) 
+         "Reads_mapped" = `reads mapped`,
+         "Total_trimmed_reads" = `raw total sequences`) %>% 
+  mutate(Reads_mapped = as.numeric(Reads_mapped),
+         Total_trimmed_reads = as.numeric(Total_trimmed_reads)) %>% 
+  # Calculate percent of trimmed reads mapped
+  mutate("Percent_trimmed_reads_mapped" = Reads_mapped / Total_trimmed_reads * 100)
   
 # Coverage ----------------------------------------------------------------
 
@@ -37,8 +43,8 @@ stats <- list.files(path = path_1, pattern = "\\.stats$", full.names = TRUE) %>%
 cov_files <- list.files(path = path_2, pattern = "txt\\.gz$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "major_minor")
+tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 5))
+colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "first_major_minor", "Sample_ref")
 
 for (i in 1:length(cov_files)) {
   
