@@ -16,6 +16,10 @@ workflow MAJOR_MAPPING {
         .map { meta, fasta, reads ->
         return [meta, reads]
         }
+    
+    // Extract only the name of the reference fasta mapped to. 
+    // Splitting on '.' to remove the meta:id which is before the name.
+    ref_name = ch_major_mapping.map { it[1].getBaseName().toString().split('\\.').last() }
 
     if (params.mapper == "bowtie2") {
             BOWTIE2_BUILD (
@@ -27,6 +31,7 @@ workflow MAJOR_MAPPING {
             BOWTIE2_BUILD.out.index,
             false,
             true,
+            ref_name,
             prefix2
         )
         aligned = BOWTIE2_ALIGN.out.aligned
