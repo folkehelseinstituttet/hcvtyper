@@ -48,7 +48,7 @@ include { MAJOR_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_map
 //
 // MODULE: Installed directly from nf-core/modules
 //
-include { fromSamplesheet                    } from 'plugin/nf-validation'
+//include { fromSamplesheet                    } from 'plugin/nf-validation'
 include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
 include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
 include { FASTQC                             } from '../modules/nf-core/fastqc/main'
@@ -209,6 +209,7 @@ workflow VIRALSEQ {
             BOWTIE2_BUILD.out.index,
             false, // Do not save unmapped reads
             true, // Sort bam file
+            "first_mapping", // Don't need reference name in first mapping
             "first_mapping" // name for output files
         )
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
@@ -242,7 +243,7 @@ workflow VIRALSEQ {
     } else if (params.strategy == "denovo") {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     }    
-    
+
     MAJOR_MAPPING (
         ch_major_mapping,
         "majority"
@@ -383,6 +384,7 @@ workflow VIRALSEQ {
     )
     multiqc_report = MULTIQC.out.report.toList()
 }
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
