@@ -1,5 +1,5 @@
 process GLUEPARSE {
-    tag "$meta.id"
+
     label 'process_single'
 
     conda "YOUR-TOOL-HERE"
@@ -8,20 +8,18 @@ process GLUEPARSE {
         'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
-    tuple val(meta), path(json)
+    path '*json'
 
     output:
-    tuple val(meta), path("*.tsv"), emit: GLUE_summary
+    path("*.tsv"), emit: GLUE_summary
     path "versions.yml"           , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    GLUE_json_parser.R ${json}
+    GLUE_json_parser.R
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
