@@ -8,7 +8,7 @@ process GLUEPARSE {
         'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
-    path '*json'
+    path '*.json'
 
     output:
     path("*.tsv"), emit: GLUE_summary
