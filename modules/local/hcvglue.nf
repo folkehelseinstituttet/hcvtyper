@@ -1,6 +1,6 @@
 process HCVGLUE {
-    tag "$meta.id"
-    label 'process_small'
+    
+    label 'process_low'
 
     // conda "YOUR-TOOL-HERE"
     // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -8,22 +8,20 @@ process HCVGLUE {
     //     'docker.io/docker:24.0.7-cli' }"
 
     input:
-    tuple val(meta), path(bam)
+    path 'bams/'
 
     output:
-    tuple val(meta), path("*.json"), optional: true, emit: GLUE_json
+    path("*.json"), optional: true, emit: GLUE_json
     //path "versions.yml"                            , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    # Copy bam file to a new filename so they are not present in work directory as links.
+    # Copy bam files from bams/ directory so they are not present in work directory as links.
     # This is for mounting to the docker image later
-    cp ${bam} glue_${bam}
+    cp bams/*.bam .
     
     # Pull the latest image
     docker pull cvrbioinformatics/gluetools-mysql:latest
@@ -35,6 +33,10 @@ process HCVGLUE {
     #docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
     docker exec gluetools-mysql installGlueProject.sh ncbi_hcv_glue
 
+    # Make a for loop over all bam files
+
+    for bam in \$(ls *.bam)
+    do
     docker run --rm \
        --name gluetools \
         -v \$PWD:/opt/bams \
@@ -43,7 +45,8 @@ process HCVGLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
          -p cmd-result-format:json \
         -EC \
-        -i project hcv module phdrReportingController invoke-function reportBam glue_${bam} 15.0 > ${bam}.json
+        -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam}.json
+    done
     """
 
     stub:
