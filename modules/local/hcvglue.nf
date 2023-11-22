@@ -14,9 +14,6 @@ process HCVGLUE {
     path("*.json"), optional: true, emit: GLUE_json
     //path "versions.yml"                            , emit: versions
 
-    when:
-    task.ext.when == null || task.ext.when
-
     script:
     """
     # Copy bam files from bams/ directory so they are not present in work directory as links.
