@@ -67,10 +67,8 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
-include { HCVGLUE as HCVGLUE_MAJOR            } from '../modules/local/hcvglue'
-include { HCVGLUE as HCVGLUE_MINOR            } from '../modules/local/hcvglue'
-include { GLUEPARSE as HCV_GLUE_PARSER_MAJOR  } from '../modules/local/glueparse'
-include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
+include { HCVGLUE                             } from '../modules/local/hcvglue'
+include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
 include { SUMMARIZE                           } from '../modules/local/summarize'
@@ -300,26 +298,6 @@ workflow VIRALSEQ {
         ch_map_minor_filtered,
         "minority"
     )
-
-    //
-    // MODULE: Run GLUE genotyping and resistance annotation for HCV
-    //
-    if (params.agens == "HCV") {
-        HCVGLUE_MAJOR (
-            MAJOR_MAPPING.out.aligned
-        )
-        HCV_GLUE_PARSER_MAJOR (
-            HCVGLUE_MAJOR.out.GLUE_json
-        )
-        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MAJOR.out.versions)
-        HCVGLUE_MINOR (
-            MINOR_MAPPING.out.aligned
-        )
-        HCV_GLUE_PARSER_MINOR (
-            HCVGLUE_MINOR.out.GLUE_json            
-        )
-        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
-    }
     
     //
     // MODULE: Plot coverage from mapping
@@ -332,6 +310,21 @@ workflow VIRALSEQ {
         MINOR_MAPPING.out.depth
     )
     ch_versions = ch_versions.mix(PLOT_COVERAGE_MINOR.out.versions)
+
+    //
+    // MODULE: Run GLUE genotyping and resistance annotation for HCV
+    //
+    if (params.agens == "HCV") {
+        ch_hcvglue = MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]}))
+        ch_hcvglue.view()
+        HCVGLUE (
+            ch_hcvglue // Collect all the bam files
+        )
+        HCV_GLUE_PARSER (
+            HCVGLUE.out.GLUE_json//.collect({it[0]})//.mix(HCVGLUE_MINOR.out.GLUE_json.collect({it[0]}) ) // Collect all the json files from major and minor mapping
+        )
+        ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
+    }
     
     //
     // MODULE: Summarize
@@ -342,7 +335,7 @@ workflow VIRALSEQ {
     ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
     ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
     if (params.agens == "HCV") {
-        ch_json = HCV_GLUE_PARSER_MAJOR.out.GLUE_summary.collect({it[1]}).mix(HCV_GLUE_PARSER_MINOR.out.GLUE_summary.collect({it[1]}))
+        ch_json = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
         ch_json = Channel.empty()
     }
