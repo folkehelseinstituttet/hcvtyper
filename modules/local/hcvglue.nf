@@ -8,11 +8,11 @@ process HCVGLUE {
     //     'docker.io/docker:24.0.7-cli' }"
 
     input:
-    path 'bams/'
+    path ('bams/*')
 
     output:
     path("*.json"), optional: true, emit: GLUE_json
-    //path "versions.yml"                            , emit: versions
+    path "versions.yml"                            , emit: versions
 
     script:
     """
@@ -44,6 +44,13 @@ process HCVGLUE {
         -EC \
         -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam}.json
     done
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+      \$(grep "projectVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
+      \$(grep "engineVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
+      \$(grep "extensionVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
+    END_VERSIONS   
     """
 
     stub:
