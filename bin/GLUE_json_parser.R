@@ -66,9 +66,9 @@ for (x in 1:length(json_files)) {
     # Only read the proper json GLUE reports (i.e. that there was a good sequence)
   if (names(json) == "phdrReport") {
     # Sample name
-    sample <- unlist(strsplit(basename(json_file), "\\."))[[1]]
-    reference <- unlist(strsplit(basename(json_file), "\\."))[[2]]
-    major_minor <- unlist(strsplit(basename(json_file), "\\."))[[3]]
+    sample <- unlist(strsplit(basename(json_files[x]), "\\."))[[1]]
+    reference <- unlist(strsplit(basename(json_files[x]), "\\."))[[2]]
+    major_minor <- unlist(strsplit(basename(json_files[x]), "\\."))[[3]]
     
     # Få tak i genotype
     genotype <- json[["phdrReport"]][["samReferenceResult"]][["genotypingResult"]][["genotypeCladeCategoryResult"]][["shortRenderedName"]]
@@ -83,7 +83,7 @@ for (x in 1:length(json_files)) {
     
     # One row per sample
     # Create a temporary dataframe to populate
-    df <- as.data.frame(matrix(nrow = 1, ncol = 48))
+    df <- as.data.frame(matrix(nrow = 1, ncol = 50))
     colnames(df) <- c("Sample", 
                       "Reference",
                       "Major_minor",
