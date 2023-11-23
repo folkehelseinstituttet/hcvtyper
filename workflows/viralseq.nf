@@ -315,13 +315,14 @@ workflow VIRALSEQ {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (params.agens == "HCV") {
-        ch_hcvglue = MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]}))
-        ch_hcvglue.view()
+        // Collect the bam files from the major and minor mapping
+        ch_hcv = MAJOR_MAPPING.out.aligned.collect{ it[1] }.mix(MINOR_MAPPING.out.aligned.collect{ it[1] }.ifEmpty([]))
         HCVGLUE (
-            ch_hcvglue // Collect all the bam files
+            ch_hcv.collect()
         )
+        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
         HCV_GLUE_PARSER (
-            HCVGLUE.out.GLUE_json//.collect({it[0]})//.mix(HCVGLUE_MINOR.out.GLUE_json.collect({it[0]}) ) // Collect all the json files from major and minor mapping
+            HCVGLUE.out.GLUE_json // Collect all the json files from major and minor mapping
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }
@@ -340,12 +341,12 @@ workflow VIRALSEQ {
         ch_json = Channel.empty()
     }
   
-    SUMMARIZE (
-        ch_stats,
-        ch_depth,
-        ch_blast,
-        ch_json 
-    )
+    // SUMMARIZE (
+    //     ch_stats,
+    //     ch_depth,
+    //     ch_blast,
+    //     ch_json 
+    // )
 
     //
     // MODULE: Dump software versions
