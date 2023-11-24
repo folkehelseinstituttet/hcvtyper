@@ -341,12 +341,12 @@ workflow VIRALSEQ {
         ch_json = Channel.empty()
     }
   
-    // SUMMARIZE (
-    //     ch_stats,
-    //     ch_depth,
-    //     ch_blast,
-    //     ch_json 
-    // )
+    SUMMARIZE (
+         ch_stats.collect(),
+         ch_depth.collect(),
+         ch_blast,
+         ch_json 
+    )
 
     //
     // MODULE: Dump software versions
