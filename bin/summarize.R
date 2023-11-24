@@ -35,7 +35,29 @@ stats <- list.files(path = path_1, pattern = "\\.stats$", full.names = TRUE) %>%
   mutate(Reads_mapped = as.numeric(Reads_mapped),
          Total_trimmed_reads = as.numeric(Total_trimmed_reads)) %>% 
   # Calculate percent of trimmed reads mapped
-  mutate("Percent_trimmed_reads_mapped" = Reads_mapped / Total_trimmed_reads * 100)
+  mutate("Percent_trimmed_reads_mapped" = Reads_mapped / Total_trimmed_reads * 100) %>% 
+  # Create columns for major and minor
+  separate(reference, into = c("genotype", NA), sep = "_", remove = F) %>% 
+  mutate(Majority_genotype_mapping = case_when(first_major_minor == "majority" ~ genotype)) %>%
+  mutate(Minority_genotype_mapping = case_when(first_major_minor == "minority" ~ genotype)) %>% 
+  select(-genotype) %>% 
+  # Create columns for reads mapped to major and minor genotype
+  mutate(Reads_mapped_majority = case_when(first_major_minor == "majority" ~ Reads_mapped)) %>%
+  mutate(Reads_mapped_minority = case_when(first_major_minor == "minority" ~ Reads_mapped)) %>%
+  mutate(Percent_mapped_majority = case_when(first_major_minor == "majority" ~ Percent_trimmed_reads_mapped)) %>% 
+  mutate(Percent_mapped_minority = case_when(first_major_minor == "minority" ~ Percent_trimmed_reads_mapped)) %>%
+  # Create columns for the major and minor references
+  mutate(Majority_reference = case_when(first_major_minor == "majority" ~ reference)) %>% 
+  mutate(Minority_reference = case_when(first_major_minor == "minority" ~ reference)) %>% 
+  mutate(Majority_reference = str_remove(Majority_reference, "_major"),
+         Minority_reference = str_remove(Minority_reference, "_minor")) %>% 
+  # Create one row per sample
+  select(-Sample_ref, -reference, -first_major_minor, -Reads_mapped, -Percent_trimmed_reads_mapped) %>% 
+  group_by(sampleName) %>% 
+  # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
+  fill(everything(), .direction = "downup") %>%
+  slice(1)
+
   
 # Coverage ----------------------------------------------------------------
 
