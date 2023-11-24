@@ -144,7 +144,7 @@ workflow VIRALSEQ {
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2 (
-        INPUT_CHECK.out.reads,
+        CUTADAPT.out.reads,
         Channel.value(file(params.kraken_all_db)),
         false,
         false
@@ -155,7 +155,7 @@ workflow VIRALSEQ {
     // MODULE: Run Kraken2 to identify target viral reads
     //
     KRAKEN2_FOCUSED (
-        INPUT_CHECK.out.reads,
+        CUTADAPT.out.reads,
         Channel.value(file(params.kraken_focused)),
         params.save_output_fastqs,
         params.save_reads_assignment
