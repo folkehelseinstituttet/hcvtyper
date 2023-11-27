@@ -1,10 +1,6 @@
 .nextflow*
 work/
-data/
-results/
 .DS_Store
-testing/
-testing*
 *.pyc
-nf-core_local_test/
+minimal_test/
 
