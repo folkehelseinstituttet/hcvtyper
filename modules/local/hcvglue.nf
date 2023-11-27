@@ -25,7 +25,6 @@ process HCVGLUE {
     docker pull cvrbioinformatics/gluetools:latest
 
     # Start the gluetools-mysql containter
-    #docker start gluetools-mysql 
     docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
 
     # Install the pre-built GLUE HCV project
@@ -47,6 +46,9 @@ process HCVGLUE {
     done
 
     docker stop gluetools-mysql 
+    # Remove the image
+    docker rm gluetools-mysql
+    
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
