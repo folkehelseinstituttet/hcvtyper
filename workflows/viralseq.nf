@@ -332,7 +332,8 @@ workflow VIRALSEQ {
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarixty. Don't need the meta
-    ch_stats = MAJOR_MAPPING.out.stats.collect({it[1]}).mix(MINOR_MAPPING.out.stats.collect({it[1]}))
+    ch_stats_withdup = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
+    ch_stats_markdup = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
     ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
     ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
     if (params.agens == "HCV") {
@@ -342,10 +343,11 @@ workflow VIRALSEQ {
     }
   
     SUMMARIZE (
-         ch_stats.collect(),
-         ch_depth.collect(),
-         ch_blast,
-         ch_json 
+        ch_stats_withdup.collect(),
+        ch_stats_markdup.collect(),
+        ch_depth.collect(),
+        ch_blast,
+        ch_json 
     )
 
     //
