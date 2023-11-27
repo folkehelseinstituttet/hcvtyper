@@ -20,17 +20,18 @@ process HCVGLUE {
     # This is for mounting to the docker image later
     cp bams/*.bam .
     
-    # Pull the latest image
+    # Pull the latest images
     docker pull cvrbioinformatics/gluetools-mysql:latest
     docker pull cvrbioinformatics/gluetools:latest
 
     # Start the gluetools-mysql containter
-    # Need to add a check to see if the container is already running. If not, run the docker run --detach... before docker start...
-    docker start gluetools-mysql 
-    #docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
+    #docker start gluetools-mysql 
+    docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
+
+    # Install the pre-built GLUE HCV project
     docker exec gluetools-mysql installGlueProject.sh ncbi_hcv_glue
 
-    # Make a for loop over all bam files
+    # Make a for loop over all bam files and run HCV-GLUE
 
     for bam in \$(ls *.bam)
     do
@@ -44,6 +45,8 @@ process HCVGLUE {
         -EC \
         -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam}.json
     done
+
+    docker stop gluetools-mysql 
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
