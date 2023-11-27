@@ -17,6 +17,11 @@
 
 ## Usage
 
+To run a minimal test:
+```
+docker run main.nf -profile docker,test
+```
+
 :::note
 If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how
 to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline)
