@@ -36,7 +36,8 @@ workflow MAJOR_MAPPING {
         )
         aligned = BOWTIE2_ALIGN.out.aligned
         depth = BOWTIE2_ALIGN.out.depth
-        stats = BOWTIE2_ALIGN.out.stats
+        stats_markdup = BOWTIE2_ALIGN.out.stats_markdup
+        stats_withdup = BOWTIE2_ALIGN.out.stats_withdup
         versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
     } 
     else if (params.mapper == "tanoti") {
@@ -57,6 +58,7 @@ workflow MAJOR_MAPPING {
     aligned
     versions
     depth
-    stats
+    stats_markdup
+    stats_withdup
     
 }

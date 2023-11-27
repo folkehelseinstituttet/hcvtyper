@@ -8,7 +8,8 @@ process SUMMARIZE {
         'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
-    path 'stats/'
+    path 'stats_withdup/'
+    path 'stats_markdup/'
     path 'depth/'
     path 'blast/'
     path 'json/'

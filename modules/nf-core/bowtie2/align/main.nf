@@ -16,12 +16,14 @@ process BOWTIE2_ALIGN {
     val prefix2
 
     output:
-    tuple val(meta), path("*.{bam,sam}")      , emit: aligned
+    tuple val(meta), path("*markdup.{bam,sam}")      , emit: aligned
+    tuple val(meta), path("*withdup.{bam,sam}")      , emit: aligned_withdup
     tuple val(meta), path("*.log")            , emit: log
     tuple val(meta), path("*fastq.gz")        , emit: fastq, optional:true
-    tuple val(meta), path("*.idxstats")       , emit: idxstats
-    tuple val(meta), path("*.stats")          , emit: stats
-    tuple val(meta), path("*.coverage.txt.gz"), emit: depth
+    tuple val(meta), path("*markdup.idxstats")       , emit: idxstats
+    tuple val(meta), path("*withdup.stats")          , emit: stats_withdup
+    tuple val(meta), path("*markdup.stats")          , emit: stats_markdup
+    tuple val(meta), path("*markdup.coverage.txt.gz"), emit: depth
     path  "versions.yml"                      , emit: versions
 
     when:
@@ -58,16 +60,25 @@ process BOWTIE2_ALIGN {
         $unaligned \\
         $args \\
         2> ${prefix}.${reference}.${prefix2}.bowtie2.log \\
-        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${reference}.${prefix2}.${extension} -
+        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${reference}.${prefix2}.withdup.${extension} -
 
+    # Create stats file for summary later with duplicates included
+    samtools stats ${prefix}.${reference}.${prefix2}.withdup.${extension} > ${prefix}.${reference}.${prefix2}.withdup.stats
+
+    # Remove duplicate reads
+    samtools sort -n ${prefix}.${reference}.${prefix2}.withdup.${extension} \\
+      | samtools fixmate -m - - \
+      | samtools sort -O BAM \
+      | samtools markdup --no-PG -r - ${prefix}.${reference}.${prefix2}.markdup.${extension}
+    
     # Creating file with coverage per site
-    samtools depth -aa -d 1000000 ${prefix}.${reference}.${prefix2}.${extension} | gzip > ${prefix}.${reference}.${prefix2}.coverage.txt.gz
+    samtools depth -aa -d 1000000 ${prefix}.${reference}.${prefix2}.markdup.${extension} | gzip > ${prefix}.${reference}.${prefix2}.markdup.coverage.txt.gz
 
     # Summarize reads mapped per reference
-    samtools idxstats ${prefix}.${reference}.${prefix2}.${extension} > ${prefix}.${reference}.${prefix2}.idxstats
+    samtools idxstats ${prefix}.${reference}.${prefix2}.markdup.${extension} > ${prefix}.${reference}.${prefix2}.markdup.idxstats
 
     # Create stats file for summary later
-    samtools stats ${prefix}.${reference}.${prefix2}.${extension} > ${prefix}.${reference}.${prefix2}.stats
+    samtools stats ${prefix}.${reference}.${prefix2}.markdup.${extension} > ${prefix}.${reference}.${prefix2}.markdup.stats
 
     if [ -f ${prefix}.unmapped.fastq.1.gz ]; then
         mv ${prefix}.unmapped.fastq.1.gz ${prefix}.unmapped_1.fastq.gz
