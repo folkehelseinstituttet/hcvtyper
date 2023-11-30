@@ -322,7 +322,7 @@ workflow VIRALSEQ {
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
         HCV_GLUE_PARSER (
-            HCVGLUE.out.GLUE_json // Collect all the json files from major and minor mapping
+            HCVGLUE.out.GLUE_json 
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }
