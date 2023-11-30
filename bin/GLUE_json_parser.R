@@ -61,10 +61,17 @@ df_final <- tibble(
 )
 
 for (x in 1:length(json_files)) {
+  # Remove any old objects if reading previous json file failed
+  try(rm(json))
+  
+  # Try to read json file. Could fail if bam file was not OK for Glue
   try(json <- read_json(json_files[x]))
-
+  
+  # Check that the json object exists
+  if (exists("json")) {
+  
     # Only read the proper json GLUE reports (i.e. that there was a good sequence)
-  if (names(json) == "phdrReport") {
+    if (names(json) == "phdrReport") {
     # Sample name
     sample <- unlist(strsplit(basename(json_files[x]), "\\."))[[1]]
     reference <- unlist(strsplit(basename(json_files[x]), "\\."))[[2]]
@@ -190,6 +197,7 @@ for (x in 1:length(json_files)) {
               }
             } 
     } 
+  }
   }
   
   # Then join mutations per drug category
