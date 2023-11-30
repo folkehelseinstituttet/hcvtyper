@@ -7,8 +7,6 @@ path_1 <- "stats_withdup/"
 path_2 <- "stats_markdup/"
 path_3 <- "depth/"
 path_4 <- "blast/"
-path_5 <- "json/"
-
 
 # Reads mapped with duplicates --------------------------------------------
 # List files
@@ -40,7 +38,6 @@ for (i in 1:length(stats_files)) {
   tmp_df$trimmed_reads_withdups_mapped[i] <- mapped_reads
 }
 tmp_df <- as_tibble(tmp_df)
-
 
 df_with_dups <- tmp_df %>% 
   # Create columns for reads mapped to major and minor genotype
@@ -230,28 +227,13 @@ df_coverage <- tmp_df %>%
   slice(1) 
 
 
------
-# Add reads mapped from the first mapping against all references
-# tmp_df <- stats %>% 
-#   filter(reference == "first_mapping") %>% 
-#   select(-major_minor, -Sample_ref, -reference) %>% 
-#   right_join(tmp_df) %>% 
-#   rename("Reads_mapped_first_mapping" = Reads_mapped)
-# 
-# # Add reads mapped from second mapping, including duplicates
-# tmp_df <- stats %>% 
-#   filter(reference == "majority_mapping") %>% 
-#   select(-major_minor, -Sample_ref, -reference) %>% 
-#   right_join(tmp_df) %>% 
-#   rename("Reads_mapped_second_mapping" = Reads_mapped)
-
 # Length of scaffolds -----------------------------------------------------
 
 # Print the length of the longest scaffold matching the given reference
 blast_files <- list.files(path = path_4, pattern = "txt$", full.names = TRUE)
 
 # Empty df
-df <- tribble(
+df_scaffolds <- tribble(
   ~"scaffold_length", ~"reference", ~"sampleName",
   )
 
@@ -267,7 +249,7 @@ for (i in 1:length(blast_files)) {
     # Select the row with the longest scaffold lengths for each genotype/blast hit
     group_by(genotype) %>% 
     slice_max(order_by = scaffold_length, n = 1) %>% 
-    ungroup %>% 
+    ungroup() %>% 
     # Sometimes the same scaffolds has two or more hits
     distinct(X1, .keep_all = TRUE) %>% 
     select(scaffold_length,
@@ -275,37 +257,58 @@ for (i in 1:length(blast_files)) {
     # Legg til en kolonne med Sample Name
     add_column("sampleName" = str_split(basename(blast_files[i]), "\\.")[[1]][1])
   
-  # Add to df
-  df_blast <- bind_rows(df, blast_out)
+  # Add to df_scaffolds
+  df_scaffolds <- bind_rows(df_scaffolds, blast_out)
   
 }
 
 # GLUE --------------------------------------------------------------------
 
-glue_reports <- list.files(path = path_4, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
-  # Keep the file names as the names of the list elements
-  set_names() %>% 
-  map(read_tsv, col_types = cols(GLUE_subtype = col_character())) %>% 
-  # Reduce the list to a single dataframe. Keep the filenames (list element names) in column 1
-  # The column name will be "sampleName"
-  bind_rows(.id = "sampleName") %>% 
-  # Clean up sampleName
-  mutate(sampleName = str_remove(sampleName, "json//")) %>% # "json//
-  # Create a new column that keeps the sample name, reference for mapping and major/minor
-  mutate("Sample_ref" = str_remove(sampleName, "_GLUE_report\\.tsv")) %>% 
-  # Keep the reference in a separate column
-  separate(sampleName, into = c("sampleName", "reference", "major_minor"), sep = "\\.") %>% 
-  mutate(major_minor = str_remove(major_minor, "_GLUE_report")) 
+glue_file <- list.files(pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
+glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
 
-# Join on sampleName, reference, major_minor
-tmp_df <- left_join(tmp_df, glue_reports)
+# glue_reports <- list.files(path = path_4, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
+#   # Keep the file names as the names of the list elements
+#   set_names() %>% 
+#   map(read_tsv, col_types = cols(GLUE_subtype = col_character())) %>% 
+#   # Reduce the list to a single dataframe. Keep the filenames (list element names) in column 1
+#   # The column name will be "sampleName"
+#   bind_rows(.id = "sampleName") %>% 
+#   # Clean up sampleName
+#   mutate(sampleName = str_remove(sampleName, "json//")) %>% # "json//
+#   # Create a new column that keeps the sample name, reference for mapping and major/minor
+#   mutate("Sample_ref" = str_remove(sampleName, "_GLUE_report\\.tsv")) %>% 
+#   # Keep the reference in a separate column
+#   separate(sampleName, into = c("sampleName", "reference", "major_minor"), sep = "\\.") %>% 
+#   mutate(major_minor = str_remove(major_minor, "_GLUE_report")) 
 
-# Join all objects on 
-# Join with stats object if sampleName and references are the same.
-df <- tmp_df %>%
-  dplyr::left_join(stats, by = join_by(sampleName, Majority_reference, Minority_reference))
+# Join dataframes ---------------------------------------------------------
+
+final <- 
+  # Combine mapped reads data
+  full_join(df_with_dups, df_nodups, join_by(sampleName, Majority_reference, Minority_reference)) %>% 
+  # Add coverage
+  left_join(df_coverage, join_by(sampleName, Majority_reference, Minority_reference))  
+  # Add scaffold length info - for the moment not included
+  #left_join(df_scaffolds, join_by(sampleName)) %>% 
+  #mutate(test = case_when(Majority_reference == reference ~ "OK",
+  #                        Minority_reference == reference ~ "OK")) %>% View()
+  #filter(test == "OK") %>%
+  # Add glue resulst - not currently. Will add for Majority and Minority separately
+  #left_join(glue_report, by = c("sampleName" = "Sample")) %>% View()
+
+
+
+
+# # Join on sampleName, reference, major_minor
+# tmp_df <- left_join(tmp_df, glue_reports)
+# 
+# # Join all objects on 
+# # Join with stats object if sampleName and references are the same.
+# df <- tmp_df %>%
+#   dplyr::left_join(stats, by = join_by(sampleName, Majority_reference, Minority_reference))
 
 # Join the blast/scaffold lengths only on sampleName and reference
 
 # Write file
-write_csv(tmp_df, file = "Genotype_mapping_summary_long.csv")
+write_csv(final, file = "Genotype_mapping_summary_long.csv")
