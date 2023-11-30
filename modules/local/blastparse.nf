@@ -17,7 +17,7 @@ process BLASTPARSE {
     tuple val(meta), path("*scaffolds.fa")  , emit: scaffolds
     tuple val(meta), path('*blast_out.csv') , emit: blast_res
     tuple val(meta), path("*major.fa")      , emit: major_fasta
-    tuple val(meta), path("*minor.fa")      , emit: minor_fasta
+    tuple val(meta), path("*minor.fa")      , emit: minor_fasta, optional: true
     tuple val(meta), path("*blastparse.csv"), emit: csv
     path "versions.yml"                     , emit: versions
 
