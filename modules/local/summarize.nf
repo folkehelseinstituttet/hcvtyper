@@ -12,7 +12,7 @@ process SUMMARIZE {
     path 'stats_markdup/'
     path 'depth/'
     path 'blast/'
-    path 'json/'
+    path json
 
     output:
     path '*csv'        , emit: summary
