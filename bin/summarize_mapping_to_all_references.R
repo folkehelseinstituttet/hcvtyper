@@ -22,7 +22,9 @@ df_final$sample[1] <- sampleName
 # Read the summary of the first mapping
 df <- read_tsv(idxstats, col_names = FALSE) %>% 
   # Identify genotype and subtype
-  separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) 
+  separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) %>% 
+  # Discard the unmapped reads marked by an *
+  filter(X1 != "*")
 
 # Count number of reads per subtype
 summary <- df %>% 
