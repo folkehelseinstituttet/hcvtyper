@@ -1,6 +1,6 @@
 process KRAKEN2_KRAKEN2 {
     tag "$meta.id"
-    label 'process_medium' // process_high
+    label 'process_high' // process_high
 
     conda "bioconda::kraken2=2.1.2 conda-forge::pigz=2.6"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
