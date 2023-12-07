@@ -342,9 +342,9 @@ workflow VIRALSEQ {
     ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
     ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
     if (params.agens == "HCV") {
-        ch_json = HCV_GLUE_PARSER.out.GLUE_summary
+        ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
-        ch_json = Channel.empty()
+        ch_glue = Channel.empty()
     }
   
     SUMMARIZE (
@@ -352,7 +352,7 @@ workflow VIRALSEQ {
         ch_stats_markdup.collect(),
         ch_depth.collect(),
         ch_blast,
-        ch_json 
+        ch_glue
     )
 
     //
