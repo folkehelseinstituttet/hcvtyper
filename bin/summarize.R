@@ -7,6 +7,7 @@ path_1 <- "stats_withdup/"
 path_2 <- "stats_markdup/"
 path_3 <- "depth/"
 path_4 <- "blast/"
+path_5 <- "glue/"
 
 # Reads mapped with duplicates --------------------------------------------
 # List files
@@ -264,8 +265,10 @@ for (i in 1:length(blast_files)) {
 
 # GLUE --------------------------------------------------------------------
 
-glue_file <- list.files(pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
-glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
+glue_file <- list.files(path = path_5, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
+glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) %>% 
+  # Only keep the majority reports for the summary
+  filter(Major_minor == "majority")
 
 # glue_reports <- list.files(path = path_4, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
 #   # Keep the file names as the names of the list elements
@@ -288,14 +291,14 @@ final <-
   # Combine mapped reads data
   full_join(df_with_dups, df_nodups, join_by(sampleName, Majority_reference, Minority_reference)) %>% 
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Majority_reference, Minority_reference))  
+  left_join(df_coverage, join_by(sampleName, Majority_reference, Minority_reference)) %>% 
   # Add scaffold length info - for the moment not included
-  #left_join(df_scaffolds, join_by(sampleName)) %>% 
-  #mutate(test = case_when(Majority_reference == reference ~ "OK",
-  #                        Minority_reference == reference ~ "OK")) %>% View()
-  #filter(test == "OK") %>%
-  # Add glue resulst - not currently. Will add for Majority and Minority separately
-  #left_join(glue_report, by = c("sampleName" = "Sample")) %>% View()
+  # left_join(df_scaffolds, join_by(sampleName)) %>% 
+  # mutate(test = case_when(Majority_reference == reference ~ "OK",
+  #                         Minority_reference == reference ~ "OK")) %>% 
+  # filter(test == "OK") %>%
+  # Add glue result. Only Majority currently
+  left_join(glue_report, by = c("sampleName" = "Sample"))
 
 
 
