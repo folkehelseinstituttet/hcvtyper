@@ -5,10 +5,12 @@ process HCVGLUE {
     // conda "YOUR-TOOL-HERE"
     // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
     //     'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-    //     'docker.io/docker:24.0.7-cli' }"
+    //     'docker.io/docker:24.0.7-cli-alpine3.18' }"
+
+    stageInMode = 'copy' // Can't mount symlinked files into docker containers
 
     input:
-    path ('bams/*')
+    path '*'
 
     output:
     path("*.json"), optional: true, emit: GLUE_json
@@ -18,7 +20,7 @@ process HCVGLUE {
     """
     # Copy bam files from bams/ directory so they are not present in work directory as links.
     # This is for mounting to the docker image later
-    cp bams/*.bam .
+    #cp bams/*.bam .
     
     # Pull the latest images
     docker pull cvrbioinformatics/gluetools-mysql:latest
