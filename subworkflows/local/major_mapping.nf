@@ -1,5 +1,6 @@
 include { BOWTIE2_BUILD } from '../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN } from '../../modules/nf-core/bowtie2/align/main' 
+include { TANOTI_ALIGN  } from '../../modules/local/tanoti.nf'
 
 
 workflow MAJOR_MAPPING {
@@ -41,17 +42,20 @@ workflow MAJOR_MAPPING {
         versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
     } 
     else if (params.mapper == "tanoti") {
-        TANOTI (
+        TANOTI_ALIGN (
             ch_align,
-            [],
+            ch_build,
             false,
             true,
-            prefix2
+            ref_name,
+            prefix2,
+            params.tanoti_stringency_2
         )
-        aligned = TANOTI.out.aligned
-        depth = TANOTI.out.depth
-        stats = TANOTI.out.stats
-        versions = TANOTI.out.versions // channel: [ versions.yml ]
+        aligned = TANOTI_ALIGN.out.aligned
+        depth = TANOTI_ALIGN.out.depth
+        stats_markdup = TANOTI_ALIGN.out.stats_markdup
+        stats_withdup = TANOTI_ALIGN.out.stats_withdup
+        versions = TANOTI_ALIGN.out.versions // channel: [ versions.yml ]
     }
 
     emit:

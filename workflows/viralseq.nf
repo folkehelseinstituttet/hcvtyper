@@ -66,6 +66,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 // Local modules
 //
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
+include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
 include { HCVGLUE                             } from '../modules/local/hcvglue'
 include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse'
@@ -211,23 +212,27 @@ workflow VIRALSEQ {
             "first_mapping" // name for output files
         )
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+        // Join idxstats and depth on the meta to ensure no sample mixup
+        ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
     } 
     else if (params.mapper == "tanoti") {
-        TANOTI (
+        TANOTI_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            [],
+            file(params.references),
             false, // Do not save unmapped reads
             true, // Sort bam file
-            "first_mapping" // name for output files
+            "first_mapping", // Don't need reference name in first mapping
+            "first_mapping", // name for output files
+            params.tanoti_stringency_1
         )
-        ch_versions = ch_versions.mix(TANOTI.out.versions.first())
+        ch_versions = ch_versions.mix(TANOTI_ALIGN.out.versions.first())
+        // Join idxstats and depth on the meta to ensure no sample mixup
+        ch_parse = TANOTI_ALIGN.out.idxstats.join(TANOTI_ALIGN.out.depth)
     }
 
     //
     // MODULE: Identify the two references with most mapped reads
     //
-    // Join idxstats and depth on the meta to ensure no sample mixup
-    ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
     PARSEFIRSTMAPPING (
         ch_parse,
         file(params.references)
