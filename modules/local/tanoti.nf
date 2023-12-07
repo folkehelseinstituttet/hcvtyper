@@ -50,9 +50,12 @@ process TANOTI_ALIGN {
     def extension = (args2 ==~ extension_pattern) ? (args2 =~ extension_pattern)[0][2].toLowerCase() : "bam"
 
     """
+    gzip -cd ${reads[0]} > tmp_R1.fastq
+    gzip -cd ${reads[1]} > tmp_R2.fastq
+
     tanoti \\
         -r $references \\
-        -i ${reads_args} \\
+        -i tmp_R1.fastq tmp_R2.fastq \\
         -o ${prefix}.${reference}.${prefix2}.tmp.sam \\
         -p 1 -u 0 -m ${stringency}
     
