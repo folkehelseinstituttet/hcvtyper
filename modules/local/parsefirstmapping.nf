@@ -12,9 +12,9 @@ process PARSEFIRSTMAPPING {
     path(references)
 
     output:
-    tuple val(meta), path("*.csv")    , emit: csv
-    tuple val(meta), path("*major.fa"), emit: major_fasta
-    tuple val(meta), path("*minor.fa"), emit: minor_fasta
+    tuple val(meta), path("*.csv")    , emit: csv, optional: true
+    tuple val(meta), path("*major.fa"), emit: major_fasta, optional: true
+    tuple val(meta), path("*minor.fa"), emit: minor_fasta, optional: true
     path "versions.yml"               , emit: versions
 
     when:
