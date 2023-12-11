@@ -1,6 +1,7 @@
 process SUMMARIZE {
     
     label 'process_single'
+    errorStrategy 'terminate'
 
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -8,6 +9,7 @@ process SUMMARIZE {
         'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
+    path 'kraken_classified/'
     path 'stats_withdup/'
     path 'stats_markdup/'
     path 'depth/'
