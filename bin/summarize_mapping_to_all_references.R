@@ -26,6 +26,8 @@ df <- read_tsv(idxstats, col_names = FALSE) %>%
   # Discard the unmapped reads marked by an *
   filter(X1 != "*")
 
+# Sometimes the mappings stats are completely empty
+if (nrow(df) > 0) {
 # Count number of reads per subtype
 summary <- df %>% 
   group_by(Subtype) %>% 
@@ -51,10 +53,12 @@ major_reads <- summary %>%
 
 df_final$major_reads[1] <- major_reads
 
-# Read the depth file from the first mapping
-cov <- read_tsv(depth, col_names = FALSE) %>% 
+# Read the depth file from the first mapping. 
+# The file can be empty and the reading fails
+  cov <- read_tsv(depth, col_names = FALSE) %>% 
   # Filter out the minority subtype
   filter(X1 == major_ref) 
+
 
 # Reference length
 ref_length <- nrow(cov)
@@ -111,6 +115,7 @@ breadth_int <- as.integer(pos / ref_length * 100)
 
 df_final$minor_cov[1] <- breadth_int
 
+
 # Write results
 write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
 #write_lines(major_ref                         , file = paste0(sampleName, ".major_ref.txt"))
@@ -122,6 +127,7 @@ fasta <- read.fasta(file = references)
 write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
 write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
 
+}
 # Write out sessionInfo() to track versions
 # session <- capture.output(sessionInfo())
 # write_lines(session, file = "R_versions.txt")
