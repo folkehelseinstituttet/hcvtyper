@@ -3,21 +3,45 @@
 library(tidyverse)
 
 # Number of mapped reads --------------------------------------------------
-path_1 <- "stats_withdup/"
-path_2 <- "stats_markdup/"
-path_3 <- "depth/"
-path_4 <- "blast/"
-path_5 <- "glue/"
+path_1 <- "kraken_classified/"
+path_2 <- "stats_withdup/"
+path_3 <- "stats_markdup/"
+path_4 <- "depth/"
+path_5 <- "blast/"
+path_6 <- "glue/"
+
+
+# Total trimmed reads with duplicates -------------------------------------
+# List files
+kraken_files <- list.files(path = path_1, pattern = "kraken2.report.txt$", full.names = TRUE)
+
+# Empty df
+kraken_df <- as.data.frame(matrix(nrow = length(kraken_files), ncol = 2))
+colnames(kraken_df) <- c("sampleName", "total_trimmed_reads_with_dups")
+
+for (i in 1:length(kraken_files)) {
+  try(rm(kraken_stats))
+  # Get sample name
+  kraken_df$sampleName[i] <- str_split(basename(kraken_files[i]), "\\.")[[1]][1]
+  
+  # Get total of trimmed sequences put in to the mapping. Adding try() if no root sequences
+  try(kraken_stats <- read_tsv(kraken_files[i], col_names = FALSE) %>% filter(X6 == "root") %>% pull(X2))
+  if (exists("kraken_stats") & length(kraken_stats) > 0) {
+    kraken_df$total_trimmed_reads_with_dups[i] <- kraken_stats 
+  }
+}
+kraken_df <- as_tibble(kraken_df)
 
 # Reads mapped with duplicates --------------------------------------------
 # List files
-stats_files <- list.files(path = path_1, pattern = "\\withdup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_2, pattern = "\\withdup.stats$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 5))
-colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "total_trimmed_reads_with_dups", "trimmed_reads_withdups_mapped")
+tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
+colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_withdups_mapped")
 
 for (i in 1:length(stats_files)) {
+  try(rm(map_stats))
   # Get sample name
   tmp_df$sampleName[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][1]
   
@@ -30,21 +54,21 @@ for (i in 1:length(stats_files)) {
   # Read the mapping stats
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#") 
   
-  # Get total of trimmed sequences put in to the mapping
-  raw_reads <- map_stats %>% filter(X2 == "raw total sequences:") %>% pull(X3)
-  tmp_df$total_trimmed_reads_with_dups[i] <- raw_reads
-  
   # Get number of mapped reads after duplicate removal
   mapped_reads <- map_stats %>% filter(X2 == "reads mapped:") %>% pull(X3)
   tmp_df$trimmed_reads_withdups_mapped[i] <- mapped_reads
 }
 tmp_df <- as_tibble(tmp_df)
 
+# Add number of classified reads from Kraken2
+tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
+
 df_with_dups <- tmp_df %>% 
   # Create columns for reads mapped to major and minor genotype
   mutate(Reads_withdup_mapped_majority = case_when(first_major_minor == "majority" ~ trimmed_reads_withdups_mapped)) %>%
   mutate(Reads_withdup_mapped_minority = case_when(first_major_minor == "minority" ~ trimmed_reads_withdups_mapped)) %>%
-  mutate(Reads_withdup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>% 
+  # Don't include number of reads mapped in the first mapping. Info must be taken from another process if we should include
+  #mutate(Reads_withdup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>% 
   select(-trimmed_reads_withdups_mapped) %>% 
   # Create columns for the major and minor references
   mutate(Majority_reference = case_when(first_major_minor == "majority" ~ reference)) %>% 
@@ -55,11 +79,11 @@ df_with_dups <- tmp_df %>%
   # Calculate percent of the trimmed reads mapped
   mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
          Reads_withdup_mapped_majority = as.integer(Reads_withdup_mapped_majority),
-         Reads_withdup_mapped_minority = as.integer(Reads_withdup_mapped_minority),
-         Reads_withdup_mapped_first_mapping = as.integer(Reads_withdup_mapped_first_mapping)) %>% 
+         Reads_withdup_mapped_minority = as.integer(Reads_withdup_mapped_minority)) %>% 
+         #Reads_withdup_mapped_first_mapping = as.integer(Reads_withdup_mapped_first_mapping)) %>% 
   mutate(Percent_reads_mapped_with_dups_majority = Reads_withdup_mapped_majority / total_trimmed_reads_with_dups * 100,
-         Percent_reads_mapped_with_dups_minority = Reads_withdup_mapped_minority / total_trimmed_reads_with_dups * 100,
-         Percent_reads_mapped_with_dups_first_mapping = Reads_withdup_mapped_first_mapping / total_trimmed_reads_with_dups * 100) %>% 
+         Percent_reads_mapped_with_dups_minority = Reads_withdup_mapped_minority / total_trimmed_reads_with_dups * 100) %>% 
+         #Percent_reads_mapped_with_dups_first_mapping = Reads_withdup_mapped_first_mapping / total_trimmed_reads_with_dups * 100) %>% 
   # Create one row per sample
   select(-first_major_minor) %>% 
   group_by(sampleName) %>% 
@@ -69,7 +93,7 @@ df_with_dups <- tmp_df %>%
 
 # Reads mapped no duplicates ----------------------------------------------
 # List files
-stats_files <- list.files(path = path_2, pattern = "\\markdup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_3, pattern = "\\markdup.stats$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
@@ -172,7 +196,7 @@ df_nodups <- tmp_df %>%
 # Coverage ----------------------------------------------------------------
 
 # List files
-cov_files <- list.files(path = path_3, pattern = "txt\\.gz$", full.names = TRUE)
+cov_files <- list.files(path = path_4, pattern = "txt\\.gz$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 4))
@@ -231,7 +255,7 @@ df_coverage <- tmp_df %>%
 # Length of scaffolds -----------------------------------------------------
 
 # Print the length of the longest scaffold matching the given reference
-blast_files <- list.files(path = path_4, pattern = "txt$", full.names = TRUE)
+blast_files <- list.files(path = path_5, pattern = "txt$", full.names = TRUE)
 
 # Empty df
 df_scaffolds <- tribble(
@@ -265,12 +289,12 @@ for (i in 1:length(blast_files)) {
 
 # GLUE --------------------------------------------------------------------
 
-glue_file <- list.files(path = path_5, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
+glue_file <- list.files(path = path_6, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
 glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) %>% 
   # Only keep the majority reports for the summary
   filter(Major_minor == "majority")
 
-# glue_reports <- list.files(path = path_4, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
+# glue_reports <- list.files(path = path_5, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
 #   # Keep the file names as the names of the list elements
 #   set_names() %>% 
 #   map(read_tsv, col_types = cols(GLUE_subtype = col_character())) %>% 
