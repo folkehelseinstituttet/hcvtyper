@@ -134,6 +134,7 @@ workflow VIRALSEQ {
     )
     ch_versions = ch_versions.mix(CUTADAPT.out.versions)
 
+
     //
     // MODULE: Run FastQC on trimmed reads
     //
@@ -167,11 +168,13 @@ workflow VIRALSEQ {
     //
 
     // Create input read channel for SPADES.
+    // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
     ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
     SPADES (
         ch_reads,
         [], // Empty input channel. Can be used to specify hmm profile
+        []  // Empty input channel. Placeholder for separate speficication of reads.
         []  // Empty input channel. Placeholder for separate speficication of reads.
     )
     ch_versions = ch_versions.mix(SPADES.out.versions.first())
@@ -191,6 +194,7 @@ workflow VIRALSEQ {
     // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
     // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
     // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
+    // See Issue on this
     ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
     BLASTPARSE (
         ch_blastparse,
@@ -203,7 +207,7 @@ workflow VIRALSEQ {
     // MODULE: Map classified reads against all references
     //
     if (params.mapper == "bowtie2") {
-        // TODO: Create subworkflow for bowtie2_align + samtools_idxstats + samtools_depth + markdups.
+
         BOWTIE2_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
             BOWTIE2_BUILD.out.index,
@@ -215,6 +219,7 @@ workflow VIRALSEQ {
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
         // Join idxstats and depth on the meta to ensure no sample mixup
         ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
+    }
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
@@ -247,6 +252,7 @@ workflow VIRALSEQ {
     } else if (params.strategy == "denovo") {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     }
+    }
 
     MAJOR_MAPPING (
         ch_major_mapping,
@@ -254,10 +260,12 @@ workflow VIRALSEQ {
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
 
+
     //
     // SUBWORKFLOW: Map reads against a potential minority reference
     //
 
+    // Create input channel for mapping against a subset of the references
     // Create input channel for mapping against a subset of the references
     if (params.strategy == "mapping") {
         ch_join = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
@@ -267,9 +275,12 @@ workflow VIRALSEQ {
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_minor = ch_join_2
             .map { meta, fasta, reads, csv ->
+            .map { meta, fasta, reads, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
             return [meta + elements[0], fasta, reads]
+            return [meta + elements[0], fasta, reads]
             }
+
 
         // Filter on read nr and coverage
         // This will result in a channel with values that meet the read nr and coverage criteria
@@ -287,9 +298,12 @@ workflow VIRALSEQ {
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_minor = ch_join_2
             .map { meta, fasta, reads, csv ->
+            .map { meta, fasta, reads, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
             return [meta + elements[0], fasta, reads]
+            return [meta + elements[0], fasta, reads]
             }
+
 
         // Filter on read nr and coverage
         // This will result in a channel with values that meet the read nr and coverage criteria
@@ -299,11 +313,14 @@ workflow VIRALSEQ {
             minorLength > params.minDenovoLength
         }
     }
+        }
+    }
 
     MINOR_MAPPING (
         ch_map_minor_filtered,
         "minority"
     )
+
 
     //
     // MODULE: Plot coverage from mapping
@@ -329,9 +346,11 @@ workflow VIRALSEQ {
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
         HCV_GLUE_PARSER (
             HCVGLUE.out.GLUE_json
+            HCVGLUE.out.GLUE_json
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }
+
 
     //
     // MODULE: Summarize
@@ -348,6 +367,7 @@ workflow VIRALSEQ {
     } else {
         ch_glue = Channel.empty()
     }
+
 
     SUMMARIZE (
         ch_classified_reads.collect(),
@@ -381,6 +401,8 @@ workflow VIRALSEQ {
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.summary.collectFile(name: 'sequencing_summary_mqc.csv'))
+
+
 
 
 
