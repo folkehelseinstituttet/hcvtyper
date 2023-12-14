@@ -55,7 +55,7 @@ process TANOTI_ALIGN {
 
     tanoti \\
         -r $references \\
-        -i tmp_R1.fastq tmp_R2.fastq \\
+        -i ${prefix}_R1.fastq ${prefix}_R2.fastq \\
         -o ${prefix}.${reference}.${prefix2}.tmp.sam \\
         -p 1 -u 0 -m ${stringency}
 
