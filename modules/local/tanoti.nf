@@ -1,6 +1,6 @@
 process TANOTI_ALIGN {
     tag "$meta.id"
-    label "process_high" // process_high
+    label "process_low" // process_high
 
     conda ""
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
