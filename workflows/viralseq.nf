@@ -60,6 +60,10 @@ include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/
 include { SPADES                             } from '../modules/nf-core/spades/main'
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
+include { SAMTOOLS_SORT } from '../modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_SORT as SAMTOOLS_SORT_2 } from '../modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_MARKDUP                   } from '../modules/nf-core/samtools/markdup/main'
+include { SAMTOOLS_FIXMATE                   } from '../modules/nf-core/samtools/fixmate/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -106,7 +110,7 @@ workflow VIRALSEQ {
     // MODULE: Run Bowtie2_build to create a reference index
     //
     BOWTIE2_BUILD(
-        file(params.references)
+        Channel.fromPath(params.references).map { [ [:], it ] } // Add empty meta map before the reference file path
     )
     ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions)
 
@@ -204,18 +208,15 @@ workflow VIRALSEQ {
     // MODULE: Map classified reads against all references
     //
     if (params.mapper == "bowtie2") {
-
         BOWTIE2_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
             BOWTIE2_BUILD.out.index,
             false, // Do not save unmapped reads
-            true, // Sort bam file
-            "first_mapping", // Don't need reference name in first mapping
-            "first_mapping" // name for output files
+            true // Sort bam file
         )
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
         // Join idxstats and depth on the meta to ensure no sample mixup
-        ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
+        //ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
@@ -229,12 +230,31 @@ workflow VIRALSEQ {
         )
         ch_versions = ch_versions.mix(TANOTI_ALIGN.out.versions.first())
         // Join idxstats and depth on the meta to ensure no sample mixup
-        ch_parse = TANOTI_ALIGN.out.idxstats.join(TANOTI_ALIGN.out.depth)
+        //ch_parse = TANOTI_ALIGN.out.idxstats.join(TANOTI_ALIGN.out.depth)
     }
+
+    // Remove duplicate reads
+    SAMTOOLS_SORT (
+        BOWTIE2_ALIGN.out.aligned
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions.first())
+    SAMTOOLS_FIXMATE (
+        SAMTOOLS_SORT.out.bam
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_FIXMATE.out.versions.first())
+    SAMTOOLS_SORT_2 (
+        SAMTOOLS_FIXMATE.out.bam
+    )
+    SAMTOOLS_MARKDUP (
+        SAMTOOLS_SORT_2.out.bam,
+        Channel.fromPath(params.references)
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_MARKDUP.out.versions.first())
 
     //
     // MODULE: Identify the two references with most mapped reads
     //
+    /*
     PARSEFIRSTMAPPING (
         ch_parse,
         file(params.references)
@@ -392,6 +412,7 @@ workflow VIRALSEQ {
         ch_multiqc_logo.toList()
     )
     multiqc_report = MULTIQC.out.report.toList()
+*/
 }
 
 
