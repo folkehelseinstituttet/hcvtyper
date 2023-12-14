@@ -58,9 +58,9 @@ process TANOTI_ALIGN {
         -i tmp_R1.fastq tmp_R2.fastq \\
         -o ${prefix}.${reference}.${prefix2}.tmp.sam \\
         -p 1 -u 0 -m ${stringency}
-    
+
     samtools $samtools_command $args2 -@ $task.cpus -o ${prefix}.${reference}.${prefix2}.withdup.bam ${prefix}.${reference}.${prefix2}.tmp.sam
-    
+
     # Create stats file for summary later with duplicates included
     samtools stats ${prefix}.${reference}.${prefix2}.withdup.bam > ${prefix}.${reference}.${prefix2}.withdup.stats
 
@@ -69,7 +69,7 @@ process TANOTI_ALIGN {
       | samtools fixmate -m - - \
       | samtools sort -O BAM \
       | samtools markdup --no-PG -r - ${prefix}.${reference}.${prefix2}.markdup.bam
-    
+
     # Creating file with coverage per site
     samtools depth -aa -d 1000000 ${prefix}.${reference}.${prefix2}.markdup.bam | gzip > ${prefix}.${reference}.${prefix2}.markdup.coverage.txt.gz
 
