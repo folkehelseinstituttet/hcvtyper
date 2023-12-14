@@ -1,30 +1,23 @@
 process BOWTIE2_ALIGN {
     tag "$meta.id"
-    label "process_medium" // process_high
+    label "process_high"
 
-    conda "bioconda::bowtie2=2.4.4 bioconda::samtools=1.16.1 conda-forge::pigz=2.6"
+    conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:a0ffedb52808e102887f6ce600d092675bf3528a-0' :
-        'biocontainers/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:a0ffedb52808e102887f6ce600d092675bf3528a-0' }"
+        'https://depot.galaxyproject.org/singularity/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:f70b31a2db15c023d641c32f433fb02cd04df5a6-0' :
+        'biocontainers/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:f70b31a2db15c023d641c32f433fb02cd04df5a6-0' }"
 
     input:
-    tuple val(meta), path(reads)
-    path (index)
+    tuple val(meta) , path(reads)
+    tuple val(meta2), path(index)
     val   save_unaligned
     val   sort_bam
-    val reference
-    val prefix2
 
     output:
-    tuple val(meta), path("*markdup.{bam,sam}")      , emit: aligned
-    tuple val(meta), path("*withdup.{bam,sam}")      , emit: aligned_withdup
-    tuple val(meta), path("*.log")            , emit: log
-    tuple val(meta), path("*fastq.gz")        , emit: fastq, optional:true
-    tuple val(meta), path("*markdup.idxstats")       , emit: idxstats
-    tuple val(meta), path("*withdup.stats")          , emit: stats_withdup
-    tuple val(meta), path("*markdup.stats")          , emit: stats_markdup
-    tuple val(meta), path("*markdup.coverage.txt.gz"), emit: depth
-    path  "versions.yml"                      , emit: versions
+    tuple val(meta), path("*.{bam,sam}"), emit: aligned
+    tuple val(meta), path("*.log")      , emit: log
+    tuple val(meta), path("*fastq.gz")  , emit: fastq, optional:true
+    path  "versions.yml"                , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -59,26 +52,8 @@ process BOWTIE2_ALIGN {
         --threads $task.cpus \\
         $unaligned \\
         $args \\
-        2> ${prefix}.${reference}.${prefix2}.bowtie2.log \\
-        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${reference}.${prefix2}.withdup.${extension} -
-
-    # Create stats file for summary later with duplicates included
-    samtools stats ${prefix}.${reference}.${prefix2}.withdup.${extension} > ${prefix}.${reference}.${prefix2}.withdup.stats
-
-    # Remove duplicate reads
-    samtools sort -n ${prefix}.${reference}.${prefix2}.withdup.${extension} \\
-      | samtools fixmate -m - - \
-      | samtools sort -O BAM \
-      | samtools markdup --no-PG -r - ${prefix}.${reference}.${prefix2}.markdup.${extension}
-    
-    # Creating file with coverage per site
-    samtools depth -aa -d 1000000 ${prefix}.${reference}.${prefix2}.markdup.${extension} | gzip > ${prefix}.${reference}.${prefix2}.markdup.coverage.txt.gz
-
-    # Summarize reads mapped per reference
-    samtools idxstats ${prefix}.${reference}.${prefix2}.markdup.${extension} > ${prefix}.${reference}.${prefix2}.markdup.idxstats
-
-    # Create stats file for summary later
-    samtools stats ${prefix}.${reference}.${prefix2}.markdup.${extension} > ${prefix}.${reference}.${prefix2}.markdup.stats
+        2> >(tee ${prefix}.bowtie2.log >&2) \\
+        | samtools $samtools_command $args2 --threads $task.cpus -o ${prefix}.${extension} -
 
     if [ -f ${prefix}.unmapped.fastq.1.gz ]; then
         mv ${prefix}.unmapped.fastq.1.gz ${prefix}.unmapped_1.fastq.gz
@@ -101,12 +76,17 @@ process BOWTIE2_ALIGN {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def extension_pattern = /(--output-fmt|-O)+\s+(\S+)/
     def extension = (args2 ==~ extension_pattern) ? (args2 =~ extension_pattern)[0][2].toLowerCase() : "bam"
+    def create_unmapped = ""
+    if (meta.single_end) {
+        create_unmapped = save_unaligned ? "touch ${prefix}.unmapped.fastq.gz" : ""
+    } else {
+        create_unmapped = save_unaligned ? "touch ${prefix}.unmapped_1.fastq.gz && touch ${prefix}.unmapped_2.fastq.gz" : ""
+    }
 
     """
     touch ${prefix}.${extension}
     touch ${prefix}.bowtie2.log
-    touch ${prefix}.unmapped_1.fastq.gz
-    touch ${prefix}.unmapped_2.fastq.gz
+    ${create_unmapped}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
