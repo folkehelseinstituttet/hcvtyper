@@ -61,10 +61,9 @@ include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/
 include { SPADES                             } from '../modules/nf-core/spades/main'
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
-include { SAMTOOLS_SORT } from '../modules/nf-core/samtools/sort/main'
-include { SAMTOOLS_SORT as SAMTOOLS_SORT_2 } from '../modules/nf-core/samtools/sort/main'
-include { SAMTOOLS_MARKDUP                   } from '../modules/nf-core/samtools/markdup/main'
-include { SAMTOOLS_FIXMATE                   } from '../modules/nf-core/samtools/fixmate/main'
+include { SAMTOOLS_INDEX                     } from '../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_IDXSTATS                  } from '../modules/nf-core/samtools/idxstats/main'
+include { SAMTOOLS_DEPTH                     } from '../modules/nf-core/samtools/depth/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -244,32 +243,31 @@ workflow VIRALSEQ {
         Channel.fromPath(params.references)
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
-    // SAMTOOLS_SORT (
-    //     BOWTIE2_ALIGN.out.aligned
-    // )
-    // ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions.first())
-    // SAMTOOLS_FIXMATE (
-    //     SAMTOOLS_SORT.out.bam
-    // )
-    // ch_versions = ch_versions.mix(SAMTOOLS_FIXMATE.out.versions.first())
-    // SAMTOOLS_SORT_2 (
-    //     SAMTOOLS_FIXMATE.out.bam
-    // )
-    // SAMTOOLS_MARKDUP (
-    //     SAMTOOLS_SORT_2.out.bam,
-    //     Channel.fromPath(params.references)
-    // )
-    // ch_versions = ch_versions.mix(SAMTOOLS_MARKDUP.out.versions.first())
 
     //
     // MODULE: Identify the two references with most mapped reads
     //
-    /*
+    SAMTOOLS_INDEX (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
+    SAMTOOLS_IDXSTATS (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai) // val(meta), path(bam), path(bai)
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions.first())
+
+    SAMTOOLS_DEPTH (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
+        [ [], []] // Passing empty channels instead of an interval file
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
+
+    // Join idxstats and depth on the meta map
     PARSEFIRSTMAPPING (
-        ch_parse,
+        SAMTOOLS_IDXSTATS.out.idxstats.join(SAMTOOLS_DEPTH.out.tsv), // val(meta), path(idxstats), path(tsv)
         file(params.references)
     )
-
+/*
     //
     // SUBWORKFLOW: Map reads against the majority reference
     //
