@@ -37,8 +37,8 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 include { INPUT_CHECK                       } from '../subworkflows/local/input_check'
 include { BAM_MARKDUPLICATES_SAMTOOLS       } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
-include { TARGETED_MAPPING as MAJOR_MAPPING } from '../subworkflows/local/major_mapping'
-include { TARGETED_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_mapping'
+include { TARGETED_MAPPING as MAJOR_MAPPING } from '../subworkflows/local/targeted_mapping'
+include { TARGETED_MAPPING as MINOR_MAPPING } from '../subworkflows/local/targeted_mapping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -225,10 +225,7 @@ workflow VIRALSEQ {
         TANOTI_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
             file(params.references),
-            false, // Do not save unmapped reads
             true, // Sort bam file
-            "first_mapping", // Don't need reference name in first mapping
-            "first_mapping", // name for output files
             params.tanoti_stringency_1
         )
         ch_versions = ch_versions.mix(TANOTI_ALIGN.out.versions.first())
@@ -273,8 +270,6 @@ workflow VIRALSEQ {
         ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     } else if (params.strategy == "denovo") {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
-    }
-/*
     }
 
     MAJOR_MAPPING (
