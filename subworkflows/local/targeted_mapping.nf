@@ -26,28 +26,14 @@ workflow TARGETED_MAPPING {
         return [meta, reads]
         }
 
-//SEE BELOW. I CAN ADD TO THE META THE REFERENCE NAME. AND THEN ADD THAT TO THE PREFIX IN THE CONFIG FILE.k
-    // Extract only the name of the reference fasta mapped to.
-    // Splitting on '.' to remove the meta:id which is before the name.
-    ref_name = ch_major_mapping.map { it[1].getBaseName().toString().split('\\.').last() }
-ch_test = ch_major_mapping
-    .map {
+    // Add the reference name to the meta map
+    ch_align = ch_major_mapping
+        .map {
         meta, fasta, reads ->
         new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
+        return [new_meta, reads]
     }
-ch_test.view()
-// From the eager pipeline:
-//     } else if ( params.mapping_tool == 'bowtie2' ) {
-//         ch_input_for_mapping = reads
-//                             .combine( index )
-//                             .multiMap {
-//                                 meta, reads, meta2, index ->
-//                                     new_meta = meta + [ reference: meta2.id ]
-//                                     reads: [ new_meta, reads ]
-//                                     index: [ meta2, index ]
-//                             }
 
-    //     BOWTIE2_ALIGN ( ch_input_for_mapping.reads, ch_input_for_mapping.index, false, true )
     if (params.mapper == "bowtie2") {
         BOWTIE2_BUILD (
             ch_build
