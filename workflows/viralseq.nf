@@ -36,6 +36,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
 include { INPUT_CHECK                    } from '../subworkflows/local/input_check'
+include { BAM_MARKDUPLICATES_SAMTOOLS } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
 include { MAJOR_MAPPING                  } from '../subworkflows/local/major_mapping'
 include { MAJOR_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_mapping'
 
@@ -238,22 +239,27 @@ workflow VIRALSEQ {
     }
 
     // Remove duplicate reads
-    SAMTOOLS_SORT (
-        BOWTIE2_ALIGN.out.aligned
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions.first())
-    SAMTOOLS_FIXMATE (
-        SAMTOOLS_SORT.out.bam
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_FIXMATE.out.versions.first())
-    SAMTOOLS_SORT_2 (
-        SAMTOOLS_FIXMATE.out.bam
-    )
-    SAMTOOLS_MARKDUP (
-        SAMTOOLS_SORT_2.out.bam,
+    BAM_MARKDUPLICATES_SAMTOOLS (
+        BOWTIE2_ALIGN.out.aligned,
         Channel.fromPath(params.references)
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_MARKDUP.out.versions.first())
+    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
+    // SAMTOOLS_SORT (
+    //     BOWTIE2_ALIGN.out.aligned
+    // )
+    // ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions.first())
+    // SAMTOOLS_FIXMATE (
+    //     SAMTOOLS_SORT.out.bam
+    // )
+    // ch_versions = ch_versions.mix(SAMTOOLS_FIXMATE.out.versions.first())
+    // SAMTOOLS_SORT_2 (
+    //     SAMTOOLS_FIXMATE.out.bam
+    // )
+    // SAMTOOLS_MARKDUP (
+    //     SAMTOOLS_SORT_2.out.bam,
+    //     Channel.fromPath(params.references)
+    // )
+    // ch_versions = ch_versions.mix(SAMTOOLS_MARKDUP.out.versions.first())
 
     //
     // MODULE: Identify the two references with most mapped reads
