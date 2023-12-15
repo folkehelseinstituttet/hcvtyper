@@ -35,10 +35,10 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK                    } from '../subworkflows/local/input_check'
-include { BAM_MARKDUPLICATES_SAMTOOLS } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
-include { MAJOR_MAPPING                  } from '../subworkflows/local/major_mapping'
-include { MAJOR_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_mapping'
+include { INPUT_CHECK                       } from '../subworkflows/local/input_check'
+include { BAM_MARKDUPLICATES_SAMTOOLS       } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
+include { TARGETED_MAPPING as MAJOR_MAPPING } from '../subworkflows/local/major_mapping'
+include { TARGETED_MAPPING as MINOR_MAPPING } from '../subworkflows/local/major_mapping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -218,8 +218,7 @@ workflow VIRALSEQ {
             true // Sort bam file
         )
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
-        // Join idxstats and depth on the meta to ensure no sample mixup
-        //ch_parse = BOWTIE2_ALIGN.out.idxstats.join(BOWTIE2_ALIGN.out.depth)
+        ch_aligned = BOWTIE2_ALIGN.out.aligned
     }
     }
     else if (params.mapper == "tanoti") {
@@ -233,13 +232,12 @@ workflow VIRALSEQ {
             params.tanoti_stringency_1
         )
         ch_versions = ch_versions.mix(TANOTI_ALIGN.out.versions.first())
-        // Join idxstats and depth on the meta to ensure no sample mixup
-        //ch_parse = TANOTI_ALIGN.out.idxstats.join(TANOTI_ALIGN.out.depth)
+        ch_aligned = TANOTI_ALIGN.out.aligned
     }
 
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS (
-        BOWTIE2_ALIGN.out.aligned,
+        ch_aligned,
         Channel.fromPath(params.references)
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
@@ -267,7 +265,7 @@ workflow VIRALSEQ {
         SAMTOOLS_IDXSTATS.out.idxstats.join(SAMTOOLS_DEPTH.out.tsv), // val(meta), path(idxstats), path(tsv)
         file(params.references)
     )
-/*
+
     //
     // SUBWORKFLOW: Map reads against the majority reference
     //
@@ -276,6 +274,7 @@ workflow VIRALSEQ {
     } else if (params.strategy == "denovo") {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     }
+/*
     }
 
     MAJOR_MAPPING (
