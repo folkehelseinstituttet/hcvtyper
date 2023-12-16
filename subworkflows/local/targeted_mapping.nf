@@ -4,6 +4,7 @@ include { TANOTI_ALIGN      } from '../../modules/local/tanoti.nf'
 include { SAMTOOLS_INDEX    } from '../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_IDXSTATS } from '../../modules/nf-core/samtools/idxstats/main'
 include { SAMTOOLS_DEPTH    } from '../../modules/nf-core/samtools/depth/main'
+include { SAMTOOLS_STATS    } from '../../modules/nf-core/samtools/stats/main'
 
 include { BAM_MARKDUPLICATES_SAMTOOLS } from '../nf-core/bam_markduplicates_samtools/main'
 
@@ -18,15 +19,8 @@ workflow TARGETED_MAPPING {
         .map { meta, fasta, reads ->
         return [meta, fasta]
         }
-    //Channel.fromPath(params.references).map { [ [:], it ] } // Add empty meta map before the reference file path
 
-    // Extract val(meta), path(reads)
-    ch_align = ch_major_mapping
-        .map { meta, fasta, reads ->
-        return [meta, reads]
-        }
-
-    // Add the reference name to the meta map
+    // Extract val(meta), path(reads). Add the reference name to the meta map
     ch_align = ch_major_mapping
         .map {
         meta, fasta, reads ->
@@ -36,7 +30,7 @@ workflow TARGETED_MAPPING {
 
     if (params.mapper == "bowtie2") {
         BOWTIE2_BUILD (
-            ch_build
+            ch_build // val(meta), path(fasta)
         )
         BOWTIE2_ALIGN (
             ch_align,
@@ -45,30 +39,20 @@ workflow TARGETED_MAPPING {
             true // Sort bam file
         )
         ch_aligned = BOWTIE2_ALIGN.out.aligned
-        // depth = BOWTIE2_ALIGN.out.depth
-        // stats_markdup = BOWTIE2_ALIGN.out.stats_markdup
-        // stats_withdup = BOWTIE2_ALIGN.out.stats_withdup
         ch_versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
     }
-    // else if (params.mapper == "tanoti") {
-    //     TANOTI_ALIGN (
-    //         ch_align,
-    //         ch_build,
-    //         false,
-    //         true,
-    //         ref_name,
-    //         prefix2,
-    //         params.tanoti_stringency_2
-    //     )
-    //     aligned = TANOTI_ALIGN.out.aligned
-    //     depth = TANOTI_ALIGN.out.depth
-    //     stats_markdup = TANOTI_ALIGN.out.stats_markdup
-    //     stats_withdup = TANOTI_ALIGN.out.stats_withdup
-    //     versions = TANOTI_ALIGN.out.versions // channel: [ versions.yml ]
-    // }
+    else if (params.mapper == "tanoti") {
+        TANOTI_ALIGN (
+            ch_align,
+            ch_build,
+            true, // Sort bam file
+            params.tanoti_stringency_2
+        )
+        ch_aligned = TANOTI_ALIGN.out.aligned
+        ch_versions = TANOTI_ALIGN.out.versions // channel: [ versions.yml ]
+    }
 
     // Remove duplicate reads
-    //NEED TO INCORPORATE THE ref_name INTO THE BAM FILE SOEHOW... MAYBE DO IT WITH GROOVY AFTER THE PROCESS?
     BAM_MARKDUPLICATES_SAMTOOLS (
         ch_aligned,
         ch_major_mapping.map { it[1] }
@@ -92,13 +76,18 @@ workflow TARGETED_MAPPING {
         [ [], []] // Passing empty channels instead of an interval file
     )
     ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
-
-
+    SAMTOOLS_STATS (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai), // val(meta), path(bam), path(bai)
+        ch_build // val(meta), path(fasta)
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
+        // stats_markdup = BOWTIE2_ALIGN.out.stats_markdup
+        // stats_withdup = BOWTIE2_ALIGN.out.stats_withdup
     emit:
     aligned = ch_aligned
     versions = ch_versions
     depth = SAMTOOLS_DEPTH.out.tsv
-    // stats_markdup
+    stats_markdup = SAMTOOLS_STATS.out.stats
     // stats_withdup
 
 }
