@@ -1,17 +1,18 @@
 include { BOWTIE2_BUILD     } from '../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN     } from '../../modules/nf-core/bowtie2/align/main'
 include { TANOTI_ALIGN      } from '../../modules/local/tanoti.nf'
-include { SAMTOOLS_INDEX    } from '../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_INDEX as INDEX_WITHDUP } from '../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_INDEX as INDEX_MARKDUP } from '../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_IDXSTATS } from '../../modules/nf-core/samtools/idxstats/main'
 include { SAMTOOLS_DEPTH    } from '../../modules/nf-core/samtools/depth/main'
-include { SAMTOOLS_STATS    } from '../../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../modules/nf-core/samtools/stats/main'
 
 include { BAM_MARKDUPLICATES_SAMTOOLS } from '../nf-core/bam_markduplicates_samtools/main'
 
 workflow TARGETED_MAPPING {
     take:
     ch_major_mapping    //tuple val(meta), path(fasta), path(reads)
-    prefix2
 
     main:
     // Extract the val(meta), path(fasta)
@@ -52,6 +53,15 @@ workflow TARGETED_MAPPING {
         ch_versions = TANOTI_ALIGN.out.versions // channel: [ versions.yml ]
     }
 
+    // Generate stats file with duplicates included
+    INDEX_WITHDUP (
+        ch_aligned
+    )
+    STATS_WITHDUP (
+        ch_aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
+        ch_build // val(meta), path(fasta)
+
+    )
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS (
         ch_aligned,
@@ -62,12 +72,13 @@ workflow TARGETED_MAPPING {
     //
     // MODULE: Identify the two references with most mapped reads
     //
-    SAMTOOLS_INDEX (
+    INDEX_MARKDUP (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
+    ch_versions = ch_versions.mix(INDEX_MARKDUP.out.versions.first())
+
     SAMTOOLS_IDXSTATS (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai) // val(meta), path(bam), path(bai)
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions.first())
 
@@ -76,18 +87,19 @@ workflow TARGETED_MAPPING {
         [ [], []] // Passing empty channels instead of an interval file
     )
     ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
-    SAMTOOLS_STATS (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai), // val(meta), path(bam), path(bai)
+
+    STATS_MARKDUP (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
         ch_build // val(meta), path(fasta)
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
+    ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
         // stats_markdup = BOWTIE2_ALIGN.out.stats_markdup
         // stats_withdup = BOWTIE2_ALIGN.out.stats_withdup
     emit:
-    aligned = ch_aligned
+    aligned = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
     versions = ch_versions
     depth = SAMTOOLS_DEPTH.out.tsv
-    stats_markdup = SAMTOOLS_STATS.out.stats
-    // stats_withdup
+    stats_withdup = STATS_WITHDUP.out.stats
+    stats_markdup = STATS_MARKDUP.out.stats
 
 }
