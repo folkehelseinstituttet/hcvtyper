@@ -64,6 +64,7 @@ include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/
 include { SAMTOOLS_INDEX                     } from '../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_IDXSTATS                  } from '../modules/nf-core/samtools/idxstats/main'
 include { SAMTOOLS_DEPTH                     } from '../modules/nf-core/samtools/depth/main'
+include { SAMTOOLS_STATS                     } from '../modules/nf-core/samtools/stats/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -242,6 +243,7 @@ workflow VIRALSEQ {
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam
     )
     ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
+
     SAMTOOLS_IDXSTATS (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai) // val(meta), path(bam), path(bai)
     )
@@ -252,6 +254,12 @@ workflow VIRALSEQ {
         [ [], []] // Passing empty channels instead of an interval file
     )
     ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
+
+    SAMTOOLS_STATS (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai), // val(meta), path(bam), path(bai)
+        Channel.fromPath(params.references).map { [ [:], it ] } // Add empty meta map before the reference file path
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
 
     // Join idxstats and depth on the meta map
     PARSEFIRSTMAPPING (
@@ -269,11 +277,10 @@ workflow VIRALSEQ {
     }
 
     MAJOR_MAPPING (
-        ch_major_mapping,
-        "majority"
+        ch_major_mapping, // val(meta), path(fasta), path(reads)
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
-/*
+
     //
     // SUBWORKFLOW: Map reads against a potential minority reference
     //
@@ -321,8 +328,7 @@ workflow VIRALSEQ {
     }
 
     MINOR_MAPPING (
-        ch_map_minor_filtered,
-        "minority"
+        ch_map_minor_filtered, // val(meta), path(fasta), path(reads)
     )
 
     //
@@ -411,7 +417,7 @@ workflow VIRALSEQ {
         ch_multiqc_logo.toList()
     )
     multiqc_report = MULTIQC.out.report.toList()
-*/
+
 }
 
 
