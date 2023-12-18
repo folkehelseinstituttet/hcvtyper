@@ -110,8 +110,9 @@ workflow VIRALSEQ {
     //
     // MODULE: Run Bowtie2_build to create a reference index
     //
+
     BOWTIE2_BUILD(
-        Channel.fromPath(params.references).map { [ [:], it ] } // Add empty meta map before the reference file path
+        [ [], file(params.references) ] // Add empty meta map before the reference file path
     )
     ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions)
 
@@ -151,7 +152,7 @@ workflow VIRALSEQ {
     //
     KRAKEN2_KRAKEN2 (
         CUTADAPT.out.reads,
-        Channel.fromPath(params.kraken_all_db),
+        Channel.value(file(params.kraken_all_db)),
         false,
         false
     )
@@ -162,7 +163,7 @@ workflow VIRALSEQ {
     //
     KRAKEN2_FOCUSED (
         CUTADAPT.out.reads,
-        Channel.fromPath(params.kraken_focused),
+        Channel.value(file(params.kraken_focused)),
         params.save_output_fastqs,
         params.save_reads_assignment
     )
