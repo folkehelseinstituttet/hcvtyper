@@ -237,7 +237,7 @@ workflow VIRALSEQ {
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS (
         ch_aligned,
-        Channel.fromPath(params.references)
+        Channel.value(file(params.references)) // Need to explicitly turn the file into a value channel so not to be consumed.
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
 
@@ -262,7 +262,7 @@ workflow VIRALSEQ {
 
     SAMTOOLS_STATS (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai), // val(meta), path(bam), path(bai)
-        Channel.fromPath(params.references).map { [ [:], it ] } // Add empty meta map before the reference file path
+        Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
     )
     ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
 
