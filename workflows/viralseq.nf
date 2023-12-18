@@ -151,7 +151,7 @@ workflow VIRALSEQ {
     //
     KRAKEN2_KRAKEN2 (
         CUTADAPT.out.reads,
-        Channel.value(file(params.kraken_all_db)),
+        Channel.fromPath(params.kraken_all_db),
         false,
         false
     )
@@ -162,7 +162,7 @@ workflow VIRALSEQ {
     //
     KRAKEN2_FOCUSED (
         CUTADAPT.out.reads,
-        Channel.value(file(params.kraken_focused)),
+        Channel.fromPath(params.kraken_focused),
         params.save_output_fastqs,
         params.save_reads_assignment
     )
