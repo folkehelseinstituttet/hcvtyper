@@ -34,7 +34,7 @@
                     },
                     "cutadapt": {
                         "branch": "master",
-                        "git_sha": "0efbaeb95c58da5a1096c99b5e919bc0c99cc952",
+                        "git_sha": "07881e42938b4f0070e864b45d424b01745bc3a4",
                         "installed_by": ["modules"]
                     },
                     "fastqc": {
@@ -51,7 +51,7 @@
                     },
                     "multiqc": {
                         "branch": "master",
-                        "git_sha": "911696ea0b62df80e900ef244d7867d177971f73",
+                        "git_sha": "4ab13872435962dadc239979554d13709e20bf29",
                         "installed_by": ["modules"]
                     },
                     "spades": {
