@@ -4,3 +4,5 @@ work/
 *.pyc
 minimal_test/
 Run911_HCV/
+Run911_HCV_tanoti/
+Run911_HCV_bowtie/
