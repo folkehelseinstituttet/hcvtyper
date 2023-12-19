@@ -65,24 +65,24 @@ tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
 
 df_with_dups <- tmp_df %>% 
   # Create columns for reads mapped to major and minor genotype
-  mutate(Reads_withdup_mapped_majority = case_when(first_major_minor == "majority" ~ trimmed_reads_withdups_mapped)) %>%
-  mutate(Reads_withdup_mapped_minority = case_when(first_major_minor == "minority" ~ trimmed_reads_withdups_mapped)) %>%
+  mutate(Reads_withdup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_withdups_mapped)) %>%
+  mutate(Reads_withdup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_withdups_mapped)) %>%
   # Don't include number of reads mapped in the first mapping. Info must be taken from another process if we should include
   #mutate(Reads_withdup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>% 
   select(-trimmed_reads_withdups_mapped) %>% 
   # Create columns for the major and minor references
-  mutate(Majority_reference = case_when(first_major_minor == "majority" ~ reference)) %>% 
-  mutate(Minority_reference = case_when(first_major_minor == "minority" ~ reference)) %>% 
-  mutate(Majority_reference = str_remove(Majority_reference, "_major"),
-         Minority_reference = str_remove(Minority_reference, "_minor")) %>% 
+  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>% 
+  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>% 
+  mutate(Major_reference = str_remove(Major_reference, "_major"),
+         Minor_reference = str_remove(Minor_reference, "_minor")) %>% 
   select(-reference) %>% 
   # Calculate percent of the trimmed reads mapped
   mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
-         Reads_withdup_mapped_majority = as.integer(Reads_withdup_mapped_majority),
-         Reads_withdup_mapped_minority = as.integer(Reads_withdup_mapped_minority)) %>% 
+         Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
+         Reads_withdup_mapped_minor = as.integer(Reads_withdup_mapped_minor)) %>% 
          #Reads_withdup_mapped_first_mapping = as.integer(Reads_withdup_mapped_first_mapping)) %>% 
-  mutate(Percent_reads_mapped_with_dups_majority = Reads_withdup_mapped_majority / total_trimmed_reads_with_dups * 100,
-         Percent_reads_mapped_with_dups_minority = Reads_withdup_mapped_minority / total_trimmed_reads_with_dups * 100) %>% 
+  mutate(Percent_reads_mapped_with_dups_major = Reads_withdup_mapped_major / total_trimmed_reads_with_dups * 100,
+         Percent_reads_mapped_with_dups_minor = Reads_withdup_mapped_minor / total_trimmed_reads_with_dups * 100) %>% 
          #Percent_reads_mapped_with_dups_first_mapping = Reads_withdup_mapped_first_mapping / total_trimmed_reads_with_dups * 100) %>% 
   # Create one row per sample
   select(-first_major_minor) %>% 
@@ -93,13 +93,15 @@ df_with_dups <- tmp_df %>%
 
 # Reads mapped no duplicates ----------------------------------------------
 # List files
-stats_files <- list.files(path = path_3, pattern = "\\markdup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_3, pattern = "nodup.stats$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
 colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_nodups_mapped")
 
 for (i in 1:length(stats_files)) {
+  try(rm(mapped_reads))
+  
   # Get sample name
   tmp_df$sampleName[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][1]
   
@@ -121,21 +123,21 @@ tmp_df <- as_tibble(tmp_df)
 df_nodups <- tmp_df %>% 
   # Create columns for major and minor
   separate(reference, into = c("genotype", NA), sep = "_", remove = F) %>% 
-  mutate(Majority_genotype_mapping = case_when(first_major_minor == "majority" ~ genotype)) %>%
-  mutate(Minority_genotype_mapping = case_when(first_major_minor == "minority" ~ genotype)) %>% 
+  mutate(Major_genotype_mapping = case_when(first_major_minor == "major" ~ genotype)) %>%
+  mutate(Minor_genotype_mapping = case_when(first_major_minor == "minor" ~ genotype)) %>% 
   select(-genotype) %>% 
   # Create columns for reads mapped to major and minor genotype
-  mutate(Reads_nodup_mapped_majority = case_when(first_major_minor == "majority" ~ trimmed_reads_nodups_mapped)) %>%
-  mutate(Reads_nodup_mapped_minority = case_when(first_major_minor == "minority" ~ trimmed_reads_nodups_mapped)) %>%
+  mutate(Reads_nodup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_nodups_mapped)) %>%
+  mutate(Reads_nodup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_nodups_mapped)) %>%
   mutate(Reads_nodup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_nodups_mapped)) %>% 
   select(-trimmed_reads_nodups_mapped) %>% 
-  #mutate(Percent_mapped_majority = case_when(first_major_minor == "majority" ~ Percent_trimmed_reads_mapped)) %>% 
-  #mutate(Percent_mapped_minority = case_when(first_major_minor == "minority" ~ Percent_trimmed_reads_mapped)) %>%
+  #mutate(Percent_mapped_major = case_when(first_major_minor == "major" ~ Percent_trimmed_reads_mapped)) %>% 
+  #mutate(Percent_mapped_minor = case_when(first_major_minor == "minor" ~ Percent_trimmed_reads_mapped)) %>%
   # Create columns for the major and minor references
-  mutate(Majority_reference = case_when(first_major_minor == "majority" ~ reference)) %>% 
-  mutate(Minority_reference = case_when(first_major_minor == "minority" ~ reference)) %>% 
-  mutate(Majority_reference = str_remove(Majority_reference, "_major"),
-         Minority_reference = str_remove(Minority_reference, "_minor")) %>% 
+  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>% 
+  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>% 
+  mutate(Major_reference = str_remove(Major_reference, "_major"),
+         Minor_reference = str_remove(Minor_reference, "_minor")) %>% 
   # Create one row per sample
   select(-reference, -first_major_minor) %>% 
   group_by(sampleName) %>% 
@@ -143,66 +145,18 @@ df_nodups <- tmp_df %>%
   fill(everything(), .direction = "downup") %>%
   slice(1)
 
-# stats <- list.files(path = path_1, pattern = "\\.stats$", full.names = TRUE) %>% 
-#   # Keep the file names as the names of the list elements
-#   set_names() %>% 
-#   map(read_tsv, col_names = FALSE, comment = "#") %>% 
-#   # Reduce the list to a single dataframe. Keep the filenames (list element names) in column 1
-#   # The column name will be "sampleName"
-#   bind_rows(.id = "sampleName") %>% 
-#   # Clean up sampleName
-#   mutate(sampleName = basename(sampleName)) %>%
-#   separate(sampleName, into = c("sampleName", "reference", "first_major_minor"), sep = "\\.") %>% 
-#   # Extract relevant mapping info and get it on one row
-#   filter(X2 == "raw total sequences:" | X2 == "reads mapped:") %>% # Keep total reads in and reads mapped
-#   mutate(X2 = str_remove(X2, ":")) %>% 
-#   pivot_wider(names_from = X2, values_from = X3) %>% 
-#   # Create a new column that keeps the sample name, reference for mapping and major/minor together
-#   unite("Sample_ref", c("sampleName", "reference", "first_major_minor"), sep = "_", remove = FALSE) %>% 
-#   # Select relevant columns and rename
-#   select(sampleName,
-#          reference,
-#          first_major_minor,
-#          Sample_ref,
-#          "Reads_mapped" = `reads mapped`,
-#          "Total_trimmed_reads" = `raw total sequences`) %>% 
-#   mutate(Reads_mapped = as.numeric(Reads_mapped),
-#          Total_trimmed_reads = as.numeric(Total_trimmed_reads)) %>% 
-#   # Calculate percent of trimmed reads mapped
-#   mutate("Percent_trimmed_reads_mapped" = Reads_mapped / Total_trimmed_reads * 100) %>% 
-#   # Create columns for major and minor
-#   separate(reference, into = c("genotype", NA), sep = "_", remove = F) %>% 
-#   mutate(Majority_genotype_mapping = case_when(first_major_minor == "majority" ~ genotype)) %>%
-#   mutate(Minority_genotype_mapping = case_when(first_major_minor == "minority" ~ genotype)) %>% 
-#   select(-genotype) %>% 
-#   # Create columns for reads mapped to major and minor genotype
-#   mutate(Reads_mapped_majority = case_when(first_major_minor == "majority" ~ Reads_mapped)) %>%
-#   mutate(Reads_mapped_minority = case_when(first_major_minor == "minority" ~ Reads_mapped)) %>%
-#   mutate(Percent_mapped_majority = case_when(first_major_minor == "majority" ~ Percent_trimmed_reads_mapped)) %>% 
-#   mutate(Percent_mapped_minority = case_when(first_major_minor == "minority" ~ Percent_trimmed_reads_mapped)) %>%
-#   # Create columns for the major and minor references
-#   mutate(Majority_reference = case_when(first_major_minor == "majority" ~ reference)) %>% 
-#   mutate(Minority_reference = case_when(first_major_minor == "minority" ~ reference)) %>% 
-#   mutate(Majority_reference = str_remove(Majority_reference, "_major"),
-#          Minority_reference = str_remove(Minority_reference, "_minor")) %>% 
-#   # Create one row per sample
-#   select(-Sample_ref, -reference, -first_major_minor, -Reads_mapped, -Percent_trimmed_reads_mapped) %>% 
-#   group_by(sampleName) %>% 
-#   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
-#   fill(everything(), .direction = "downup") %>%
-#   slice(1)
-
   
 # Coverage ----------------------------------------------------------------
 
 # List files
-cov_files <- list.files(path = path_4, pattern = "txt\\.gz$", full.names = TRUE)
+cov_files <- list.files(path = path_4, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 4))
 colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "first_major_minor")
 
 for (i in 1:length(cov_files)) {
+  try(rm(cov))
   
   # Get sample name
   tmp_df$sampleName[i] <- str_split(basename(cov_files[i]), "\\.")[[1]][1]
@@ -233,17 +187,18 @@ for (i in 1:length(cov_files)) {
 
 # Create column for subtype and Sample_ref
 tmp_df <- as_tibble(tmp_df)
+
 df_coverage <- tmp_df %>%
   # Don't need first mapping data
   filter(reference != "first_mapping") %>% 
   # Create columns for major and minor coverage
-  mutate(Majority_cov_breadth_min_5 = case_when(first_major_minor == "majority" ~ cov_breadth_min_5)) %>% 
-  mutate(Minority_cov_breadth_min_5 = case_when(first_major_minor == "minority" ~ cov_breadth_min_5)) %>% 
+  mutate(Major_cov_breadth_min_5 = case_when(first_major_minor == "major" ~ cov_breadth_min_5)) %>% 
+  mutate(Minor_cov_breadth_min_5 = case_when(first_major_minor == "minor" ~ cov_breadth_min_5)) %>% 
   # Create columns for the major and minor references
-  mutate(Majority_reference = case_when(first_major_minor == "majority" ~ reference)) %>% 
-  mutate(Minority_reference = case_when(first_major_minor == "minority" ~ reference)) %>% 
-  mutate(Majority_reference = str_remove(Majority_reference, "_major"),
-         Minority_reference = str_remove(Minority_reference, "_minor")) %>% 
+  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>% 
+  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>% 
+  mutate(Major_reference = str_remove(Major_reference, "_major"),
+         Minor_reference = str_remove(Minor_reference, "_minor")) %>% 
   # Create one row per sample
   select(-reference, -first_major_minor, -cov_breadth_min_5) %>% 
   group_by(sampleName) %>% 
@@ -292,7 +247,7 @@ for (i in 1:length(blast_files)) {
 glue_file <- list.files(path = path_6, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
 glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) %>% 
   # Only keep the majority reports for the summary
-  filter(Major_minor == "majority")
+  filter(Major_minor == "major")
 
 # glue_reports <- list.files(path = path_5, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
 #   # Keep the file names as the names of the list elements
@@ -313,9 +268,9 @@ glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character
 
 final <- 
   # Combine mapped reads data
-  full_join(df_with_dups, df_nodups, join_by(sampleName, Majority_reference, Minority_reference)) %>% 
+  full_join(df_with_dups, df_nodups, join_by(sampleName, Major_reference, Minor_reference)) %>% 
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Majority_reference, Minority_reference)) %>% 
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>% 
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>% 
   # mutate(test = case_when(Majority_reference == reference ~ "OK",
