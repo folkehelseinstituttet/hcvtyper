@@ -174,14 +174,12 @@ workflow VIRALSEQ {
     //
 
     // Create input read channel for SPADES.
-    // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
     ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
     SPADES (
         ch_reads,
         [], // Empty input channel. Can be used to specify hmm profile
-        []  // Empty input channel. Placeholder for separate speficication of reads.
-        []  // Empty input channel. Placeholder for separate speficication of reads.
+        []  // Empty input channel. Placeholder for separate specification of reads.
     )
     ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
@@ -221,7 +219,6 @@ workflow VIRALSEQ {
         )
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
         ch_aligned = BOWTIE2_ALIGN.out.aligned
-    }
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
@@ -291,7 +288,6 @@ workflow VIRALSEQ {
     //
 
     // Create input channel for mapping against a subset of the references
-    // Create input channel for mapping against a subset of the references
     if (params.strategy == "mapping") {
         ch_join = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
         ch_join_2 = ch_join.join(PARSEFIRSTMAPPING.out.csv) // meta, fasta, reads, csv
@@ -300,12 +296,9 @@ workflow VIRALSEQ {
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_minor = ch_join_2
             .map { meta, fasta, reads, csv ->
-            .map { meta, fasta, reads, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
             return [meta + elements[0], fasta, reads]
-            return [meta + elements[0], fasta, reads]
             }
-
 
         // Filter on read nr and coverage
         // This will result in a channel with values that meet the read nr and coverage criteria
@@ -323,12 +316,9 @@ workflow VIRALSEQ {
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_minor = ch_join_2
             .map { meta, fasta, reads, csv ->
-            .map { meta, fasta, reads, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
             return [meta + elements[0], fasta, reads]
-            return [meta + elements[0], fasta, reads]
             }
-
 
         // Filter on read nr and coverage
         // This will result in a channel with values that meet the read nr and coverage criteria
@@ -338,13 +328,10 @@ workflow VIRALSEQ {
             minorLength > params.minDenovoLength
         }
     }
-        }
-    }
 
     MINOR_MAPPING (
         ch_map_minor_filtered, // val(meta), path(fasta), path(reads)
     )
-
 
     //
     // MODULE: Plot coverage from mapping
@@ -353,6 +340,7 @@ workflow VIRALSEQ {
         MAJOR_MAPPING.out.depth
     )
     ch_versions = ch_versions.mix(PLOT_COVERAGE_MAJOR.out.versions)
+
     PLOT_COVERAGE_MINOR (
         MINOR_MAPPING.out.depth
     )
@@ -368,13 +356,12 @@ workflow VIRALSEQ {
             ch_hcv.collect()
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
+
         HCV_GLUE_PARSER (
-            HCVGLUE.out.GLUE_json
             HCVGLUE.out.GLUE_json
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }
-
 
     //
     // MODULE: Summarize
@@ -426,10 +413,6 @@ workflow VIRALSEQ {
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.summary.collectFile(name: 'sequencing_summary_mqc.csv'))
 
-
-
-
-
     MULTIQC (
         ch_multiqc_files.collect(),
         ch_multiqc_config.toList(),
@@ -437,7 +420,6 @@ workflow VIRALSEQ {
         ch_multiqc_logo.toList()
     )
     multiqc_report = MULTIQC.out.report.toList()
-
 }
 
 
