@@ -174,15 +174,19 @@ for (i in 1:length(cov_files)) {
   ref_length <- nrow(cov)
   
   # Nr. of positions with coverage >= 5
-  pos <- nrow(
-    cov %>% 
-      filter(X3 >= 5)
-  )
-  
-  # Coverage breadth
-  breadth <- round(pos / ref_length * 100, digits = 2)
-  tmp_df$cov_breadth_min_5[i] <- breadth
-  
+  # If ref_length is zero it means that no reads were mapped. Set coverage to zero.
+  # Coverage may also be zero if there are reads mapped, but never more than 5 per position
+  if (ref_length > 0) {
+    pos <- nrow(
+      cov %>% 
+        filter(X3 >= 5)
+    )
+    # Coverage breadth
+    breadth <- round(pos / ref_length * 100, digits = 2)
+    tmp_df$cov_breadth_min_5[i] <- breadth
+  } else if (ref_length == 0) {
+    tmp_df$cov_breadth_min_5[i] <- 0
+  }
 }
 
 # Create column for subtype and Sample_ref
@@ -249,21 +253,6 @@ glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character
   # Only keep the majority reports for the summary
   filter(Major_minor == "major")
 
-# glue_reports <- list.files(path = path_5, pattern = "GLUE_report.tsv$", full.names = TRUE) %>% 
-#   # Keep the file names as the names of the list elements
-#   set_names() %>% 
-#   map(read_tsv, col_types = cols(GLUE_subtype = col_character())) %>% 
-#   # Reduce the list to a single dataframe. Keep the filenames (list element names) in column 1
-#   # The column name will be "sampleName"
-#   bind_rows(.id = "sampleName") %>% 
-#   # Clean up sampleName
-#   mutate(sampleName = str_remove(sampleName, "json//")) %>% # "json//
-#   # Create a new column that keeps the sample name, reference for mapping and major/minor
-#   mutate("Sample_ref" = str_remove(sampleName, "_GLUE_report\\.tsv")) %>% 
-#   # Keep the reference in a separate column
-#   separate(sampleName, into = c("sampleName", "reference", "major_minor"), sep = "\\.") %>% 
-#   mutate(major_minor = str_remove(major_minor, "_GLUE_report")) 
-
 # Join dataframes ---------------------------------------------------------
 
 final <- 
@@ -278,19 +267,6 @@ final <-
   # filter(test == "OK") %>%
   # Add glue result. Only Majority currently
   left_join(glue_report, by = c("sampleName" = "Sample"))
-
-
-
-
-# # Join on sampleName, reference, major_minor
-# tmp_df <- left_join(tmp_df, glue_reports)
-# 
-# # Join all objects on 
-# # Join with stats object if sampleName and references are the same.
-# df <- tmp_df %>%
-#   dplyr::left_join(stats, by = join_by(sampleName, Majority_reference, Minority_reference))
-
-# Join the blast/scaffold lengths only on sampleName and reference
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
