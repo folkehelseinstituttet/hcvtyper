@@ -45,7 +45,7 @@
                     },
                     "kraken2/kraken2": {
                         "branch": "master",
-                        "git_sha": "cfd937a668919d948f6fcbf4218e79de50c2f36f",
+                        "git_sha": "d6549f46c3c1c3fe3def110f3d18059a68a65cc6",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/kraken2/kraken2/kraken2-kraken2.diff"
                     },
