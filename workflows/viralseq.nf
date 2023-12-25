@@ -176,36 +176,38 @@ workflow VIRALSEQ {
     // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
     ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
-    SPADES (
-        ch_reads,
-        [], // Empty input channel. Can be used to specify hmm profile
-        []  // Empty input channel. Placeholder for separate specification of reads.
-    )
-    ch_versions = ch_versions.mix(SPADES.out.versions.first())
+    if (!params.skip_assembly) {
+            SPADES (
+                ch_reads,
+                [], // Empty input channel. Can be used to specify hmm profile
+                []  // Empty input channel. Placeholder for separate specification of reads.
+            )
+            ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
-    //
-    // MODULE: Blast assembled scaffolds against viral references.
-    //
-    BLAST_BLASTN (
-        SPADES.out.scaffolds,
-        BLAST_MAKEBLASTDB.out.db
-    )
-    ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+            //
+            // MODULE: Blast assembled scaffolds against viral references.
+            //
+            BLAST_BLASTN (
+                SPADES.out.scaffolds,
+                BLAST_MAKEBLASTDB.out.db
+            )
+            ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
 
-    //
-    // MODULE: Parse blast output
-    //
-    // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
-    // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
-    // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
-    // See Issue on this
-    ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
-    BLASTPARSE (
-        ch_blastparse,
-        file(params.references),
-        params.agens
-    )
-    ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+            //
+            // MODULE: Parse blast output
+            //
+            // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
+            // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
+            // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
+            // See Issue on this
+            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
+            BLASTPARSE (
+                ch_blastparse,
+                file(params.references),
+                params.agens
+            )
+            ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+    }
 
     //
     // MODULE: Map classified reads against all references
@@ -372,7 +374,11 @@ workflow VIRALSEQ {
     ch_stats_withdup = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
     ch_stats_markdup = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
     ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
-    ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
+    if (!params.skip_assembly) {
+        ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
+    } else {
+        ch_blast = file("dummy_file")
+    }
     if (params.agens == "HCV") {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
