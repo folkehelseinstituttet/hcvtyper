@@ -120,7 +120,7 @@ workflow VIRALSEQ {
     // MODULE: Create Blast database from reference sequences
     //
     BLAST_MAKEBLASTDB (
-        file(params.references)
+        [ [id:"blastdb/"], file(params.references) ] // Add meta map before the reference file path
     )
     ch_versions = ch_versions.mix(BLAST_MAKEBLASTDB.out.versions)
 
