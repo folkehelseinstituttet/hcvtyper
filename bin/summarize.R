@@ -3,21 +3,59 @@
 library(tidyverse)
 
 # Number of mapped reads --------------------------------------------------
-path_1 <- "kraken_classified/"
-path_2 <- "stats_withdup/"
-path_3 <- "stats_markdup/"
-path_4 <- "depth/"
-path_5 <- "blast/"
-path_6 <- "glue/"
+path_1 <- "cutadapt/"
+path_2 <- "kraken_classified/"
+path_3 <- "stats_withdup/"
+path_4 <- "stats_markdup/"
+path_5 <- "depth/"
+path_6 <- "blast/"
+path_7 <- "glue/"
 
 
-# Total trimmed reads with duplicates -------------------------------------
+
+# Cutadapt ----------------------------------------------------------------
+
 # List files
-kraken_files <- list.files(path = path_1, pattern = "kraken2.report.txt$", full.names = TRUE)
+cutadapt_files <- list.files(path = path_1, pattern = ".log$", full.names = TRUE)
+
+# Empty df
+cutadapt_df <- as.data.frame(matrix(nrow = length(cutadapt_files), ncol = 3))
+colnames(cutadapt_df) <- c("sampleName", "total_raw_read_pairs", "total_trimmed_read_pairs")
+
+for (i in 1:length(cutadapt_files)) {
+  try(rm(cutadapt_stats))
+  
+  # Get sample name
+  cutadapt_df$sampleName[i] <- str_split(basename(cutadapt_files[i]), "\\.")[[1]][1]
+  
+  # Get number of raw and trimmed read pairs
+  try(cutadapt_stats <- as_tibble(read_lines(cutadapt_files[i])))
+  
+  raw <- filter(cutadapt_stats, str_detect(value, "Total read pairs processed:"))
+  
+  if (nrow(raw) > 0) {
+    tmp <- str_split(raw, "\\s+")[[1]] # Split on white space and get the list content
+    tmp <- as.numeric(str_remove(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
+    cutadapt_df$total_raw_read_pairs[i] <- tmp
+  } 
+  
+  trimmed <- filter(cutadapt_stats, str_detect(value, "Pairs written \\(passing filters\\)"))
+  
+  if (nrow(trimmed) > 0) {
+    tmp <- str_split(trimmed, "\\s+")[[1]] # Split on white space and get the list content
+    tmp <- as.numeric(str_remove(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
+    cutadapt_df$total_trimmed_read_pairs[i] <- tmp
+  } 
+}
+cutadapt_df <- as_tibble(cutadapt_df)
+
+# Kraken ------------------------------------------------------------------
+# List files
+kraken_files <- list.files(path = path_2, pattern = "kraken2.report.txt$", full.names = TRUE)
 
 # Empty df
 kraken_df <- as.data.frame(matrix(nrow = length(kraken_files), ncol = 2))
-colnames(kraken_df) <- c("sampleName", "total_trimmed_reads_with_dups")
+colnames(kraken_df) <- c("sampleName", "total_classified_read_pairs")
 
 for (i in 1:length(kraken_files)) {
   try(rm(kraken_stats))
@@ -27,18 +65,18 @@ for (i in 1:length(kraken_files)) {
   # Get total of trimmed sequences put in to the mapping. Adding try() if no root sequences
   try(kraken_stats <- read_tsv(kraken_files[i], col_names = FALSE) %>% filter(X6 == "root") %>% pull(X2))
   if (exists("kraken_stats") & length(kraken_stats) > 0) {
-    kraken_df$total_trimmed_reads_with_dups[i] <- kraken_stats
+    kraken_df$total_classified_read_pairs[i] <- kraken_stats
   }
 }
 kraken_df <- as_tibble(kraken_df)
 
 # Reads mapped with duplicates --------------------------------------------
 # List files
-stats_files <- list.files(path = path_2, pattern = "\\withdup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_3, pattern = "\\withdup.stats$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_withdups_mapped")
+colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_read_pairs_withdups_mapped")
 
 for (i in 1:length(stats_files)) {
   try(rm(map_stats))
@@ -55,34 +93,39 @@ for (i in 1:length(stats_files)) {
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
 
   # Get number of mapped reads after duplicate removal
-  mapped_reads <- map_stats %>% filter(X2 == "reads mapped:") %>% pull(X3)
-  tmp_df$trimmed_reads_withdups_mapped[i] <- mapped_reads
+  mapped_read_pairs <- map_stats %>% filter(X2 == "reads mapped and paired:") %>% pull(X3)
+  # Divide by 2 to get read pairs
+  mapped_read_pairs <- as.numeric(mapped_read_pairs)/2
+  tmp_df$trimmed_read_pairs_withdups_mapped[i] <- mapped_read_pairs
 }
 tmp_df <- as_tibble(tmp_df)
+
+# Add number of raw and trimmed read pairs
+tmp_df <- left_join(tmp_df, cutadapt_df, by = "sampleName")
 
 # Add number of classified reads from Kraken2
 tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
 
 df_with_dups <- tmp_df %>%
   # Create columns for reads mapped to major and minor genotype
-  mutate(Reads_withdup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_withdups_mapped)) %>%
-  mutate(Reads_withdup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_withdups_mapped)) %>%
+  mutate(Read_pairs_withdup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_read_pairs_withdups_mapped)) %>%
+  mutate(Read_pairs_withdup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_read_pairs_withdups_mapped)) %>%
   # Don't include number of reads mapped in the first mapping. Info must be taken from another process if we should include
   #mutate(Reads_withdup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>%
-  select(-trimmed_reads_withdups_mapped) %>%
+  select(-trimmed_read_pairs_withdups_mapped) %>%
   # Create columns for the major and minor references
   mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
   mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
   mutate(Major_reference = str_remove(Major_reference, "_major"),
          Minor_reference = str_remove(Minor_reference, "_minor")) %>%
-  select(-reference) %>%
+  select(-reference) %>% 
   # Calculate percent of the trimmed reads mapped
-  mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
-         Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
-         Reads_withdup_mapped_minor = as.integer(Reads_withdup_mapped_minor)) %>%
+  #mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
+  #       Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
+  #       Reads_withdup_mapped_minor = as.integer(Reads_withdup_mapped_minor)) %>%
          #Reads_withdup_mapped_first_mapping = as.integer(Reads_withdup_mapped_first_mapping)) %>%
-  mutate(Percent_reads_mapped_with_dups_major = Reads_withdup_mapped_major / total_trimmed_reads_with_dups * 100,
-         Percent_reads_mapped_with_dups_minor = Reads_withdup_mapped_minor / total_trimmed_reads_with_dups * 100) %>%
+  mutate(Percent_read_pairs_mapped_of_trimmed_with_dups_major = Read_pairs_withdup_mapped_major / total_trimmed_read_pairs * 100,
+         Percent_read_pairs_mapped_of_trimmed_with_dups_minor = Read_pairs_withdup_mapped_minor / total_trimmed_read_pairs * 100) %>%
          #Percent_reads_mapped_with_dups_first_mapping = Reads_withdup_mapped_first_mapping / total_trimmed_reads_with_dups * 100) %>%
   # Create one row per sample
   select(-first_major_minor) %>%
@@ -93,11 +136,11 @@ df_with_dups <- tmp_df %>%
 
 # Reads mapped no duplicates ----------------------------------------------
 # List files
-stats_files <- list.files(path = path_3, pattern = "nodup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_4, pattern = "nodup.stats$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_nodups_mapped")
+colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_read_pairs_nodups_mapped")
 
 for (i in 1:length(stats_files)) {
   try(rm(mapped_reads))
@@ -115,8 +158,11 @@ for (i in 1:length(stats_files)) {
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
 
   # Get number of mapped reads after duplicate removal
-  mapped_reads <- map_stats %>% filter(X2 == "reads mapped:") %>% pull(X3)
-  tmp_df$trimmed_reads_nodups_mapped[i] <- mapped_reads
+  mapped_read_pairs <- map_stats %>% filter(X2 == "reads mapped and paired:") %>% pull(X3)
+  # Divide by 2 to get read pairs
+  mapped_read_pairs <- as.numeric(mapped_read_pairs)/2
+  tmp_df$trimmed_read_pairs_nodups_mapped[i] <- mapped_read_pairs
+
 }
 tmp_df <- as_tibble(tmp_df)
 
@@ -127,10 +173,10 @@ df_nodups <- tmp_df %>%
   mutate(Minor_genotype_mapping = case_when(first_major_minor == "minor" ~ genotype)) %>%
   select(-genotype) %>%
   # Create columns for reads mapped to major and minor genotype
-  mutate(Reads_nodup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_nodups_mapped)) %>%
-  mutate(Reads_nodup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_nodups_mapped)) %>%
-  mutate(Reads_nodup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_nodups_mapped)) %>%
-  select(-trimmed_reads_nodups_mapped) %>%
+  mutate(Read_pairs_nodup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_read_pairs_nodups_mapped)) %>%
+  mutate(Read_pairs_nodup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_read_pairs_nodups_mapped)) %>%
+  mutate(Read_pairs_nodup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_read_pairs_nodups_mapped)) %>%
+  select(-trimmed_read_pairs_nodups_mapped) %>%
   #mutate(Percent_mapped_major = case_when(first_major_minor == "major" ~ Percent_trimmed_reads_mapped)) %>%
   #mutate(Percent_mapped_minor = case_when(first_major_minor == "minor" ~ Percent_trimmed_reads_mapped)) %>%
   # Create columns for the major and minor references
@@ -149,7 +195,7 @@ df_nodups <- tmp_df %>%
 # Coverage ----------------------------------------------------------------
 
 # List files
-cov_files <- list.files(path = path_4, pattern = "tsv$", full.names = TRUE)
+cov_files <- list.files(path = path_5, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 4))
@@ -214,7 +260,7 @@ df_coverage <- tmp_df %>%
 # Length of scaffolds -----------------------------------------------------
 
 # Print the length of the longest scaffold matching the given reference
-blast_files <- list.files(path = path_5, pattern = "txt$", full.names = TRUE)
+blast_files <- list.files(path = path_6, pattern = "txt$", full.names = TRUE)
 
 if (length(blast_files > 0)) {
 
@@ -250,7 +296,7 @@ for (i in 1:length(blast_files)) {
 }
 # GLUE --------------------------------------------------------------------
 
-glue_file <- list.files(path = path_6, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
+glue_file <- list.files(path = path_7, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
 glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) %>%
   # Only keep the majority reports for the summary
   filter(Major_minor == "major")
@@ -268,7 +314,25 @@ final <-
   #                         Minority_reference == reference ~ "OK")) %>%
   # filter(test == "OK") %>%
   # Add glue result. Only Majority currently
-  left_join(glue_report, by = c("sampleName" = "Sample"))
+  left_join(glue_report, by = c("sampleName" = "Sample")) %>% 
+  # Reorder columns
+  select(sampleName,
+         total_raw_read_pairs,
+         total_trimmed_read_pairs,
+         total_classified_read_pairs,
+         Major_genotype_mapping,
+         Major_reference,
+         Minor_genotype_mapping,
+         Minor_reference,
+         Read_pairs_withdup_mapped_major,
+         Read_pairs_nodup_mapped_major,
+         Percent_read_pairs_mapped_of_trimmed_with_dups_major,
+         Major_cov_breadth_min_5,
+         Read_pairs_withdup_mapped_minor,
+         Read_pairs_nodup_mapped_minor,
+         Percent_read_pairs_mapped_of_trimmed_with_dups_minor,
+         Minor_cov_breadth_min_5,
+         everything())
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
