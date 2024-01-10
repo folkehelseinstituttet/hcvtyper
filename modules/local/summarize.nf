@@ -18,8 +18,9 @@ process SUMMARIZE {
     path 'glue/'
 
     output:
-    path '*csv'        , emit: summary
-    path "versions.yml", emit: versions
+    path '*long.csv'        , emit: summary
+    path '*mqc.csv'         , emit: mqc
+    path "versions.yml"     , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
