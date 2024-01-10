@@ -337,3 +337,25 @@ final <-
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
+
+# Write file for MultiQC
+# Add MultiQC info lines
+header <- c("# id: 'summary'",
+            "# section_name: 'Summary'",
+            "# description: 'These statistics are generated from the process SUMMARIZE and the R script summarize.R",
+            "# format: 'csv'")
+
+# Convert final data to data frame
+tt <- as.data.frame(final)
+
+# Set up file name for writing to
+file <- "Genotype_mapping_summary_long_mqc.csv"
+
+# Add MultiQC header to file
+write_lines(header, file)
+
+# Add the column names to file
+tt %>% colnames() %>% paste0(collapse = ",") %>% write_lines(file, append = TRUE)
+
+# Write the data to file
+write_csv(tt, file, append = TRUE) # colnames will not be included
