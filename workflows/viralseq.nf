@@ -306,7 +306,7 @@ workflow VIRALSEQ {
         // This will result in a channel with values that meet the read nr and coverage criteria
         ch_map_minor_filtered = ch_map_minor
         .filter { entry ->
-            def minorReads = entry[0]['minor_reads'].toInteger()
+            def minorReads = entry[0]['minor_read_pairs'].toInteger()
             def minorCov = entry[0]['minor_cov'].toInteger()
             minorReads > params.minAgensRead && minorCov > params.minAgensCov
         }
@@ -370,10 +370,11 @@ workflow VIRALSEQ {
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarixty. Don't need the meta
+    ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
-    ch_stats_withdup = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
-    ch_stats_markdup = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
-    ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
+    ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
+    ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
+    ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
     if (!params.skip_assembly) {
         ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
     } else {
@@ -387,6 +388,7 @@ workflow VIRALSEQ {
 
 
     SUMMARIZE (
+        ch_cutadapt.collect(),
         ch_classified_reads.collect(),
         ch_stats_withdup.collect(),
         ch_stats_markdup.collect(),
