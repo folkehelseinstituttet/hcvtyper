@@ -332,7 +332,8 @@ final <-
          Read_pairs_nodup_mapped_minor,
          Percent_read_pairs_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
-         everything())
+         everything()) %>% 
+  select(-Reference, -Major_minor)
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
