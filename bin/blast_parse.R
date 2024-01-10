@@ -35,6 +35,41 @@ scaf <- read_tsv(blast_out, col_names = FALSE) %>%
     "send" = "X10",
     "evalue" = "X11",
     "bitscore" = "X12")
+
+# Plot evalues, bitscore and hit length
+scaf %>% 
+  arrange(desc(bitscore)) %>% 
+  head(n = 30) %>% 
+  ggplot(aes(x = reorder(sseqid, -bitscore), y = bitscore)) +
+  geom_point() +
+  ylab("Bitscore") +
+  xlab("Reference") +
+  ggtitle(paste0(prefix, " Blastn, top 30 highest bitscores")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+ggsave(paste0(prefix, ".bitscore_plot.png"),
+       plot = last_plot(),
+       device = "png",
+       dpi = 300,
+       bg = "white")
+
+scaf %>% 
+  arrange(desc(length)) %>% 
+  head(n = 30) %>% 
+  ggplot(aes(x = reorder(sseqid, -length), y = length)) +
+  geom_point() +
+  ylab("Hit length") +
+  xlab("Reference") +
+  ggtitle(paste0(prefix, " Blastn, top 30 longest hits")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+ggsave(paste0(prefix, ".hitlength_plot.png"),
+       plot = last_plot(),
+       device = "png",
+       dpi = 300,
+       bg = "white")
   
 # Separate the subtypes from the subject header
 # Add a column for the subtype
