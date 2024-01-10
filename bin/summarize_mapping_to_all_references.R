@@ -15,7 +15,7 @@ references <- args[4]
 
 # Create empty dataframe to populate
 df_final <- as.data.frame(matrix(nrow = 1, ncol = 7))
-colnames(df_final) <- c("sample", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
+colnames(df_final) <- c("sample", "major_ref", "major_read_pairs", "major_cov", "minor_ref", "minor_read_pairs", "minor_cov")
 
 df_final$sample[1] <- sampleName
 
@@ -31,8 +31,8 @@ if (nrow(df) > 0) {
 # Count number of reads per subtype
 summary <- df %>% 
   group_by(Subtype) %>% 
-  summarise(reads = sum(X3)) %>% 
-  arrange(desc(reads))
+  summarise(read_pairs = sum(X3)) %>% 
+  arrange(desc(read_pairs))
 
 ## Major
 # Find major reference to use
@@ -46,12 +46,12 @@ major_ref <- df %>%
 
 df_final$major_ref[1] <- major_ref
 
-# How many reads mapped to the minor subtype
-major_reads <- summary %>% 
+# How many read pairs mapped to the minor subtype
+major_read_pairs <- summary %>% 
   filter(Subtype == major_tmp) %>% 
-  pull(reads)
+  pull(read_pairs)
 
-df_final$major_reads[1] <- major_reads
+df_final$major_read_pairs[1] <- major_read_pairs
 
 # Read the depth file from the first mapping. 
 # The file can be empty and the reading fails
@@ -88,11 +88,11 @@ minor_ref <- df %>%
 df_final$minor_ref[1] <- minor_ref
 
 # How many reads mapped to the minor subtype
-minor_reads <- summary %>% 
+minor_read_pairs <- summary %>% 
   filter(Subtype == minor_tmp) %>% 
-  pull(reads)
+  pull(read_pairs)
 
-df_final$minor_reads[1] <- minor_reads
+df_final$minor_read_pairs[1] <- minor_read_pairs
 
 # Read the depth file from the first mapping
 cov <- read_tsv(depth, col_names = FALSE) %>% 
