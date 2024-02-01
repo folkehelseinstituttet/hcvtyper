@@ -9,7 +9,7 @@ process TANOTI_ALIGN {
 
     input:
     tuple val(meta) , path(reads)
-    path  (references)
+    tuple val(meta2), path(references)
     val   sort_bam
     val   stringency
 
