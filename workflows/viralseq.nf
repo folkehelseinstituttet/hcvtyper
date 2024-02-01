@@ -225,7 +225,7 @@ workflow VIRALSEQ {
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            file(params.references),
+            [ [], file(params.references) ], // Add empty meta map before the reference file path
             true, // Sort bam file
             params.tanoti_stringency_1
         )
