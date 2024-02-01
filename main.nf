@@ -11,6 +11,33 @@ nextflow.enable.dsl = 2
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    GENOME PARAMETER VALUES
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+def primer_set         = ''
+def primer_set_version = 0
+if (params.platform == 'illumina' && params.protocol == 'amplicon') {
+    primer_set         = params.primer_set
+    primer_set_version = params.primer_set_version
+} else if (params.platform == 'nanopore') {
+    primer_set          = 'gunther'
+    primer_set_version  = params.primer_set_version
+    params.artic_scheme = WorkflowMain.getGenomeAttribute(params, 'scheme', log, primer_set, primer_set_version)
+}
+
+params.fasta         = WorkflowMain.getGenomeAttribute(params, 'fasta'     , log, primer_set, primer_set_version)
+params.gff           = WorkflowMain.getGenomeAttribute(params, 'gff'       , log, primer_set, primer_set_version)
+params.bowtie2_index = WorkflowMain.getGenomeAttribute(params, 'bowtie2'   , log, primer_set, primer_set_version)
+params.primer_bed    = WorkflowMain.getGenomeAttribute(params, 'primer_bed', log, primer_set, primer_set_version)
+
+params.nextclade_dataset           = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset'          , log, primer_set, primer_set_version)
+params.nextclade_dataset_name      = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset_name'     , log, primer_set, primer_set_version)
+params.nextclade_dataset_reference = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset_reference', log, primer_set, primer_set_version)
+params.nextclade_dataset_tag       = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset_tag'      , log, primer_set, primer_set_version)
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     VALIDATE & PRINT PARAMETER SUMMARY
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -39,13 +66,29 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { VIRALSEQ } from './workflows/viralseq'
+if (params.platform == 'illumina') {
+    include { VIRALSEQ } from './workflows/viralseq'
+} else if (params.platform == 'nanopore' & params.agens == ' hbv') {
+    include { HBV_NANOPORE } from './workflows/hbv_nanopore'
+}
 
 //
 // WORKFLOW: Run main niph/viralseq analysis pipeline
 //
 workflow NIPH_VIRALSEQ {
-    VIRALSEQ ()
+
+    //
+    // WORKFLOW: Virus genome assembly and analysis from Illumina capture data
+    //
+    if (params.platform == 'illumina') {
+        VIRALSEQ ()
+
+    //
+    // WORKFLOW: HBV genome assembly and analysis from Gunther PCR and Nanopore data
+    //
+    } else if (params.platform == 'nanopore' & params.agens == ' hbv') {
+        HBV_NANOPORE ()
+    }
 }
 
 /*
