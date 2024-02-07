@@ -2,13 +2,14 @@ process SAMPLESHEET_CHECK {
     tag "$samplesheet"
     label 'process_single'
 
-    conda "conda-forge::python=3.8.3"
+    conda "conda-forge::python=3.9.5"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/python:3.8.3' :
-        'biocontainers/python:3.8.3' }"
+        'https://depot.galaxyproject.org/singularity/python:3.9--1' :
+        'quay.io/biocontainers/python:3.9--1' }"
 
     input:
     path samplesheet
+    val  platform
 
     output:
     path '*.csv'       , emit: csv
@@ -17,11 +18,12 @@ process SAMPLESHEET_CHECK {
     when:
     task.ext.when == null || task.ext.when
 
-    script: // This script is bundled with the pipeline, in niph/viralseq/bin/
+    script: // This script is taken from the viralrecon pipeline, in nf-core/viralrecon/bin/
     """
     check_samplesheet_hbv.py \\
         $samplesheet \\
-        samplesheet.valid.csv
+        samplesheet.valid.csv \\
+        --platform $platform
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
