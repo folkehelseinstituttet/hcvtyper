@@ -17,10 +17,7 @@ nextflow.enable.dsl = 2
 
 def primer_set         = ''
 def primer_set_version = 0
-if (params.platform == 'illumina' && params.protocol == 'amplicon') {
-    primer_set         = params.primer_set
-    primer_set_version = params.primer_set_version
-} else if (params.platform == 'nanopore') {
+if (params.platform == 'nanopore') {
     primer_set          = 'gunther'
     primer_set_version  = params.primer_set_version
     params.artic_scheme = WorkflowMain.getGenomeAttribute(params, 'scheme', log, primer_set, primer_set_version)
@@ -68,7 +65,7 @@ WorkflowMain.initialise(workflow, params, log)
 
 if (params.platform == 'illumina') {
     include { VIRALSEQ } from './workflows/viralseq'
-} else if (params.platform == 'nanopore' & params.agens == ' hbv') {
+} else if (params.platform == 'nanopore' & params.agens == 'HBV') {
     include { HBV_NANOPORE } from './workflows/hbv_nanopore'
 }
 
@@ -86,7 +83,7 @@ workflow NIPH_VIRALSEQ {
     //
     // WORKFLOW: HBV genome assembly and analysis from Gunther PCR and Nanopore data
     //
-    } else if (params.platform == 'nanopore' & params.agens == ' hbv') {
+    } else if (params.platform == 'nanopore' & params.agens == 'HBV') {
         HBV_NANOPORE ()
     }
 }
