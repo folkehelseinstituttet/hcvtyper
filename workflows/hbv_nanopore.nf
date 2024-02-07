@@ -8,7 +8,7 @@ include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-validation'
 
 def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
 def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
-def summary_params = paramsSummaryMap(workflow)
+//def summary_params = paramsSummaryMap(workflow)
 
 // Print parameter summary log to screen
 log.info logo + paramsSummaryLog(workflow) + citation
@@ -70,7 +70,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK         } from '../subworkflows/local/input_check'
+include { INPUT_CHECK         } from '../subworkflows/local/input_check_hbv'
 include { PREPARE_GENOME      } from '../subworkflows/local/prepare_genome_nanopore'
 include { SNPEFF_SNPSIFT      } from '../subworkflows/local/snpeff_snpsift'
 include { VARIANTS_LONG_TABLE } from '../subworkflows/local/variants_long_table'
@@ -353,9 +353,11 @@ workflow HBV_NANOPORE {
     //
     BCFTOOLS_STATS (
         VCFLIB_VCFUNIQ.out.vcf.join(TABIX_TABIX.out.tbi, by: [0]),
-        [],
-        [],
-        []
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ]
     )
     ch_versions = ch_versions.mix(BCFTOOLS_STATS.out.versions.first().ifEmpty(null))
 
@@ -377,7 +379,6 @@ workflow HBV_NANOPORE {
 
         MOSDEPTH_GENOME (
             ARTIC_MINION.out.bam_primertrimmed.join(ARTIC_MINION.out.bai_primertrimmed, by: [0]),
-            [ [:], [] ],
             [ [:], [] ]
         )
         ch_mosdepth_multiqc  = MOSDEPTH_GENOME.out.global_txt
@@ -389,8 +390,10 @@ workflow HBV_NANOPORE {
         ch_versions = ch_versions.mix(PLOT_MOSDEPTH_REGIONS_GENOME.out.versions)
 
         MOSDEPTH_AMPLICON (
+            // TODO: This is a temporary fix to get the amplicon coverage plot working
+            // Check if the input channels are correct
             ARTIC_MINION.out.bam_primertrimmed.join(ARTIC_MINION.out.bai_primertrimmed, by: [0]),
-            PREPARE_GENOME.out.primer_collapsed_bed.map { [ [:], it ] }.collect(),
+            //PREPARE_GENOME.out.primer_collapsed_bed.map { [ [:], it ] }.collect(),
             [ [:], [] ]
         )
         ch_versions = ch_versions.mix(MOSDEPTH_AMPLICON.out.versions.first().ifEmpty(null))
