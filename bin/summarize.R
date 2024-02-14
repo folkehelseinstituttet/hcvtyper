@@ -24,28 +24,28 @@ colnames(cutadapt_df) <- c("sampleName", "total_raw_read_pairs", "total_trimmed_
 
 for (i in 1:length(cutadapt_files)) {
   try(rm(cutadapt_stats))
-  
+
   # Get sample name
   cutadapt_df$sampleName[i] <- str_split(basename(cutadapt_files[i]), "\\.")[[1]][1]
-  
+
   # Get number of raw and trimmed read pairs
   try(cutadapt_stats <- as_tibble(read_lines(cutadapt_files[i])))
-  
+
   raw <- filter(cutadapt_stats, str_detect(value, "Total read pairs processed:"))
-  
+
   if (nrow(raw) > 0) {
     tmp <- str_split(raw, "\\s+")[[1]] # Split on white space and get the list content
     tmp <- as.numeric(str_remove(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
     cutadapt_df$total_raw_read_pairs[i] <- tmp
-  } 
-  
+  }
+
   trimmed <- filter(cutadapt_stats, str_detect(value, "Pairs written \\(passing filters\\)"))
-  
+
   if (nrow(trimmed) > 0) {
     tmp <- str_split(trimmed, "\\s+")[[1]] # Split on white space and get the list content
     tmp <- as.numeric(str_remove(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
     cutadapt_df$total_trimmed_read_pairs[i] <- tmp
-  } 
+  }
 }
 cutadapt_df <- as_tibble(cutadapt_df)
 
@@ -118,7 +118,7 @@ df_with_dups <- tmp_df %>%
   mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
   mutate(Major_reference = str_remove(Major_reference, "_major"),
          Minor_reference = str_remove(Minor_reference, "_minor")) %>%
-  select(-reference) %>% 
+  select(-reference) %>%
   # Calculate percent of the trimmed reads mapped
   #mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
   #       Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
@@ -297,9 +297,13 @@ for (i in 1:length(blast_files)) {
 # GLUE --------------------------------------------------------------------
 
 glue_file <- list.files(path = path_7, pattern = "GLUE_collected_report.tsv$", full.names = TRUE)
-glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) %>%
-  # Only keep the majority reports for the summary
-  filter(Major_minor == "major")
+glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
+
+if (nrow(glue_report) > 0) {
+  glue_report %>%
+    # Only keep the majority reports for the summary
+    filter(Major_minor == "major")
+}
 
 # Join dataframes ---------------------------------------------------------
 
@@ -307,15 +311,22 @@ final <-
   # Combine mapped reads data
   full_join(df_with_dups, df_nodups, join_by(sampleName, Major_reference, Minor_reference)) %>%
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
+
+if (nrow(glue_report) > 0) {
+  final <- final %>%
+    # Add glue result. Only Majority currently
+    left_join(glue_report, by = c("sampleName" = "Sample"))
+}
+
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>%
   # mutate(test = case_when(Majority_reference == reference ~ "OK",
   #                         Minority_reference == reference ~ "OK")) %>%
   # filter(test == "OK") %>%
-  # Add glue result. Only Majority currently
-  left_join(glue_report, by = c("sampleName" = "Sample")) %>% 
-  # Reorder columns
+
+# Reorder columns
+final <- final %>%
   select(sampleName,
          total_raw_read_pairs,
          total_trimmed_read_pairs,
@@ -332,7 +343,7 @@ final <-
          Read_pairs_nodup_mapped_minor,
          Percent_read_pairs_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
-         everything()) %>% 
+         everything()) %>%
   select(-Reference, -Major_minor)
 
 # Write file
