@@ -2,7 +2,7 @@
 
 library(tidyverse)
 
-summary_file <- list.files("^Genotype_mapping_summary_long.csv$", full.names = TRUE, recursive = TRUE)
+summary_file <- list.files(path = "/summarize", pattern = "^Genotype_mapping_summary_long.csv$", full.names = TRUE, recursive = TRUE)
 
 summary <- read_csv(summary_file)
 
