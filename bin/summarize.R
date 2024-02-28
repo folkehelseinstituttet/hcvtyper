@@ -300,7 +300,7 @@ glue_file <- list.files(path = path_7, pattern = "GLUE_collected_report.tsv$", f
 glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
 
 if (nrow(glue_report) > 0) {
-  glue_report %>%
+  glue_report <- glue_report %>%
     # Only keep the majority reports for the summary
     filter(Major_minor == "major")
 }
