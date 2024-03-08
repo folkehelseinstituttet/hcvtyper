@@ -14,7 +14,7 @@
     "//tanoti_stringency_2_comment": "Mapping stringency to use in the second mapping against specific references",
     "strategy": "mapping",
     "//strategy_comment": "Either 'mapping' or 'denovo'. Whether to use mapped reads or blast hit of denovo as basis for major and minor strain identification",
-    "minAgensRead": 5000,
+    "minAgensRead": 50000,
     "//minAgensRead_comment": "Minimum number of reads mapping (after removing duplicates) to the agent to be considered a minority referenceS",
     "minAgensCov": 5,
     "//minAgensCov_comment": "Minimum coverage (after the first mapping) to the agent to be considered a minority reference",
