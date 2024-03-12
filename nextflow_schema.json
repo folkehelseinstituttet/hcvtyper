@@ -282,8 +282,8 @@
             "default": "None"
         },
         "skip_assembly": {
-            "type": "string",
-            "default": "false"
+            "type": "boolean",
+            "default": "true"
         }
     }
 }

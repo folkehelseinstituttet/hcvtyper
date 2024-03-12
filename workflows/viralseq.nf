@@ -351,7 +351,7 @@ workflow VIRALSEQ {
     //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
-    if (params.agens == "HCV") {
+    if (params.agens == "HCV" && !params.skip_hcvglue) {
         // Collect the bam files from the major and minor mapping
         ch_hcv = MAJOR_MAPPING.out.aligned.collect{ it[1] }.mix(MINOR_MAPPING.out.aligned.collect{ it[1] }.ifEmpty([]))
         HCVGLUE (
@@ -380,10 +380,10 @@ workflow VIRALSEQ {
     } else {
         ch_blast = file("dummy_file")
     }
-    if (params.agens == "HCV") {
+    if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
-        ch_glue = Channel.empty()
+        ch_glue = file("dummy_file")
     }
 
 

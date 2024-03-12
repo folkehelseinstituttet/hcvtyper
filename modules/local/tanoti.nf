@@ -15,8 +15,8 @@ process TANOTI_ALIGN {
     val   stringency
 
     output:
-    tuple val(meta), path("*.{bam,sam}"), emit: aligned
-    path  "versions.yml"                , emit: versions
+    tuple val(meta), path("*.bam"), emit: aligned
+    path  "versions.yml"          , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
