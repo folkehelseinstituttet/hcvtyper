@@ -16,6 +16,7 @@ process SUMMARIZE {
     path 'depth/'
     path 'blast/'
     path 'glue/'
+    path 'id/'
 
     output:
     path '*long.csv'        , emit: summary
