@@ -120,7 +120,7 @@ workflow VIRALSEQ {
     // MODULE: Create Blast database from reference sequences
     //
     BLAST_MAKEBLASTDB (
-        file(params.references)
+        [ [id:"blastdb/"], file(params.references) ] // Add meta map before the reference file path
     )
     ch_versions = ch_versions.mix(BLAST_MAKEBLASTDB.out.versions)
 
@@ -139,6 +139,7 @@ workflow VIRALSEQ {
         INPUT_CHECK.out.reads
     )
     ch_versions = ch_versions.mix(CUTADAPT.out.versions)
+
 
     //
     // MODULE: Run FastQC on trimmed reads
@@ -175,36 +176,38 @@ workflow VIRALSEQ {
     // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
     ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
-    SPADES (
-        ch_reads,
-        [], // Empty input channel. Can be used to specify hmm profile
-        []  // Empty input channel. Placeholder for separate speficication of reads.
-    )
-    ch_versions = ch_versions.mix(SPADES.out.versions.first())
+    if (!params.skip_assembly) {
+            SPADES (
+                ch_reads,
+                [], // Empty input channel. Can be used to specify hmm profile
+                []  // Empty input channel. Placeholder for separate specification of reads.
+            )
+            ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
-    //
-    // MODULE: Blast assembled scaffolds against viral references.
-    //
-    BLAST_BLASTN (
-        SPADES.out.scaffolds,
-        BLAST_MAKEBLASTDB.out.db
-    )
-    ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+            //
+            // MODULE: Blast assembled scaffolds against viral references.
+            //
+            BLAST_BLASTN (
+                SPADES.out.scaffolds,
+                BLAST_MAKEBLASTDB.out.db
+            )
+            ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
 
-    //
-    // MODULE: Parse blast output
-    //
-    // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
-    // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
-    // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
-    // See Issue on this
-    ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
-    BLASTPARSE (
-        ch_blastparse,
-        file(params.references),
-        params.agens
-    )
-    ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+            //
+            // MODULE: Parse blast output
+            //
+            // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
+            // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
+            // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
+            // See Issue on this
+            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
+            BLASTPARSE (
+                ch_blastparse,
+                file(params.references),
+                params.agens
+            )
+            ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+    }
 
     //
     // MODULE: Map classified reads against all references
@@ -222,7 +225,7 @@ workflow VIRALSEQ {
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            file(params.references),
+            [ [], file(params.references) ], // Add empty meta map before the reference file path
             true, // Sort bam file
             params.tanoti_stringency_1
         )
@@ -303,7 +306,7 @@ workflow VIRALSEQ {
         // This will result in a channel with values that meet the read nr and coverage criteria
         ch_map_minor_filtered = ch_map_minor
         .filter { entry ->
-            def minorReads = entry[0]['minor_reads'].toInteger()
+            def minorReads = entry[0]['minor_read_pairs'].toInteger()
             def minorCov = entry[0]['minor_cov'].toInteger()
             minorReads > params.minAgensRead && minorCov > params.minAgensCov
         }
@@ -339,6 +342,7 @@ workflow VIRALSEQ {
         MAJOR_MAPPING.out.depth
     )
     ch_versions = ch_versions.mix(PLOT_COVERAGE_MAJOR.out.versions)
+
     PLOT_COVERAGE_MINOR (
         MINOR_MAPPING.out.depth
     )
@@ -347,13 +351,14 @@ workflow VIRALSEQ {
     //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
-    if (params.agens == "HCV") {
+    if (params.agens == "HCV" && !params.skip_hcvglue) {
         // Collect the bam files from the major and minor mapping
         ch_hcv = MAJOR_MAPPING.out.aligned.collect{ it[1] }.mix(MINOR_MAPPING.out.aligned.collect{ it[1] }.ifEmpty([]))
         HCVGLUE (
             ch_hcv.collect()
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
+
         HCV_GLUE_PARSER (
             HCVGLUE.out.GLUE_json
         )
@@ -365,18 +370,25 @@ workflow VIRALSEQ {
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarixty. Don't need the meta
+    ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
-    ch_stats_withdup = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
-    ch_stats_markdup = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
-    ch_depth = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
-    ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
-    if (params.agens == "HCV") {
+    ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
+    ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
+    ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
+    if (!params.skip_assembly) {
+        ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
+    } else {
+        ch_blast = file("dummy_file")
+    }
+    if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
-        ch_glue = Channel.empty()
+        ch_glue = file("dummy_file")
     }
 
+
     SUMMARIZE (
+        ch_cutadapt.collect(),
         ch_classified_reads.collect(),
         ch_stats_withdup.collect(),
         ch_stats_markdup.collect(),
@@ -406,10 +418,9 @@ workflow VIRALSEQ {
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
-    ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.summary.collectFile(name: 'sequencing_summary_mqc.csv'))
-
-
+    ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
 
     MULTIQC (
         ch_multiqc_files.collect(),

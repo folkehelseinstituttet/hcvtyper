@@ -11,7 +11,7 @@ process PLOTCOVERAGE {
     tuple val(meta), path(depth)
 
     output:
-    path("*.png")      , emit: png
+    path("*.png")      , emit: png, optional: true
     path "versions.yml", emit: versions
 
     when:

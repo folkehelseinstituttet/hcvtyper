@@ -7,12 +7,12 @@
                 "nf-core": {
                     "blast/blastn": {
                         "branch": "master",
-                        "git_sha": "cfd937a668919d948f6fcbf4218e79de50c2f36f",
+                        "git_sha": "f0d13ae7e1f9b24a705764f8673af859268d7077",
                         "installed_by": ["modules"]
                     },
                     "blast/makeblastdb": {
                         "branch": "master",
-                        "git_sha": "d763d24378326e1ec23e3a34bb47a0c82007c9d9",
+                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
                         "installed_by": ["modules"]
                     },
                     "bowtie2/align": {
@@ -39,13 +39,13 @@
                     },
                     "fastqc": {
                         "branch": "master",
-                        "git_sha": "bd8092b67b5103bdd52e300f75889442275c3117",
+                        "git_sha": "65ad3e0b9a4099592e1102e92e10455dc661cf53",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/fastqc/fastqc.diff"
                     },
                     "kraken2/kraken2": {
                         "branch": "master",
-                        "git_sha": "cfd937a668919d948f6fcbf4218e79de50c2f36f",
+                        "git_sha": "d6549f46c3c1c3fe3def110f3d18059a68a65cc6",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/kraken2/kraken2/kraken2-kraken2.diff"
                     },
@@ -96,7 +96,7 @@
                     },
                     "spades": {
                         "branch": "master",
-                        "git_sha": "cfd937a668919d948f6fcbf4218e79de50c2f36f",
+                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
                         "installed_by": ["modules"]
                     }
                 }

@@ -1,6 +1,7 @@
 process TANOTI_ALIGN {
     tag "$meta.id"
     label "process_low"
+    label "process_long"
 
     conda ""
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -9,13 +10,13 @@ process TANOTI_ALIGN {
 
     input:
     tuple val(meta) , path(reads)
-    path  (references)
+    tuple val(meta2), path(references)
     val   sort_bam
     val   stringency
 
     output:
-    tuple val(meta), path("*.{bam,sam}"), emit: aligned
-    path  "versions.yml"                , emit: versions
+    tuple val(meta), path("*.bam"), emit: aligned
+    path  "versions.yml"          , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
