@@ -19,7 +19,7 @@
 
 To run a minimal test:
 ```
-docker run main.nf -profile docker,test
+nextflow run main.nf -profile docker,test
 ```
 
 :::note
