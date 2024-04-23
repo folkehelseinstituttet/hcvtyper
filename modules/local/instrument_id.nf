@@ -2,9 +2,10 @@ process INSTRUMENT_ID {
     tag "$meta.id"
     label 'process_single'
 
+    conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-       'https://depot.galaxyproject.org/singularity/ubuntu:20.04' :
-       'nf-core/ubuntu:20.04' }"
+        'https://depot.galaxyproject.org/singularity/seqkit:2.2.0--h9ee0642_0':
+        'biocontainers/seqkit:2.2.0--h9ee0642_0' }"
 
     input:
     tuple val(meta), path(reads)
@@ -21,7 +22,7 @@ process INSTRUMENT_ID {
 
     """
     # Get the first line of the fastq file
-    sqid=\$(gzip -cd ${reads[0]} | awk 'FNR <= 1')
-    echo \${sqid} > ${prefix}_sequencerID.tsv
+    sqid=\$(seqkit head -n 1 ${reads[0]} | awk 'FNR <= 1')
+    echo \${sqid} > ${prefix}.sequencerID.tsv
     """
 }
