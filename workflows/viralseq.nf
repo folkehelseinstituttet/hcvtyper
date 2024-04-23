@@ -70,6 +70,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 // Local modules
 //
+include { INSTRUMENT_ID                       } from '../modules/local/instrument_id'
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
@@ -106,6 +107,13 @@ workflow VIRALSEQ {
     // TODO: OPTIONAL, you can use nf-validation plugin to create an input channel from the samplesheet with Channel.fromSamplesheet("input")
     // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
     // ! There is currently no tooling to help you write a sample sheet schema
+
+    //
+    // MODULE: Identify the instrument ID
+    //
+    INSTRUMENT_ID (
+        INPUT_CHECK.out.reads
+    )
 
     //
     // MODULE: Run Bowtie2_build to create a reference index
@@ -370,6 +378,7 @@ workflow VIRALSEQ {
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarixty. Don't need the meta
+    ch_sequence_id      = INSTRUMENT_ID.out.id.collect({it[1]})
     ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
@@ -386,7 +395,6 @@ workflow VIRALSEQ {
         ch_glue = file("dummy_file")
     }
 
-
     SUMMARIZE (
         ch_cutadapt.collect(),
         ch_classified_reads.collect(),
@@ -394,7 +402,8 @@ workflow VIRALSEQ {
         ch_stats_markdup.collect(),
         ch_depth.collect(),
         ch_blast,
-        ch_glue
+        ch_glue,
+        ch_sequence_id.collect()
     )
 
     //
