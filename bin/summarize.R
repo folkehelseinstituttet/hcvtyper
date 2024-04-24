@@ -502,8 +502,9 @@ lw_import <- final %>%
          "Majority quality:" = major_typbar,
          "Minor quality:" = minor_typbar,
          `...23`,
-         everything())
+         everything()
          )
+
 
 # Write file
 write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
