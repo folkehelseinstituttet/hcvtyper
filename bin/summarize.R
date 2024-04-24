@@ -197,12 +197,15 @@ df_nodups <- tmp_df %>%
 
 # Coverage ----------------------------------------------------------------
 
+# Add both breadth (in percent) and depth (average depth)
+# All this is without duplicates
+
 # List files
 cov_files <- list.files(path = path_5, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "first_major_minor")
+tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 5))
+colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "first_major_minor", "avg_depth")
 
 for (i in 1:length(cov_files)) {
   try(rm(cov))
@@ -221,6 +224,9 @@ for (i in 1:length(cov_files)) {
 
   # Reference length
   ref_length <- nrow(cov)
+  
+  # Average depth
+  tmp_df$avg_depth[i] <- mean(cov$X3)
 
   # Nr. of positions with coverage >= 5
   # If ref_length is zero it means that no reads were mapped. Set coverage to zero.
@@ -247,13 +253,16 @@ df_coverage <- tmp_df %>%
   # Create columns for major and minor coverage
   mutate(Major_cov_breadth_min_5 = case_when(first_major_minor == "major" ~ cov_breadth_min_5)) %>%
   mutate(Minor_cov_breadth_min_5 = case_when(first_major_minor == "minor" ~ cov_breadth_min_5)) %>%
+  # Create columns for major and minor average depth
+  mutate(Major_avg_depth = case_when(first_major_minor == "major" ~ avg_depth)) %>%
+  mutate(Minor_avg_depth = case_when(first_major_minor == "minor" ~ avg_depth)) %>%
   # Create columns for the major and minor references
   mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
   mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
   mutate(Major_reference = str_remove(Major_reference, "_major"),
          Minor_reference = str_remove(Minor_reference, "_minor")) %>%
   # Create one row per sample
-  select(-reference, -first_major_minor, -cov_breadth_min_5) %>%
+  select(-reference, -first_major_minor, -cov_breadth_min_5, -avg_depth) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
@@ -409,3 +418,59 @@ tt %>% colnames() %>% paste0(collapse = ",") %>% write_lines(file, append = TRUE
 
 # Write the data to file
 write_csv(tt, file, append = TRUE) # colnames will not be included
+
+
+# Create LW import --------------------------------------------------------
+
+# NEED TO ADD: 
+#  - AVERAGE DEPTH WITHOUT DUPLICATES
+#  - Percent covered above depth=9 without duplicates:
+#  - Percent most abundant minority genotype:
+#  - "Average depth minor without duplicates:
+#  - "Script name and stringency:
+#  - "Majority quality:" og "Minor quality" (typbar/ikke typbar)
+#  - ...23
+
+lw_import <- final %>% 
+  select("Sample" = sampleName,
+         "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
+         "Majority genotype:" = Major_genotype_mapping,
+         "Number of mapped reads:" = Reads_withdup_mapped_major,
+         "Average depth without duplicates" = ,
+         "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
+         "Percent covered above depth=9 without duplicates:" = ,
+         "Most abundant minority genotype" = Minor_genotype_mapping,
+         "Percent most abundant minority genotype:" = ,
+         "Number of mapped reads minor:" = Reads_withdup_mapped_minor,
+         "Percent covered minor:" = Minor_cov_breadth_min_5,
+         "Number of mapped reads minor without duplicates:" = Reads_nodup_mapped_minor,
+         "Average depth minor without duplicates:" = ,
+         "Script name and stringency:" = ,
+         "Total number of reads before trim:" = total_raw_reads,
+         "Total number of reads after trim:" = ,
+         "Majority quality:" = ,
+         "Minor quality:" = ,
+         "...23" = ,
+         GLUE_genotype,
+         GLUE_subtype,
+         starts_with("gleca"),
+         starts_with("grazo"),
+         starts_with("parita"),
+         starts_with("voxila"),
+         NS34A, NS34A_short,
+         starts_with("daclatas"),
+         starts_with("elbas"),
+         starts_with("ledipas"),
+         starts_with("ombitas"),
+         starts_with("pibrentas"),
+         starts_with("velpata"),
+         NS5A, NS5A_short,
+         starts_with("dasa"),
+         starts_with("sofos"),
+         NS5B, NS5B_short,
+         `HCV project version`,
+         `GLUE engine version`,
+         `PHE drug resistance extension version`
+         )
+
+
