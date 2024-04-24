@@ -204,8 +204,8 @@ df_nodups <- tmp_df %>%
 cov_files <- list.files(path = path_5, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 5))
-colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "first_major_minor", "avg_depth")
+tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 6))
+colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth")
 
 for (i in 1:length(cov_files)) {
   try(rm(cov))
@@ -228,19 +228,28 @@ for (i in 1:length(cov_files)) {
   # Average depth
   tmp_df$avg_depth[i] <- mean(cov$X3)
 
-  # Nr. of positions with coverage >= 5
+  # Nr. of positions with coverage >= 5 and > 9
   # If ref_length is zero it means that no reads were mapped. Set coverage to zero.
   # Coverage may also be zero if there are reads mapped, but never more than 5 per position
   if (ref_length > 0) {
-    pos <- nrow(
+    pos_5 <- nrow(
       cov %>%
         filter(X3 >= 5)
     )
+    
+    pos_10 <- nrow(
+      cov %>%
+        filter(X3 > 9)
+    )
     # Coverage breadth
-    breadth <- round(pos / ref_length * 100, digits = 2)
-    tmp_df$cov_breadth_min_5[i] <- breadth
+    breadth_5 <- round(pos_5 / ref_length * 100, digits = 2)
+    tmp_df$cov_breadth_min_5[i] <- breadth_5
+    
+    breadth_10 <- round(pos_10 / ref_length * 100, digits = 2)
+    tmp_df$cov_breadth_min_10[i] <- breadth_10
   } else if (ref_length == 0) {
     tmp_df$cov_breadth_min_5[i] <- 0
+    tmp_df$cov_breadth_min_10[i] <- 0
   }
 }
 
@@ -253,6 +262,8 @@ df_coverage <- tmp_df %>%
   # Create columns for major and minor coverage
   mutate(Major_cov_breadth_min_5 = case_when(first_major_minor == "major" ~ cov_breadth_min_5)) %>%
   mutate(Minor_cov_breadth_min_5 = case_when(first_major_minor == "minor" ~ cov_breadth_min_5)) %>%
+  mutate(Major_cov_breadth_min_10 = case_when(first_major_minor == "major" ~ cov_breadth_min_10)) %>%
+  mutate(Minor_cov_breadth_min_10 = case_when(first_major_minor == "minor" ~ cov_breadth_min_10)) %>%
   # Create columns for major and minor average depth
   mutate(Major_avg_depth = case_when(first_major_minor == "major" ~ avg_depth)) %>%
   mutate(Minor_avg_depth = case_when(first_major_minor == "minor" ~ avg_depth)) %>%
@@ -262,7 +273,7 @@ df_coverage <- tmp_df %>%
   mutate(Major_reference = str_remove(Major_reference, "_major"),
          Minor_reference = str_remove(Minor_reference, "_minor")) %>%
   # Create one row per sample
-  select(-reference, -first_major_minor, -cov_breadth_min_5, -avg_depth) %>%
+  select(-reference, -first_major_minor, -cov_breadth_min_5, -cov_breadth_min_10, -avg_depth) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
@@ -367,6 +378,11 @@ if (nrow(glue_report) > 0) {
     left_join(glue_report, by = c("sampleName" = "Sample"))
 }
 
+# Add percentage of total classified reads belonging to major and minor genotype. Duplicates included. As a proxy for abundance.
+final <- final %>% 
+  mutate(abundance_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
+  mutate(abundance_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
+
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>%
   # mutate(test = case_when(Majority_reference == reference ~ "OK",
@@ -423,34 +439,32 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 # Create LW import --------------------------------------------------------
 
 # NEED TO ADD: 
-#  - AVERAGE DEPTH WITHOUT DUPLICATES
-#  - Percent covered above depth=9 without duplicates:
-#  - Percent most abundant minority genotype:
-#  - "Average depth minor without duplicates:
 #  - "Script name and stringency:
 #  - "Majority quality:" og "Minor quality" (typbar/ikke typbar)
-#  - ...23
 
 lw_import <- final %>% 
+  add_column("...23" = NA) %>% 
   select("Sample" = sampleName,
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
          "Number of mapped reads:" = Reads_withdup_mapped_major,
-         "Average depth without duplicates" = ,
+         "Average depth without duplicates" = Major_avg_depth,
          "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
-         "Percent covered above depth=9 without duplicates:" = ,
+         "Percent covered above depth=9 without duplicates:" = Major_cov_breadth_min_10,
          "Most abundant minority genotype" = Minor_genotype_mapping,
-         "Percent most abundant minority genotype:" = ,
+         "Percent most abundant minority genotype:" = abundance_minor,
          "Number of mapped reads minor:" = Reads_withdup_mapped_minor,
          "Percent covered minor:" = Minor_cov_breadth_min_5,
          "Number of mapped reads minor without duplicates:" = Reads_nodup_mapped_minor,
-         "Average depth minor without duplicates:" = ,
+         "Average depth minor without duplicates:" = Minor_avg_depth,
+         "Percent covered above depth=5 minor without duplicates:" = Minor_cov_breadth_min_5,
+         "Percent covered above depth=9 minor without duplicates:" = Minor_cov_breadth_min_10,
          "Script name and stringency:" = ,
          "Total number of reads before trim:" = total_raw_reads,
          "Total number of reads after trim:" = ,
          "Majority quality:" = ,
          "Minor quality:" = ,
-         "...23" = ,
+         `...23`,
          GLUE_genotype,
          GLUE_subtype,
          starts_with("gleca"),
