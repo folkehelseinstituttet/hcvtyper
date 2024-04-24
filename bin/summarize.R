@@ -401,7 +401,21 @@ script_string <- paste0(
 )
 
 final <- final %>% 
-  add_column("Script name and stringency:" = script_string)
+  add_column("script_name_stringency" = script_string)
+
+
+# Decide if a sample is "typbar" or not
+#NB! Currently only dumy thresholds. Needs to be adjusted
+
+final <- final %>% 
+  mutate(major_typbar = case_when(
+    Major_cov_breadth_min_5 >= 20 ~ "YES",
+    .default = "NO"
+  )) %>% 
+  mutate(minor_typbar = case_when(
+    Minor_cov_breadth_min_5 >= 20 ~ "YES",
+    .default = "NO"
+  ))
 
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>%
@@ -482,32 +496,16 @@ lw_import <- final %>%
          "Average depth minor without duplicates:" = Minor_avg_depth,
          "Percent covered above depth=5 minor without duplicates:" = Minor_cov_breadth_min_5,
          "Percent covered above depth=9 minor without duplicates:" = Minor_cov_breadth_min_10,
-         "Script name and stringency:" = ,
+         "Script name and stringency:" = script_name_stringency,
          "Total number of reads before trim:" = total_raw_reads,
-         "Total number of reads after trim:" = ,
-         "Majority quality:" = ,
-         "Minor quality:" = ,
+         "Total number of reads after trim:" = total_trimmed_reads,
+         "Majority quality:" = major_typbar,
+         "Minor quality:" = minor_typbar,
          `...23`,
-         GLUE_genotype,
-         GLUE_subtype,
-         starts_with("gleca"),
-         starts_with("grazo"),
-         starts_with("parita"),
-         starts_with("voxila"),
-         NS34A, NS34A_short,
-         starts_with("daclatas"),
-         starts_with("elbas"),
-         starts_with("ledipas"),
-         starts_with("ombitas"),
-         starts_with("pibrentas"),
-         starts_with("velpata"),
-         NS5A, NS5A_short,
-         starts_with("dasa"),
-         starts_with("sofos"),
-         NS5B, NS5B_short,
-         `HCV project version`,
-         `GLUE engine version`,
-         `PHE drug resistance extension version`
+         everything())
          )
+
+# Write file
+write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
 
 
