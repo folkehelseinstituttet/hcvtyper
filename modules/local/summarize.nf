@@ -23,6 +23,7 @@ process SUMMARIZE {
     output:
     path '*long.csv'        , emit: summary
     path '*mqc.csv'         , emit: mqc
+    path '*LW_import.csv'   , emit: lw
     path "versions.yml"     , emit: versions
 
     when:
