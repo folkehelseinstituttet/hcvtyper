@@ -10,6 +10,7 @@ path_4 <- "stats_markdup/"
 path_5 <- "depth/"
 path_6 <- "blast/"
 path_7 <- "glue/"
+path_8 <- "id/"
 
 
 
@@ -307,13 +308,49 @@ if (nrow(glue_report) > 0) {
     filter(Major_minor == "major")
 }
 
+# Sequencer ID ------------------------------------------------------------
+id_files <- list.files(path = path_8, pattern = "sequencerID.tsv$", full.names = TRUE)
+
+if (length(id_files > 0)) {
+    # Empty df
+    id_df <- as.data.frame(matrix(nrow = length(id_files), ncol = 2))
+    colnames(id_df) <- c("sampleName", "sequencer_id")
+}
+
+for (i in 1:length(id_files)) {
+  try(rm(id))
+
+  # Get sample name
+  id_df$sampleName[i] <- str_split(basename(id_files[i]), "\\.")[[1]][1]
+
+  # Get the sequencer id
+  id <- read_tsv(id_files[i], col_names = FALSE)
+  
+  # Extract the first field if header does not start with '@SRR'
+  if (str_detect(id$X1, "^@SRR")) {
+    id_df$sequencer_id[i] <- id %>% pull(X1)
+  } else {
+    id_df$sequencer_id[i] <- id %>% 
+      # Extract string up to the first ":". 
+      # The "?" means a "lazy", or non-greedy, match to get the shortest string that satisfies the criteria. 
+      # This is useful because there are several ":"
+      str_extract("^.*?:") %>% 
+      # Remove the leading "@" and the trailing ":"
+      str_remove_all("^@|:$") 
+  }
+}
+
+id_df <- as_tibble(id_df)
+
 # Join dataframes ---------------------------------------------------------
 
 final <-
   # Combine mapped reads data
   full_join(df_with_dups, df_nodups, join_by(sampleName, Major_reference, Minor_reference)) %>%
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  # Add sequencer id
+  left_join(id_df, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
