@@ -2,7 +2,15 @@
 
 library(tidyverse)
 
-# Number of mapped reads --------------------------------------------------
+args = commandArgs(trailingOnly=TRUE)
+
+# Define variables --------------------------------------------------------
+
+# NB! Script name is currently hard coded. Needs to be changed
+script_name <- "viralseq"
+stringency_1 <- args[1]
+stringency_2 <- args[2]
+
 path_1 <- "cutadapt/"
 path_2 <- "kraken_classified/"
 path_3 <- "stats_withdup/"
@@ -383,6 +391,18 @@ final <- final %>%
   mutate(abundance_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
   mutate(abundance_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
 
+# Add tanoti mapping stringencies
+# Merge the stringencies and add script name.
+script_string <- paste0(
+  script_name, 
+  "(", 
+  paste(stringency_1, stringency_2, sep = "/"), 
+  ")"
+)
+
+final <- final %>% 
+  add_column("Script name and stringency:" = script_string)
+
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>%
   # mutate(test = case_when(Majority_reference == reference ~ "OK",
@@ -403,10 +423,14 @@ final <- final %>%
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
          Major_cov_breadth_min_5,
+         Major_cov_breadth_min_10,
+         abundance_major,
          Reads_withdup_mapped_minor,
          Reads_nodup_mapped_minor,
          Percent_reads_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
+         Minor_cov_breadth_min_10,
+         abundance_minor,
          everything()) #%>%
   #select(-Reference, -Major_minor)
 
@@ -439,7 +463,6 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 # Create LW import --------------------------------------------------------
 
 # NEED TO ADD: 
-#  - "Script name and stringency:
 #  - "Majority quality:" og "Minor quality" (typbar/ikke typbar)
 
 lw_import <- final %>% 

@@ -9,6 +9,8 @@ process SUMMARIZE {
         'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
+    val stringency_1
+    val stringency_2
     path 'cutadapt/'
     path 'kraken_classified/'
     path 'stats_withdup/'
@@ -30,7 +32,7 @@ process SUMMARIZE {
     def args = task.ext.args ?: ''
 
     """
-    summarize.R
+    summarize.R $stringency_1 $stringency_2
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -396,6 +396,8 @@ workflow VIRALSEQ {
     }
 
     SUMMARIZE (
+        params.tanoti_stringency_1,
+        params.tanoti_stringency_2,
         ch_cutadapt.collect(),
         ch_classified_reads.collect(),
         ch_stats_withdup.collect(),
