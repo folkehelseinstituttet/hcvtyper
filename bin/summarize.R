@@ -485,6 +485,8 @@ lw_import <- final %>%
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
          "Number of mapped reads:" = Reads_withdup_mapped_major,
+#         "Percent covered:" = ,
+         "Number of mapped reads without duplicates:" = Reads_nodup_mapped_major,
          "Average depth without duplicates" = Major_avg_depth,
          "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
          "Percent covered above depth=9 without duplicates:" = Major_cov_breadth_min_10,
