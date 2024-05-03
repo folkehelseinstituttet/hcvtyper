@@ -2,7 +2,7 @@
 
 library(tidyverse)
 
-summary_file <- list.files(path = "/summarize", pattern = "^Genotype_mapping_summary_long.csv$", full.names = TRUE, recursive = TRUE)
+summary_file <- list.files(path = "/summarize", pattern = "^Genotype_mapping_summary_long_LW_import.csv$", full.names = TRUE, recursive = TRUE)
 
 summary <- read_csv(summary_file)
 
@@ -24,4 +24,4 @@ if (nrow(glue_report) > 0) {
 }
 
 # Write file
-write_csv(final, file = "Genotype_mapping_summary_long_with_glue.csv")
+write_csv(final, file = "Genotype_mapping_summary_long_LW_import_with_glue.csv")
