@@ -497,7 +497,7 @@ lw_import <- final %>%
          "Number of mapped reads:" = Reads_withdup_mapped_major,
          "Percent covered:" = Major_cov_breadth_min_1,
          "Number of mapped reads without duplicates:" = Reads_nodup_mapped_major,
-         "Average depth without duplicates" = Major_avg_depth,
+         "Average depth without duplicates:" = Major_avg_depth,
          "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
          "Percent covered above depth=9 without duplicates:" = Major_cov_breadth_min_10,
          "Most abundant minority genotype" = Minor_genotype_mapping,
@@ -515,6 +515,17 @@ lw_import <- final %>%
          "Minor quality:" = minor_typbar,
          `...23`,
          everything()
+         ) %>%
+  select(-`Most abundant minority genotype`, 
+         -total_classified_reads,
+         -Major_reference,
+         -Minor_reference,
+         -abundance_major,
+         -Percent_reads_mapped_of_trimmed_with_dups_minor,
+         -Reads_nodup_mapped_first_mapping,
+         -Minor_cov_breadth_min_1,
+         -Reference,
+         -Major_minor
          )
 
 
