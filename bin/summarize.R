@@ -523,8 +523,7 @@ lw_import <- final %>%
          -abundance_major,
          -Percent_reads_mapped_of_trimmed_with_dups_minor,
          -Reads_nodup_mapped_first_mapping,
-         -Minor_cov_breadth_min_1,
-         -Major_minor
+         -Minor_cov_breadth_min_1
          )
 
 
