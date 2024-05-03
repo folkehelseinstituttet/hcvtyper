@@ -20,7 +20,7 @@ if (nrow(glue_report) > 0) {
 if (nrow(glue_report) > 0) {
   final <- summary %>%
     # Add glue result. Only Majority currently
-    left_join(glue_report, by = c("sampleName" = "Sample"))
+    left_join(glue_report, by = join_by(Sample))
 }
 
 # Write file
