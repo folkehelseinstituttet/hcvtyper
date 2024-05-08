@@ -521,11 +521,20 @@ lw_import <- final %>%
          -abundance_major,
          -Percent_reads_mapped_of_trimmed_with_dups_minor,
          -Reads_nodup_mapped_first_mapping,
-         -Minor_cov_breadth_min_1,
-         -Reference,
-         -Major_minor
+         -Minor_cov_breadth_min_1
          )
 
+# Remove column "Reference" if exists
+# This column is not present if GLUE is dropped
+if ("^Reference$" %in% colnames(lw_import)) {
+  lw_import <- lw_import %>% select(-Reference)
+}
+
+# Remove column "Major_minor" if exists
+# This column is not present if GLUE is dropped
+if ("^Major_minor$" %in% colnames(lw_import)) {
+  lw_import <- lw_import %>% select(-Major_minor)
+}
 
 # Write file
 write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
