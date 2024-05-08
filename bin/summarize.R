@@ -524,12 +524,6 @@ lw_import <- final %>%
          -Minor_cov_breadth_min_1
          )
 
-# Remove column "Reference" if exists
-# This column is not present if GLUE is dropped
-if ("^Reference$" %in% colnames(lw_import)) {
-  lw_import <- lw_import %>% select(-Reference)
-}
-
 # Remove column "Major_minor" if exists
 # This column is not present if GLUE is dropped
 if ("^Major_minor$" %in% colnames(lw_import)) {
