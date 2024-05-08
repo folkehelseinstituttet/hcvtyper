@@ -490,7 +490,6 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 #  - "Majority quality:" og "Minor quality" (typbar/ikke typbar)
 
 lw_import <- final %>%
-  add_column("...23" = NA) %>%
   select("Sample" = sampleName,
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
@@ -513,17 +512,18 @@ lw_import <- final %>%
          "Total number of reads after trim:" = total_trimmed_reads,
          "Majority quality:" = major_typbar,
          "Minor quality:" = minor_typbar,
-         `...23`,
          everything()
          ) %>%
-  select(-`Most abundant minority genotype`, 
+  select(-`Most abundant minority genotype`,
          -total_classified_reads,
          -Major_reference,
          -Minor_reference,
          -abundance_major,
          -Percent_reads_mapped_of_trimmed_with_dups_minor,
          -Reads_nodup_mapped_first_mapping,
-         -Minor_cov_breadth_min_1
+         -Minor_cov_breadth_min_1,
+         -Reference,
+         -Major_minor
          )
 
 
