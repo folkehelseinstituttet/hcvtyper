@@ -1,4 +1,4 @@
-# ![niph/viralseq](docs/images/logo-engelsk-hele-navnet.svg#gh-light-mode-only)
+# ![niph/viralseq](docs/images/logo-engelsk-hele-navnet.webp#gh-light-mode-only) # ![niph/viralseq](docs/images/logo-engelsk-hele-navnet-hvit.webp#gh-dark-mode-only)
 
 ## Introduction
 
