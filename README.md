@@ -9,7 +9,7 @@
 maps Illumina reads to a reference genome and creates a consensus sequence. 
 
 ## Requirements  
-The pipeline only requires (Nextflow)[https://nextflow.io/] and (Docker)[https://www.docker.com/] in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
   
 ## Usage
 First you should clone this repo:  
