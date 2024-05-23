@@ -1,3 +1,5 @@
+# ![niph/viralseq](docs/images/logo-engelsk-hele-navnet.svg)
+
 ## Introduction
 
 **niph/viralseq** is a bioinformatics pipeline that ...
