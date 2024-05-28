@@ -77,6 +77,8 @@ breadth_int <- as.integer(pos / ref_length * 100)
 df_final$major_cov[1] <- breadth_int
 
 ## Minor
+# Only execute if two or more references have reads mapped
+if(nrow(df) > 1) { 
 minor_tmp <- summary$Subtype[2] 
 minor_ref <- df %>% 
   filter(Subtype == minor_tmp) %>% 
@@ -114,7 +116,7 @@ breadth <- round(pos / ref_length * 100, digits = 2)
 breadth_int <- as.integer(pos / ref_length * 100)
 
 df_final$minor_cov[1] <- breadth_int
-
+}
 
 # Write results
 write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
@@ -125,8 +127,9 @@ write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
 # Read the reference fasta file
 fasta <- read.fasta(file = references)
 write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
+if (nrow(df) > 1) {
 write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
-
+}
 }
 # Write out sessionInfo() to track versions
 # session <- capture.output(sessionInfo())
