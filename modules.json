@@ -43,6 +43,11 @@
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/fastqc/fastqc.diff"
                     },
+                    "fastqscreen/fastqscreen": {
+                        "branch": "master",
+                        "git_sha": "e1316cdcbef318b9cdfd35586423f8337c3d45f0",
+                        "installed_by": ["modules"]
+                    },
                     "kraken2/kraken2": {
                         "branch": "master",
                         "git_sha": "d6549f46c3c1c3fe3def110f3d18059a68a65cc6",

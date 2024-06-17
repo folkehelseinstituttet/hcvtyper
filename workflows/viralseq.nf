@@ -54,6 +54,7 @@ include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/
 include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
 include { FASTQC                             } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
+include { FASTQSCREEN_FASTQSCREEN            } from '../modules/nf-core/fastqscreen/fastqscreen/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
@@ -113,6 +114,14 @@ workflow VIRALSEQ {
     //
     INSTRUMENT_ID (
         INPUT_CHECK.out.reads
+    )
+
+    //
+    // MODULE: Run Fastqscreen to remove human reads
+    //
+    FASTQSCREEN_FASTQSCREEN (
+        INPUT_CHECK.out.reads,
+        PATH TO DATABASE
     )
 
     //
