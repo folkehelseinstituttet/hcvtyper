@@ -64,6 +64,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 // Local modules
 //
 include { INSTRUMENT_ID                      } from '../modules/local/instrument_id'
+include { VIGOR                              } from '../modules/local/vigor4'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -173,6 +174,12 @@ workflow ROV_ILLUMINA {
     )
     ch_versions = ch_versions.mix(SPADES_ISOLATE.out.versions.first())
 
+    //
+    // MODULE: Run VIGOR4
+    //
+    VIGOR (
+        SPADES_RNAVIRAL.out.contigs
+    )
     //
     // MODULE: Dump software versions
     //
