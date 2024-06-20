@@ -39,13 +39,39 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { VIRALSEQ } from './workflows/viralseq'
+if (params.platform == 'illumina' & params.agens == 'HCV') {
+    include { VIRALSEQ } from './workflows/viralseq'
+} else if (params.platform == 'illumina' & params.agens == 'ROV') {
+    include { ROV_ILLUMINA } from './workflows/rov_illumina'
+} else if (params.platform == 'nanopore' & params.agens == 'HBV') {
+    include { HBV_NANOPORE } from './workflows/hbv_nanopore'
+}
+
+
 
 //
 // WORKFLOW: Run main niph/viralseq analysis pipeline
 //
 workflow NIPH_VIRALSEQ {
-    VIRALSEQ ()
+
+    //
+    // WORKFLOW: HCV genome assembly and analysis from Illumina capture data
+    //
+    if (params.platform == 'illumina' & params.agens == 'HCV') {
+        VIRALSEQ ()
+
+    //
+    // WORKFLOW: ROV genome assembly and analysis from Illumina data
+    //
+    } else if (params.platform == 'illumina' & params.agens == 'ROV') {
+        ROV_ILLUMINA ()
+
+    //
+    // WORKFLOW: HBV genome assembly and analysis from Gunther PCR and Nanopore data
+    //
+    } else if (params.platform == 'nanopore' & params.agens == 'HBV') {
+        HBV_NANOPORE ()
+    }
 }
 
 /*
