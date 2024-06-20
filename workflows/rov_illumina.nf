@@ -56,7 +56,8 @@ include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/m
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
-include { SPADES                             } from '../modules/nf-core/spades/main'
+include { SPADES as SPADES_RNAVIRAL          } from '../modules/nf-core/spades/main'
+include { SPADES as SPADES_ISOLATE           } from '../modules/nf-core/spades/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -150,6 +151,27 @@ workflow ROV_ILLUMINA {
     BBMAP_BBNORM (
         KRAKEN2_FOCUSED.out.classified_reads_fastq
     )
+
+    //
+    // MODULE: de novo assembly with Spades
+    //
+
+    // Create input read channel for SPADES.
+    // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
+    ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
+    SPADES_RNAVIRAL (
+        ch_reads,
+        [], // Empty input channel. Can be used to specify hmm profile
+        []  // Empty input channel. Placeholder for separate specification of reads.
+    )
+    ch_versions = ch_versions.mix(SPADES_RNAVIRAL.out.versions.first())
+
+    SPADES_ISOLATE (
+        ch_reads,
+        [], // Empty input channel. Can be used to specify hmm profile
+        []  // Empty input channel. Placeholder for separate specification of reads.
+    )
+    ch_versions = ch_versions.mix(SPADES_ISOLATE.out.versions.first())
 
     //
     // MODULE: Dump software versions
