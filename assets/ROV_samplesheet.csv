@@ -1,0 +1,2 @@
+sample,fastq_1,fastq_2
+ROV_1,data/reads/ROV_R1.fastq.gz,data/reads/ROV_R2.fastq.gz
