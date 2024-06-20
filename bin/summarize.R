@@ -44,7 +44,7 @@ for (i in 1:length(cutadapt_files)) {
 
   if (nrow(raw) > 0) {
     tmp <- str_split(raw, "\\s+")[[1]] # Split on white space and get the list content
-    tmp <- as.numeric(str_remove(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
+    tmp <- as.numeric(str_remove_all(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
     tmp <- tmp*2 # Double to get reads
     cutadapt_df$total_raw_reads[i] <- tmp
   }
@@ -53,7 +53,7 @@ for (i in 1:length(cutadapt_files)) {
 
   if (nrow(trimmed) > 0) {
     tmp <- str_split(trimmed, "\\s+")[[1]] # Split on white space and get the list content
-    tmp <- as.numeric(str_remove(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
+    tmp <- as.numeric(str_remove_all(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
     tmp <- tmp*2 # Double to get reads
     cutadapt_df$total_trimmed_reads[i] <- tmp
   }
