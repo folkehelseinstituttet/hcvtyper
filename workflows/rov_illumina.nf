@@ -180,6 +180,8 @@ workflow ROV_ILLUMINA {
     VIGOR (
         SPADES_RNAVIRAL.out.contigs
     )
+    ch_versions = ch_versions.mix(VIGOR.out.versions.first())
+
     //
     // MODULE: Dump software versions
     //

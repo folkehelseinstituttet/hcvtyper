@@ -14,6 +14,7 @@ process VIGOR {
 
     output:
     tuple val(meta), path("*"), emit: vigor_out
+    path  "versions.yml"      , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -28,6 +29,11 @@ process VIGOR {
         -i ${prefix}_contigs.fasta \\
         -o ${meta.id}_vigor4_out \\
         -d rtva
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        vigor4: \$( /home/vigor4/vigor4/bin/vigor4 --version )
+    END_VERSIONS
     """
 
     stub:
