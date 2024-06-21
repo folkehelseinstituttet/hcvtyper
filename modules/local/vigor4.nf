@@ -2,6 +2,7 @@ process VIGOR {
 
     label 'process_medium'
     errorStrategy 'terminate'
+    containerOptions '-u $(id -u):$(id -g)'
 
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
