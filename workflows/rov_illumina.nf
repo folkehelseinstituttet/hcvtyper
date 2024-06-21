@@ -159,7 +159,7 @@ workflow ROV_ILLUMINA {
 
     // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
-    ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
+    ch_reads = BBMAP_BBNORM.out.fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
     SPADES_RNAVIRAL (
         ch_reads,
         [], // Empty input channel. Can be used to specify hmm profile
