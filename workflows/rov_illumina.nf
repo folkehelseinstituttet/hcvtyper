@@ -183,6 +183,14 @@ workflow ROV_ILLUMINA {
     ch_versions = ch_versions.mix(VIGOR.out.versions.first())
 
     //
+    // MODULE: Parse VIGOR4 output
+    //
+    ch_vigorparse = VIGOR.out.gff3.join(VIGOR.out.contigs) // Create a tuple channel with meta, gff3 and contigs
+    PARSE_VIGOR (
+        ch_vigorparse
+    )
+
+    //
     // MODULE: Dump software versions
     //
     CUSTOM_DUMPSOFTWAREVERSIONS (
