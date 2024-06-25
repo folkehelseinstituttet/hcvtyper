@@ -15,7 +15,7 @@ def extract_sequences(name, thresholds):
         # Set the thresholds for the current gene, or use default values if not specified
         lower_threshold, upper_threshold = thresholds.get(name, (100, 10000))  # Default thresholds
 
-        with open(gff3) as gff_file, open(fasta) as fasta_file, open('output_log.txt', 'w') as log_file:
+        with open(gff3) as gff_file, open(fasta) as fasta_file:
             sequences = SeqIO.parse(fasta_file, "fasta")
             fasta_dict = {seq.id: seq for seq in sequences}
 
