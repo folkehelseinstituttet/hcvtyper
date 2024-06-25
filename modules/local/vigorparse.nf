@@ -11,14 +11,16 @@ process PARSE_VIGOR {
     tuple val(meta), path(gff3), path(contigs)
 
     output:
-    path "versions.yml"           , emit: versions
+    tuple val(meta), path("*.fasta"), emit: gene_fasta
+    path "versions.yml"             , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
+    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    ExtractGeneFromGff3.py
+    ExtractGeneFromGff3.py $prefix $gff3 $contigs
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
