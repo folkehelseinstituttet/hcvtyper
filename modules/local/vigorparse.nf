@@ -5,13 +5,12 @@ process PARSE_VIGOR {
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-        'docker.io/python:alpine3.20' }"
+        'docker.io/pegi3s/biopython:1.78' }"
 
     input:
     tuple val(meta), path(gff3), path(contigs)
 
     output:
-    path("*.tsv"), emit: GLUE_summary
     path "versions.yml"           , emit: versions
 
     when:
@@ -19,13 +18,11 @@ process PARSE_VIGOR {
 
     script:
     """
-    ExtractGeneFromGff3_multiple2.py
+    ExtractGeneFromGff3.py
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-      r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-      tidyverse: \$(Rscript -e "library(tidyverse); cat(as.character(packageVersion('tidyverse')))")
-      seqinr: \$(Rscript -e "library(seqinr); cat(as.character(packageVersion('seqinr')))")
+      Python: \$(python --version 2>&1 | cut -d' ' -f2)
     END_VERSIONS
     """
 
