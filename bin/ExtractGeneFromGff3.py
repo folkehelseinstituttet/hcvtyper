@@ -3,13 +3,19 @@
 import sys
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+import sys
+
+# Define input files
+sample_id = sys.argv[1]
+gff3      = sys.argv[2]
+fasta     = sys.argv[3]
 
 def extract_sequences(name, thresholds):
     try:
         # Set the thresholds for the current gene, or use default values if not specified
         lower_threshold, upper_threshold = thresholds.get(name, (100, 10000))  # Default thresholds
 
-        with open("vigor4.gff3") as gff_file, open("contigs.fasta") as fasta_file:
+        with open(gff3) as gff_file, open(fasta) as fasta_file, open('output_log.txt', 'w') as log_file:
             sequences = SeqIO.parse(fasta_file, "fasta")
             fasta_dict = {seq.id: seq for seq in sequences}
 
@@ -45,7 +51,9 @@ def extract_sequences(name, thresholds):
             seq_diffs.sort(key=lambda x: len(x.seq), reverse=True)
 
             # Save all sequences in a single file
-            output_file = f"output_{name}.fasta"
+            # Modify output file name
+            #output_file = name.replace("vigor4_out.gff3", "vigorparse") + ".fasta"
+            output_file = f"{sample_id}_{name}.fasta"
             with open(output_file, "w") as out_file:
                 SeqIO.write(seq_diffs, out_file, "fasta")
 
@@ -56,8 +64,7 @@ def extract_sequences(name, thresholds):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        name = sys.argv[1]
-        # Define thresholds for each gene here with lower and upper bounds
+        # Create a dictionary with gene names and length thresholds with lower and upper bounds
         thresholds = {
             "VP7": (490, 1300),
             "VP4": (1100, 2500),
@@ -72,6 +79,8 @@ if __name__ == "__main__":
             "NSP5": (500, 750)
             # Add more gene names and their thresholds as needed
         }
-        extract_sequences(name, thresholds)
+        # Loop through all genes and extract sequences
+        for name in thresholds.keys():
+            extract_sequences(name, thresholds)
     else:
         print("Please provide the gene name parameter.")
