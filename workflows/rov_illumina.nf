@@ -53,6 +53,7 @@ include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
 include { FASTQC                             } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
+include { MAFFT                              } from '../modules/nf-core/mafft/main'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
@@ -191,6 +192,18 @@ workflow ROV_ILLUMINA {
         ch_vigorparse
     )
     ch_versions = ch_versions.mix(PARSE_VIGOR.out.versions.first())
+
+    // TODO
+    // PARSE_VIGOR produces a channel with [[meta], [fasta_file_1, fasta_file_2, ...]]
+    // Will try to split this and process each fasta separately for MAFFT and IQTREE
+    PARSE_VIGOR.out.gene_fasta
+    .transpose()
+    .view()
+
+    MAFFT(
+        PARSE_VIGOR.out.gene_fasta.transpose()
+    )
+    ch_versions = ch_versions.mix(MAFFT.out.versions.first())
 
     //
     // MODULE: Dump software versions
