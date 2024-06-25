@@ -65,6 +65,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 include { INSTRUMENT_ID                      } from '../modules/local/instrument_id'
 include { VIGOR                              } from '../modules/local/vigor4'
+include { PARSE_VIGOR                        } from '../modules/local/vigorparse'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,6 +190,7 @@ workflow ROV_ILLUMINA {
     PARSE_VIGOR (
         ch_vigorparse
     )
+    ch_versions = ch_versions.mix(PARSE_VIGOR.out.versions.first())
 
     //
     // MODULE: Dump software versions
