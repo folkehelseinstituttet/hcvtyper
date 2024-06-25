@@ -193,15 +193,18 @@ workflow ROV_ILLUMINA {
     )
     ch_versions = ch_versions.mix(PARSE_VIGOR.out.versions.first())
 
-    // TODO
-    // PARSE_VIGOR produces a channel with [[meta], [fasta_file_1, fasta_file_2, ...]]
-    // Will try to split this and process each fasta separately for MAFFT and IQTREE
-    PARSE_VIGOR.out.gene_fasta
-    .transpose()
-    .view()
-
+    //
+    // MODULE: Align gene sequences with MAFFT
+    //
     MAFFT(
-        PARSE_VIGOR.out.gene_fasta.transpose()
+        // Transpose channel to process each gene fasta independently
+        PARSE_VIGOR.out.gene_fasta.transpose(),
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        false
     )
     ch_versions = ch_versions.mix(MAFFT.out.versions.first())
 
