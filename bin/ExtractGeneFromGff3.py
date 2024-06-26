@@ -53,7 +53,7 @@ def extract_sequences(name, thresholds):
             # Save all sequences in a single file
             # Modify output file name
             #output_file = name.replace("vigor4_out.gff3", "vigorparse") + ".fasta"
-            output_file = f"{sample_id}_{name}.fasta"
+            output_file = f"{sample_id}.{name}.fasta"
             with open(output_file, "w") as out_file:
                 SeqIO.write(seq_diffs, out_file, "fasta")
 
