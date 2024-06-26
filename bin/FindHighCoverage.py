@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 import sys
 from Bio import SeqIO
 
@@ -9,7 +8,13 @@ sample_id = sys.argv[1]
 fasta     = sys.argv[2]
 
 # Define gene names to search for
-gene_names = ["VP7", "VP4", "VP6", "VP1", "VP2", "VP3", "NSP1", "NSP2", "NSP3", "NSP4", "NSP5"]
+# gene_names = ["VP7", "VP4", "VP6", "VP1", "VP2", "VP3", "NSP1", "NSP2", "NSP3", "NSP4", "NSP5"]
+
+# Extract sample id from the fasta file name. Use this as a control that the sample id from the meta map is correct
+sample_id_2 = fasta.split(".")[0]
+
+# Extract gene name from fasta file name
+gene = fasta.split(".")[1]
 
 def extract_highest_coverage(input_file):
     highest_cov = 0
@@ -37,12 +42,12 @@ def extract_highest_coverage(input_file):
         best_record.description = best_record.id = "target"  # Reset description and id
 
         # Write the best record to the output file
-        output_file = f"{sample_id}_{gene}_highest_cov.fasta"
+        output_file = f"{sample_id}.{gene}_highest_cov.fasta"
         with open(output_file, "w") as output_handle:
             SeqIO.write(best_record, output_handle, "fasta")
 
         # Write new header to the header file
-        output_header_file = f"{sample_id}_{gene}_highest_cov_header.txt"
+        output_header_file = f"{sample_id}.{gene}_highest_cov_header.txt"
         with open(output_header_file, "w") as header_handle:
             header_handle.write(new_header + "\n")
 
@@ -50,7 +55,10 @@ if __name__ == "__main__":
     if len(sys.argv) < 1:
         print("Usage: python script.py <gene>")
         sys.exit(1)
-    for gene_name in gene_names:
-        extract_highest_coverage(fasta)
+    if sample_id == sample_id_2:
+            extract_highest_coverage(fasta)
+    else:
+        print("Sample ID from the meta map and fasta file do not match. Exiting...")
+
 
 
