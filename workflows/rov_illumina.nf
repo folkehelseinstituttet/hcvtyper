@@ -36,6 +36,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
 include { INPUT_CHECK                        } from '../subworkflows/local/input_check'
+include { VIGOR_VIGORPARSE                   } from '../subworkflows/local/vigor_vigorparse'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,8 +66,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 // Local modules
 //
 include { INSTRUMENT_ID                      } from '../modules/local/instrument_id'
-include { VIGOR                              } from '../modules/local/vigor4'
-include { PARSE_VIGOR                        } from '../modules/local/vigorparse'
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -177,28 +177,19 @@ workflow ROV_ILLUMINA {
     ch_versions = ch_versions.mix(SPADES_ISOLATE.out.versions.first())
 
     //
-    // MODULE: Run VIGOR4
+    // SUBWORKFLOW: Run VIGOR4 and parse output
     //
-    VIGOR (
-        SPADES_RNAVIRAL.out.contigs
+    VIGOR_VIGORPARSE (
+        SPADES_RNAVIRAL.out.contigs // val(meta), path(contigs)
     )
-    ch_versions = ch_versions.mix(VIGOR.out.versions.first())
-
-    //
-    // MODULE: Parse VIGOR4 output
-    //
-    ch_vigorparse = VIGOR.out.gff3.join(VIGOR.out.contigs) // Create a tuple channel with meta, gff3 and contigs
-    PARSE_VIGOR (
-        ch_vigorparse
-    )
-    ch_versions = ch_versions.mix(PARSE_VIGOR.out.versions.first())
+    ch_versions = ch_versions.mix(VIGOR_VIGORPARSE.out.versions.first())
 
     //
     // MODULE: Align gene sequences with MAFFT
     //
     MAFFT(
         // Transpose channel to process each gene fasta independently
-        PARSE_VIGOR.out.gene_fasta.transpose(),
+        VIGOR_VIGORPARSE.out.gene_fasta.transpose(),
         [ [:], [] ],
         [ [:], [] ],
         [ [:], [] ],
