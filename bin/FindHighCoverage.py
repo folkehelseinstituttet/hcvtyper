@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-TODO: Trekke ut Gene name fra input-filen. Siste elemntet før .fasta|
+
 import sys
 from Bio import SeqIO
 
