@@ -28,7 +28,6 @@ workflow VIGOR_VIGORPARSE {
     //
     // MODULE: Find contig with highest coverage per segment
     //
-    VIGOR_GFF_EXTRACT.out.gene_fasta.view()
     VIGOR_HIGH_COVERAGE(
         // Create tuple channels with with meta and fasta for each fasta file from gff extract
         VIGOR_GFF_EXTRACT.out.gene_fasta.transpose()
