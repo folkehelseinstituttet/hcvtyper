@@ -1,5 +1,5 @@
 process VIGOR_HIGH_COVERAGE {
-
+    tag "$meta.id"
     label 'process_single'
 
     conda "YOUR-TOOL-HERE"
