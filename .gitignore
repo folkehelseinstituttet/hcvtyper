@@ -4,6 +4,7 @@ work/
 *.pyc
 minimal_test/
 ROV_test/
+ROV/
 Run911_HCV/
 Run911_HCV_tanoti/
 Run911_HCV_bowtie/
