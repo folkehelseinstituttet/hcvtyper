@@ -39,7 +39,7 @@ def extract_highest_coverage(input_file):
         seq_length = len(best_record.seq)
         # Create new header with sequence length
         new_header = f">{best_record.description} NewLength{seq_length}"
-        best_record.description = best_record.id = "target"  # Reset description and id
+        #best_record.description = best_record.id = "target"  # Reset description and id
 
         # Write the best record to the output file
         output_file = f"{sample_id}.{gene}_highest_cov.fasta"
