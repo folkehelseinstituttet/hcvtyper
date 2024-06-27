@@ -11,8 +11,9 @@ process VIGOR_HIGH_COVERAGE {
     tuple val(meta), path(fasta)
 
     output:
-    tuple val(meta), path("*.fasta"), emit: gene_fasta
-    path "versions.yml"             , emit: versions
+    tuple val(meta), path("*_highest_cov.fasta")     , emit: gene_fasta , optional: true
+    tuple val(meta), path("*_highest_cov_header.txt"), emit: gene_header, optional: true
+    path "versions.yml"                              , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
