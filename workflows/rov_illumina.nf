@@ -68,6 +68,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 include { INSTRUMENT_ID                      } from '../modules/local/instrument_id'
 include { PREPARE_MAFFT                      } from '../modules/local/prepare_mafft'
+include { PARSE_PHYLOGENY                    } from '../modules/local/parse_phylogeny'
 
 
 /*
@@ -215,7 +216,6 @@ workflow ROV_ILLUMINA {
         return [updatedMeta, filePath]
     }
 
-    //TODO: Add the gene name to the meta map. meta.gene. And then in the modules config alter the prefix to be metda.id_meta.gene
     //
     // MODULE: Align gene sequences with MAFFT
     //
@@ -257,6 +257,13 @@ workflow ROV_ILLUMINA {
     )
     ch_versions = ch_versions.mix(IQTREE.out.versions.first())
 
+    //
+    // MODULE: Parse phylogeny to genotype the sample sequence
+    //
+    PARSE_PHYLOGENY(
+        IQTREE.out.phylogeny
+    )
+    ch_versions = ch_versions.mix(PARSE_PHYLOGENY.out.versions.first())
     //
     // MODULE: Dump software versions
     //
