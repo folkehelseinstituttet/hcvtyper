@@ -54,6 +54,7 @@ include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
 include { FASTQC                             } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
+include { IQTREE                             } from '../modules/nf-core/iqtree/main'
 include { MAFFT                              } from '../modules/nf-core/mafft/main'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
@@ -66,6 +67,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 // Local modules
 //
 include { INSTRUMENT_ID                      } from '../modules/local/instrument_id'
+include { PREPARE_MAFFT                      } from '../modules/local/prepare_mafft'
 
 
 /*
@@ -185,11 +187,41 @@ workflow ROV_ILLUMINA {
     ch_versions = ch_versions.mix(VIGOR_VIGORPARSE.out.versions.first())
 
     //
+    // MODULE: Combine the highes covered gene contig with the corresponding reference dataset for MAFFT input
+    //
+    PREPARE_MAFFT(
+        VIGOR_VIGORPARSE.out.gene_fasta,
+        [ [], file(params.rov_references) ]
+    )
+
+    // Prepare a mafft input channel that has the gene name in the meta map. This is for renaming the output files.
+    // Add the gene name from the fasta file names to the meta map like this:
+    // [[meta.id, meta.single_end, meta.gene], file path]
+    ch_mafft = PREPARE_MAFFT.out.fasta.map { item ->
+        def meta = item[0] // Original meta map
+        def filePath = item[1].toString() // File path as string
+
+        // Use getName to get the filename from the file path
+        def fileName = new File(filePath).getName()
+
+        // Extract the gene name from the file path
+        def geneName = fileName.split("_")[0]
+
+        // Add the gene name to the meta map
+        def updatedMeta = meta.clone() // Clone the original meta map to avoid modifying the original
+        updatedMeta.gene = geneName // Add the gene name
+
+        // Emit the updated item
+        return [updatedMeta, filePath]
+    }
+
+    //TODO: Add the gene name to the meta map. meta.gene. And then in the modules config alter the prefix to be metda.id_meta.gene
+    //
     // MODULE: Align gene sequences with MAFFT
     //
     MAFFT(
         // Transpose channel to process each gene fasta independently
-        VIGOR_VIGORPARSE.out.gene_fasta.transpose(),
+        ch_mafft,
         [ [:], [] ],
         [ [:], [] ],
         [ [:], [] ],
@@ -198,6 +230,32 @@ workflow ROV_ILLUMINA {
         false
     )
     ch_versions = ch_versions.mix(MAFFT.out.versions.first())
+
+    // Add empty element to MAFFT.out.fas to comply with IQTREE input
+    ch_iqtree = MAFFT.out.fas.map {
+        item ->
+        return item + [[]]
+    }
+
+    //
+    // MODULE: IQTREE
+    //
+    IQTREE(
+        ch_iqtree,
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+    )
+    ch_versions = ch_versions.mix(IQTREE.out.versions.first())
 
     //
     // MODULE: Dump software versions
