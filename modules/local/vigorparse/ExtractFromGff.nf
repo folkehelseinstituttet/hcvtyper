@@ -24,7 +24,7 @@ process VIGOR_GFF_EXTRACT {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-      Python: \$(python --version 2>&1 | cut -d' ' -f2)
+        Python: \$(python --version 2>&1 | cut -d' ' -f2)
     END_VERSIONS
     """
 
