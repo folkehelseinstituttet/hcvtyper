@@ -1,5 +1,5 @@
 process VIGOR_GFF_EXTRACT {
-
+    tag "$meta.id"
     label 'process_single'
 
     conda "YOUR-TOOL-HERE"
