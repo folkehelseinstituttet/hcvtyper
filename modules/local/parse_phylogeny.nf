@@ -13,10 +13,10 @@ process PARSE_PHYLOGENY {
     tuple val(met3),  path(high_cov_fasta)
 
     output:
-    tuple val(meta), path("temp_prefix_ratio_*.csv"), emit: ratio
-    tuple val(meta), path("temp_prefix_header_*.csv"), emit: header
-    tuple val(meta), path("*.fasta"), emit: fasta
-    path "versions.yml"                             , emit: versions
+    tuple val(meta), path("temp_prefix_ratio_*.csv")    , emit: ratio
+    tuple val(meta), path("temp_prefix_header_*.csv")   , emit: header
+    tuple val(meta), path("temp_percentagecalc_*.fasta"), emit: percentcalc_fasta
+    path "versions.yml"                                 , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
