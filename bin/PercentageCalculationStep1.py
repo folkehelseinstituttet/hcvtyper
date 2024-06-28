@@ -7,7 +7,19 @@ if len(sys.argv) < 2:
     print("Usage: python script.py <gene_name>")
     sys.exit(1)
 
-gene_name = sys.argv[1]
+# Define gene name
+gene_name        = sys.argv[1]
+references_file  = sys.argv[2]
+output_type_file = sys.argv[3]
+
+# Define file paths
+csv_file = 'temp_prefix_header_{}.csv'.format(gene_name)
+#references_file = '/home/torstein/RoV/RotavAr/v0/6/References_{}.fasta'.format(gene_name)
+#output_type_file = 'output_{}_1.fasta'.format(gene_name)
+temp_output_file = 'temp_percentagecalc_{}.fasta'.format(gene_name)
+
+# Extract the gene name from the input csv file. Compare this to the gene_name variable as a sanity check
+gene_name_2 = csv_file.split("_")[-1].split("." )[0]
 
 def extract_and_combine_sequences(header_file, references_file, output_type_file, temp_output_file):
     """
@@ -16,7 +28,8 @@ def extract_and_combine_sequences(header_file, references_file, output_type_file
     # Step 1: Read the header from the CSV file
     try:
         with open(header_file, 'r') as file:
-            full_header = file.readline().strip().split(':')[0]  # Consider part before ':' only
+            full_header = file.readline().strip()
+            #full_header = file.readline().strip().split(':')[0]  # Consider part before ':' only
     except FileNotFoundError:
         print(f"Error: The file {header_file} was not found.")
         return
@@ -45,7 +58,7 @@ def extract_and_combine_sequences(header_file, references_file, output_type_file
         print(f"Error writing to {temp_output_file}: {str(e)}")
         return
 
-    # Step 4: Append the sequence from output_x_1.fasta
+    # Step 4: Append the highest coverage gene sequence from FindHighCoverage.py
     try:
         type_sequence = next(SeqIO.parse(output_type_file, "fasta"), None)
         if type_sequence:
@@ -56,11 +69,6 @@ def extract_and_combine_sequences(header_file, references_file, output_type_file
     except FileNotFoundError:
         print(f"Error: The file {output_type_file} was not found.")
 
-# Define file paths
-csv_file = 'temp_prefix_header_{}.csv'.format(gene_name)
-references_file = '/home/torstein/RoV/RotavAr/v0/6/References_{}.fasta'.format(gene_name)
-output_type_file = 'output_{}_1.fasta'.format(gene_name)
-temp_output_file = 'temp_percentagecalc_{}.fasta'.format(gene_name)
-
 # Call the function with correct parameters
-extract_and_combine_sequences(csv_file, references_file, output_type_file, temp_output_file)
+if gene_name == gene_name_2:
+    extract_and_combine_sequences(csv_file, references_file, output_type_file, temp_output_file)
