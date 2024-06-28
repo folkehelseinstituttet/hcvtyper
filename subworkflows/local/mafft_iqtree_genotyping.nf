@@ -1,7 +1,8 @@
-include { IQTREE          } from '../../modules/nf-core/iqtree/main'
-include { MAFFT           } from '../../modules/nf-core/mafft/main'
-include { PREPARE_MAFFT   } from '../../modules/local/prepare_mafft'
-include { PARSE_PHYLOGENY } from '../../modules/local/parse_phylogeny'
+include { IQTREE                  } from '../../modules/nf-core/iqtree/main'
+include { MAFFT                   } from '../../modules/nf-core/mafft/main'
+include { MAFFT as MAFFT_PAIRWISE } from '../../modules/nf-core/mafft/main'
+include { PREPARE_MAFFT           } from '../../modules/local/prepare_mafft'
+include { PARSE_PHYLOGENY         } from '../../modules/local/parse_phylogeny'
 
 workflow MAFFT_IQTREE_GENOTYPE {
 
@@ -45,7 +46,6 @@ workflow MAFFT_IQTREE_GENOTYPE {
     // MODULE: Align gene sequences with MAFFT
     //
     MAFFT(
-        // Transpose channel to process each gene fasta independently
         ch_mafft,
         [ [:], [] ],
         [ [:], [] ],
@@ -92,10 +92,22 @@ workflow MAFFT_IQTREE_GENOTYPE {
     )
     ch_versions = ch_versions.mix(PARSE_PHYLOGENY.out.versions.first())
 
+    MAFFT_PAIRWISE(
+        PARSE_PHYLOGENY.out.percentcalc_fasta,
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        [ [:], [] ],
+        false
+    )
+    ch_versions = ch_versions.mix(MAFFT_PAIRWISE.out.versions.first())
+
     emit:
     ratio    = PARSE_PHYLOGENY.out.ratio
     header   = PARSE_PHYLOGENY.out.header
-    fasta    = PARSE_PHYLOGENY.out.fasta
+    fasta    = PARSE_PHYLOGENY.out.percentcalc_fasta
+    aligned  = MAFFT.out.fas
     versions = ch_versions
 
 }
