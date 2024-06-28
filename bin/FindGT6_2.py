@@ -21,7 +21,8 @@ def list_and_sort_by_auto_prefix_save_csv(tree_file, target_name):
     target_clade = None
     for clade in tree.find_clades():
         # clade.name should be contained within target_name. E.g. "NODE"
-        if target_name in clade.name:
+        # Ensure clade.name is not None before checking if target_name is in clade.name
+        if clade.name and target_name in clade.name:
             target_clade = clade
             break
 
