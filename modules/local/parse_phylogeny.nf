@@ -8,10 +8,14 @@ process PARSE_PHYLOGENY {
         'docker.io/pegi3s/biopython:1.78' }"
 
     input:
-    tuple val(meta), path(treefile)
+    tuple val(meta) , path(treefile)
+    tuple val(meta2), path(references)
+    tuple val(met3),  path(high_cov_fasta)
 
     output:
-    tuple val(meta), path("temp_prefix_ratio_*.csv"), emit: genotype
+    tuple val(meta), path("temp_prefix_ratio_*.csv"), emit: ratio
+    tuple val(meta), path("temp_prefix_header_*.csv"), emit: header
+    tuple val(meta), path("*.fasta"), emit: fasta
     path "versions.yml"                             , emit: versions
 
     when:
@@ -21,7 +25,15 @@ process PARSE_PHYLOGENY {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
+     # Untar the different reference fiiles
+    tar -xzf $references
+
+    # Find the relevant gene reference file
+    gene_ref=\$(find . -name "References_${gene_name}.fasta")
+
     FindGT6_2.py $treefile $gene_name
+
+    PercentageCalculationStep1.py $gene_name \$gene_ref $high_cov_fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
