@@ -10,7 +10,7 @@ process PARSE_PHYLOGENY {
     input:
     tuple val(meta) , path(treefile)
     tuple val(meta2), path(references)
-    tuple val(met3),  path(high_cov_fasta)
+    tuple val(meta3), path(high_cov_fasta)
 
     output:
     tuple val(meta), path("temp_prefix_ratio_*.csv")    , emit: ratio
@@ -25,7 +25,7 @@ process PARSE_PHYLOGENY {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-     # Untar the different reference fiiles
+    # Untar the different reference files
     tar -xzf $references
 
     # Find the relevant gene reference file
