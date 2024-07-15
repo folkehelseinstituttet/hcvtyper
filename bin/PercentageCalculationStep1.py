@@ -9,10 +9,10 @@ if len(sys.argv) < 2:
 
 # Define gene name
 gene_name        = sys.argv[1]
+
+# Define files
 references_file  = sys.argv[2]
 output_type_file = sys.argv[3]
-
-# Define file paths
 csv_file = 'temp_prefix_header_{}.csv'.format(gene_name)
 #references_file = '/home/torstein/RoV/RotavAr/v0/6/References_{}.fasta'.format(gene_name)
 #output_type_file = 'output_{}_1.fasta'.format(gene_name)
