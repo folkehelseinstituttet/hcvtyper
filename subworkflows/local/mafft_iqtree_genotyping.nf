@@ -118,6 +118,7 @@ workflow MAFFT_IQTREE_GENOTYPE {
     ch_versions = ch_versions.mix(PARSE_PHYLOGENY_2.out.versions.first())
 
     emit:
+    genotype = PARSE_PHYLOGENY_2.out.genotyping
     ratio    = PARSE_PHYLOGENY.out.ratio
     header   = PARSE_PHYLOGENY.out.header
     fasta    = PARSE_PHYLOGENY.out.percentcalc_fasta
