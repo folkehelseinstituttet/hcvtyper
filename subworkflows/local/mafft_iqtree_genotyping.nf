@@ -1,8 +1,9 @@
 include { IQTREE                  } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                   } from '../../modules/nf-core/mafft/main'
 include { MAFFT as MAFFT_PAIRWISE } from '../../modules/nf-core/mafft/main'
-include { PREPARE_MAFFT           } from '../../modules/local/prepare_mafft'
 include { PARSE_PHYLOGENY         } from '../../modules/local/parse_phylogeny'
+include { PARSE_PHYLOGENY_2       } from '../../modules/local/parse_phylogeny_2'
+include { PREPARE_MAFFT           } from '../../modules/local/prepare_mafft'
 
 workflow MAFFT_IQTREE_GENOTYPE {
 
@@ -58,8 +59,8 @@ workflow MAFFT_IQTREE_GENOTYPE {
 
     // Add empty element to MAFFT.out.fas to comply with IQTREE input
     ch_iqtree = MAFFT.out.fas.map {
-        item ->
-        return item + [[]]
+        meta ->
+        return meta + [[]]
     }
 
     //
@@ -92,6 +93,9 @@ workflow MAFFT_IQTREE_GENOTYPE {
     )
     ch_versions = ch_versions.mix(PARSE_PHYLOGENY.out.versions.first())
 
+    //
+    // MODULE: PURPOSE?
+    //
     MAFFT_PAIRWISE(
         PARSE_PHYLOGENY.out.percentcalc_fasta,
         [ [:], [] ],
@@ -102,6 +106,16 @@ workflow MAFFT_IQTREE_GENOTYPE {
         false
     )
     ch_versions = ch_versions.mix(MAFFT_PAIRWISE.out.versions.first())
+
+    //
+    // MODULE: PURPOSE?
+    //
+    //NB! RENAME PROCESS
+    PARSE_PHYLOGENY_2(
+        MAFFT_PAIRWISE.out.fas,
+        PARSE_PHYLOGENY.out.ratio
+    )
+    ch_versions = ch_versions.mix(PARSE_PHYLOGENY_2.out.versions.first())
 
     emit:
     ratio    = PARSE_PHYLOGENY.out.ratio
