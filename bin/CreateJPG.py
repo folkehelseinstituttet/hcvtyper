@@ -7,7 +7,7 @@ import sys
 os.environ["QT_QPA_PLATFORM"] = "offscreen"  # Required for headless environments
 
 gene_name = sys.argv[1]
-tree_file = sys.argv[2]
+treefile  = sys.argv[2]
 
 # Extract the gene name from the input fasta and csv files. Compare this to the gene_name variable as a sanity check
 gene_name_2 = treefile.split(".")[1]
@@ -65,4 +65,4 @@ def display_tree(tree_file):
 if __name__ == '__main__':
     if gene_name == gene_name_2:
         tree_jpg = f'temp2_tree_visualization_{gene_name}.jpg'
-        display_tree(tree_file)
+        display_tree(treefile)
