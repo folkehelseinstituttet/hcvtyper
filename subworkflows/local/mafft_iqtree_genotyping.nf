@@ -1,3 +1,4 @@
+include { CREATE_JPG              } from '../../modules/local/create_jpg'
 include { IQTREE                  } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                   } from '../../modules/nf-core/mafft/main'
 include { MAFFT as MAFFT_PAIRWISE } from '../../modules/nf-core/mafft/main'
@@ -116,6 +117,11 @@ workflow MAFFT_IQTREE_GENOTYPE {
         PARSE_PHYLOGENY.out.ratio
     )
     ch_versions = ch_versions.mix(PARSE_PHYLOGENY_2.out.versions.first())
+
+    CREATE_JPG(
+        IQTREE.out.phylogeny
+    )
+    ch_versions = ch_versions.mix(CREATE_JPG.out.versions.first())
 
     emit:
     genotype = PARSE_PHYLOGENY_2.out.genotyping
