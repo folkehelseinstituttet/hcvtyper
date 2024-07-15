@@ -5,7 +5,7 @@ process CREATE_JPG {
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-        'docker.io/pegi3s/biopython:1.78' }"
+        'NEED IMAGE' }"
 
     input:
     tuple val(meta) , path(treefile)
