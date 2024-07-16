@@ -4,7 +4,7 @@ process CUTADAPT {
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/cutadapt:3.4--py39h38f01e4_1' :
+        'https://depot.galaxyproject.org/singularity/cutadapt:4.6--py39hf95cd2a_1' :
         'biocontainers/cutadapt:4.6--py39hf95cd2a_1' }"
 
     input:
@@ -24,6 +24,7 @@ process CUTADAPT {
     def trimmed  = meta.single_end ? "-o ${prefix}.trim.fastq.gz" : "-o ${prefix}_1.trim.fastq.gz -p ${prefix}_2.trim.fastq.gz"
     """
     cutadapt \\
+        -Z \\
         --cores $task.cpus \\
         $args \\
         $trimmed \\
