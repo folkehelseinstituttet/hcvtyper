@@ -437,7 +437,9 @@ workflow VIRALSEQ {
         ch_multiqc_files.collect(),
         ch_multiqc_config.toList(),
         ch_multiqc_custom_config.toList(),
-        ch_multiqc_logo.toList()
+        ch_multiqc_logo.toList(),
+        [],
+        []
     )
     multiqc_report = MULTIQC.out.report.toList()
 }
