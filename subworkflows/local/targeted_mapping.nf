@@ -65,7 +65,7 @@ workflow TARGETED_MAPPING {
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS (
         ch_aligned,
-        ch_major_mapping.map { it[1] }
+        ch_major_mapping.map { meta, fasta, _ -> [meta, fasta] } // Extract only the meta and fasta elements from the channel
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
 

@@ -1,7 +1,7 @@
-name: cutadapt
+name: custom_dumpsoftwareversions
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  - bioconda::cutadapt=4.6
+  - bioconda::multiqc=1.20

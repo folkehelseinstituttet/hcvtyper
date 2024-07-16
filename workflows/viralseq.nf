@@ -244,7 +244,7 @@ workflow VIRALSEQ {
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS (
         ch_aligned,
-        Channel.value(file(params.references)) // Need to explicitly turn the file into a value channel so not to be consumed.
+        [ [], file(params.references) ]
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
 
