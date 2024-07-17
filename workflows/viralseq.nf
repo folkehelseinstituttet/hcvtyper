@@ -98,8 +98,6 @@ workflow VIRALSEQ {
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
-    // ch_reads = Channel.fromSamplesheet(params.input)
-    // ch_reads.view()
     INPUT_CHECK (
         file(params.input)
     )
