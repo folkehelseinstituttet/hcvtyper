@@ -4,12 +4,15 @@ from Bio import SeqIO
 import csv
 import sys
 
+# Define sample name
+sample_name = sys.argv[1]
+
 # Define gene name
-gene_name = sys.argv[1]
+gene_name = sys.argv[2]
 
 # Define file names
-aligned_fasta_file = sys.argv[2]
-csv_ratio          = sys.argv[3]
+aligned_fasta_file = sys.argv[3]
+csv_ratio          = sys.argv[4]
 
 # Extract the gene name from the input fasta and csv files. Compare this to the gene_name variable as a sanity check
 gene_name_2 = aligned_fasta_file.split(".")[1]
@@ -49,7 +52,7 @@ def calculate_percent_similarity_and_update_csv(fasta_file, prefix_csv):
         existing_data = list(reader)
 
     # Output to CSV
-    csv_file = 'genotyping_result_{}.csv'.format(gene_name)
+    csv_file = '{}.genotyping_result.{}.csv'.format(sample_name, gene_name)
 
     with open(csv_file, "w", newline='') as file:
         writer = csv.writer(file)
