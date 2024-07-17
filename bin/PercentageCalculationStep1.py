@@ -7,19 +7,22 @@ if len(sys.argv) < 2:
     print("Usage: python script.py <gene_name>")
     sys.exit(1)
 
+# Define sample name
+sample_name = sys.argv[1]
+
 # Define gene name
-gene_name        = sys.argv[1]
+gene_name        = sys.argv[2]
 
 # Define files
-references_file  = sys.argv[2]
-output_type_file = sys.argv[3]
-csv_file = 'temp_prefix_header_{}.csv'.format(gene_name)
+references_file  = sys.argv[3]
+output_type_file = sys.argv[4]
+csv_file = '{}.temp_prefix_header.{}.csv'.format(sample_name, gene_name)
 #references_file = '/home/torstein/RoV/RotavAr/v0/6/References_{}.fasta'.format(gene_name)
 #output_type_file = 'output_{}_1.fasta'.format(gene_name)
-temp_output_file = 'temp_percentagecalc_{}.fasta'.format(gene_name)
+temp_output_file = '{}.temp_percentagecalc.{}.fasta'.format(sample_name, gene_name)
 
 # Extract the gene name from the input csv file. Compare this to the gene_name variable as a sanity check
-gene_name_2 = csv_file.split("_")[-1].split("." )[0]
+gene_name_2 = output_type_file.split("_")[0].split("." )[1]
 
 def extract_and_combine_sequences(header_file, references_file, output_type_file, temp_output_file):
     """

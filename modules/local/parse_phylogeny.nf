@@ -12,9 +12,9 @@ process PARSE_PHYLOGENY {
     tuple val(meta2), path(references)
 
     output:
-    tuple val(meta), path("temp_prefix_ratio_*.csv")    , emit: ratio
-    tuple val(meta), path("temp_prefix_header_*.csv")   , emit: header
-    tuple val(meta), path("temp_percentagecalc_*.fasta"), emit: percentcalc_fasta
+    tuple val(meta), path("*temp_prefix_ratio*.csv")    , emit: ratio
+    tuple val(meta), path("*temp_prefix_header*.csv")   , emit: header
+    tuple val(meta), path("*temp_percentagecalc*.fasta"), emit: percentcalc_fasta
     path "versions.yml"                                 , emit: versions
 
     when:
@@ -30,9 +30,9 @@ process PARSE_PHYLOGENY {
     # Find the relevant gene reference file
     gene_ref=\$(find . -name "References_${gene_name}.fasta")
 
-    FindGT6_2.py $treefile $gene_name
+    FindGT6_2.py $prefix $treefile $gene_name
 
-    PercentageCalculationStep1.py $gene_name \$gene_ref $high_cov_fasta
+    PercentageCalculationStep1.py $prefix $gene_name \$gene_ref $high_cov_fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

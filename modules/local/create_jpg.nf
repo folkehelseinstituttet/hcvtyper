@@ -21,7 +21,7 @@ process CREATE_JPG {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-    CreateJPG.py $gene_name $treefile
+    CreateJPG.py $prefix $gene_name $treefile
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -16,7 +16,7 @@ csv_ratio          = sys.argv[4]
 
 # Extract the gene name from the input fasta and csv files. Compare this to the gene_name variable as a sanity check
 gene_name_2 = aligned_fasta_file.split(".")[1]
-gene_name_3 = csv_ratio.split("_")[-1].split("." )[0]
+gene_name_3 = csv_ratio.split(".")[-2]
 
 def calculate_percent_similarity_and_update_csv(fasta_file, prefix_csv):
     sequences = list(SeqIO.parse(fasta_file, "fasta"))

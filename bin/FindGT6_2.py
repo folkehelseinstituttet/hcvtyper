@@ -4,9 +4,12 @@ from Bio import Phylo
 import csv
 import sys
 
+# Define sample name
+sample_name = sys.argv[1]
+
 # Define input
-tree_file = sys.argv[1]
-gene_name = sys.argv[2]
+tree_file = sys.argv[2]
+gene_name = sys.argv[3]
 
 # Extract the gene name from the input file name. Compare this to the gene_name variable as a sanity check
 gene_name_2 = tree_file.split(".")[1]
@@ -47,7 +50,7 @@ def list_and_sort_by_auto_prefix_save_csv(tree_file, target_name):
         if underscore_index != -1:
             closest_header = closest_header[:underscore_index]  # Truncate at the first underscore
 
-        header_file_path = 'temp_prefix_header_{}.csv'.format(gene_name)
+        header_file_path = '{}.temp_prefix_header.{}.csv'.format(sample_name, gene_name)
         with open(header_file_path, mode='w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([closest_header])
@@ -64,7 +67,7 @@ def list_and_sort_by_auto_prefix_save_csv(tree_file, target_name):
     ratio = len(filtered_names) / total_with_prefix if total_with_prefix else 0
 
     # Save the prefix and ratio to a CSV file
-    csv_file_path = 'temp_prefix_ratio_{}.csv'.format(gene_name)
+    csv_file_path = '{}.temp_prefix_ratio.{}.csv'.format(sample_name, gene_name)
     with open(csv_file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(["Prefix", "Closest Count / Total Count"])

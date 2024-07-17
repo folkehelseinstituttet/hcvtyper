@@ -38,7 +38,7 @@ workflow MAFFT_IQTREE_GENOTYPE {
         def fileName = new File(filePath).getName()
 
         // Extract the gene name from the file path
-        def geneName = fileName.split("_")[0]
+        def geneName = fileName.split("_")[0].split("\\.")[1]
 
         // Add the gene name to the meta map
         def updatedMeta = meta.clone() // Clone the original meta map to avoid modifying the original
@@ -114,6 +114,7 @@ workflow MAFFT_IQTREE_GENOTYPE {
         // Emit the updated item
         return [updatedMeta, filePath]
     }
+
     // Then join the ch_parse_phylogeny with the IQTREE output to have the phylogeny and the highest cov fasta for the same gene
     ch_parse_phylogeny = ch_parse_phylogeny_temp.join(IQTREE.out.phylogeny)
     PARSE_PHYLOGENY(

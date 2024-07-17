@@ -32,7 +32,7 @@ process PREPARE_MAFFT {
         gene=\$(echo \$fasta_file | cut -d'.' -f2 | cut -d'_' -f1)
 
         # Concatenate the fasta file with the corresponding gene references
-        cat \$fasta_file \$(ls References_\$gene.fasta) > \${gene}_merged.fasta
+        cat \$fasta_file \$(ls References_\$gene.fasta) > ${prefix}.\${gene}_merged.fasta
     done
     """
 
