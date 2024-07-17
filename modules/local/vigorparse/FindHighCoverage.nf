@@ -21,7 +21,11 @@ process VIGOR_HIGH_COVERAGE {
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    FindHighCoverage.py $prefix $fasta
+    # For loop over all fasta files
+    for fasta_file in $prefix*.fasta
+    do
+        FindHighCoverage.py $prefix \$fasta_file
+    done
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

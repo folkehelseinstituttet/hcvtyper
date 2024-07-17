@@ -8,9 +8,8 @@ process PARSE_PHYLOGENY {
         'docker.io/pegi3s/biopython:1.78' }"
 
     input:
-    tuple val(meta) , path(treefile)
+    tuple val(meta) , path(high_cov_fasta), path(treefile)
     tuple val(meta2), path(references)
-    tuple val(meta3), path(high_cov_fasta)
 
     output:
     tuple val(meta), path("temp_prefix_ratio_*.csv")    , emit: ratio

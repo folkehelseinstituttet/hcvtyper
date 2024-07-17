@@ -8,12 +8,11 @@ process PARSE_PHYLOGENY_2 {
         'docker.io/pegi3s/biopython:1.78' }"
 
     input:
-    tuple val(meta) , path(fasta)
-    tuple val(meta2), path(ratio_csv)
+    tuple val(meta) , path(fasta), path(ratio_csv)
 
     output:
-    tuple val(meta), path("genotyping_result_*.csv"), emit: genotyping, optional: true
-    path "versions.yml"                             , emit: versions
+    tuple val(meta), path("*genotyping_result*.csv"), emit: genotyping
+    path "versions.yml"                              , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -22,7 +21,7 @@ process PARSE_PHYLOGENY_2 {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-    PercentageCalculationStep2.py $gene_name $fasta $ratio_csv
+    PercentageCalculationStep2.py $prefix $gene_name $fasta $ratio_csv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

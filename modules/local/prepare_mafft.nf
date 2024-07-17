@@ -20,15 +20,20 @@ process PREPARE_MAFFT {
     task.ext.when == null || task.ext.when
 
     script:
+    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     # Untar the different reference fiiles
     tar -xzf $references
 
-    # Extract gene name from fasta file
-    gene=\$(echo $fasta | cut -d'.' -f2 | cut -d'_' -f1)
+    # Loop through gene fastas, extract gene name from fasta file,
+    # and merge with correspooding reference file
+    for fasta_file in $prefix*highest_cov.fasta
+    do
+        gene=\$(echo \$fasta_file | cut -d'.' -f2 | cut -d'_' -f1)
 
-    # Concatenate the fasta file with the corresponding gene references
-    cat $fasta \$(ls References_\$gene.fasta) > \${gene}_merged.fasta
+        # Concatenate the fasta file with the corresponding gene references
+        cat \$fasta_file \$(ls References_\$gene.fasta) > \${gene}_merged.fasta
+    done
     """
 
     stub:
