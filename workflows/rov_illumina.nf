@@ -121,7 +121,7 @@ workflow ROV_ILLUMINA {
     // MODULE: Run FastQC on trimmed reads
     //
     FASTQC_TRIM (
-        INPUT_CHECK.out.reads
+        CUTADAPT.out.reads
     )
 
     //
