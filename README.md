@@ -3,16 +3,19 @@
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 
+## TODO
+- [ ] Rotavirus: Could include all contigs for each segment in the first alignment and phylogeny step (maybe add a length cutoff to remove very short contigs). And then use that tree to identify co-infection with multiple genotypes/strains.
+
 ## Introduction
 
-**niph/viralseq** is a bioinformatics pipeline that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using the [Tanoti mapper](https://github.com/vbsreenu/Tanoti), which is designed for highly variable datasets, and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations. 
-maps Illumina reads to a reference genome and creates a consensus sequence. 
+**niph/viralseq** is a bioinformatics pipeline that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using the [Tanoti mapper](https://github.com/vbsreenu/Tanoti), which is designed for highly variable datasets, and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
+maps Illumina reads to a reference genome and creates a consensus sequence.
 
-## Requirements  
+## Requirements
 The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
-  
+
 ## Usage
-First you should clone this repo:  
+First you should clone this repo:
 ```
 git clone https://github.com/jonbra/viralseq.git
 ```
