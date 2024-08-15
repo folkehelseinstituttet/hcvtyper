@@ -37,7 +37,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 include { INPUT_CHECK                        } from '../subworkflows/local/input_check'
 include { VIGOR_VIGORPARSE                   } from '../subworkflows/local/vigor_vigorparse'
-include { MAFFT_IQTREE_GENOTYPE              } from '../subworkflows/local/mafft_iqtree_genotyping'
+include { MAFFT_IQTREE_GENOTYPING            } from '../subworkflows/local/mafft_iqtree_genotyping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,11 +184,11 @@ workflow ROV_ILLUMINA {
     //
     // SUBWORKFLOW: Align gene sequences with MAFFT, create phylogenies with IQTREE, and parse phylogeny to genotype the sample sequence
     //
-    MAFFT_IQTREE_GENOTYPE(
+    MAFFT_IQTREE_GENOTYPING(
         VIGOR_VIGORPARSE.out.gff_extract_fasta, // val(meta), path(gene_fasta)
         [ [], file(params.rov_references) ]
     )
-    ch_versions = ch_versions.mix(MAFFT_IQTREE_GENOTYPE.out.versions.first())
+    ch_versions = ch_versions.mix(MAFFT_IQTREE_GENOTYPING.out.versions.first())
 
 
     //

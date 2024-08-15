@@ -8,7 +8,7 @@ include { EXTRACT_COMBINE_SEQS    } from '../../modules/local/extract_combine_se
 include { COLLECT_GENOTYPE_INFO   } from '../../modules/local/collect_genotype_info'
 include { PREPARE_MAFFT           } from '../../modules/local/prepare_mafft'
 
-workflow MAFFT_IQTREE_GENOTYPE {
+workflow MAFFT_IQTREE_GENOTYPING {
 
     take:
     ch_vigorparse   // channel: [ val(meta), path(gene_fasta) ]
