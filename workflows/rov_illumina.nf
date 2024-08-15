@@ -185,7 +185,7 @@ workflow ROV_ILLUMINA {
     // SUBWORKFLOW: Align gene sequences with MAFFT, create phylogenies with IQTREE, and parse phylogeny to genotype the sample sequence
     //
     MAFFT_IQTREE_GENOTYPE(
-        VIGOR_VIGORPARSE.out.gene_fasta, // val(meta), path(gene_fasta)
+        VIGOR_VIGORPARSE.out.gff_extract_fasta, // val(meta), path(gene_fasta)
         [ [], file(params.rov_references) ]
     )
     ch_versions = ch_versions.mix(MAFFT_IQTREE_GENOTYPE.out.versions.first())

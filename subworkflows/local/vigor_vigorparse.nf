@@ -35,7 +35,8 @@ workflow VIGOR_VIGORPARSE {
     ch_versions = ch_versions.mix(VIGOR.out.versions.first())
 
     emit:
-    gene_fasta = VIGOR_HIGH_COVERAGE.out.gene_fasta
-    versions = ch_versions
+    gff_extract_fasta = VIGOR_GFF_EXTRACT.out.gene_fasta
+    high_cov_fasta    = VIGOR_HIGH_COVERAGE.out.gene_fasta
+    versions          = ch_versions
 
 }

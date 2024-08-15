@@ -1,9 +1,11 @@
 include { CREATE_JPG              } from '../../modules/local/create_jpg'
+include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS } from '../../modules/local/calculate_pairwise_alignment_metrics'
 include { IQTREE                  } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                   } from '../../modules/nf-core/mafft/main'
 include { MAFFT as MAFFT_PAIRWISE } from '../../modules/nf-core/mafft/main'
 include { PARSE_PHYLOGENY         } from '../../modules/local/parse_phylogeny'
-include { PARSE_PHYLOGENY_2       } from '../../modules/local/parse_phylogeny_2'
+include { EXTRACT_COMBINE_SEQS    } from '../../modules/local/extract_combine_seqs'
+include { COLLECT_GENOTYPE_INFO   } from '../../modules/local/collect_genotype_info'
 include { PREPARE_MAFFT           } from '../../modules/local/prepare_mafft'
 
 workflow MAFFT_IQTREE_GENOTYPE {
@@ -16,7 +18,10 @@ workflow MAFFT_IQTREE_GENOTYPE {
     ch_versions = Channel.empty()
 
     //
-    // MODULE: Combine the highes covered gene contig with the corresponding reference dataset for MAFFT input
+    // MODULE: Combine all contigs from a given segment with the corresponding reference dataset for MAFFT input
+    //
+    //
+    // MODULE: Combine the highest covered gene contig with the corresponding reference dataset for MAFFT input
     //
     PREPARE_MAFFT(
         ch_vigorparse,
@@ -91,13 +96,24 @@ workflow MAFFT_IQTREE_GENOTYPE {
     // Here we need to join all the output from a single sample before further parsing
 
     //
-    // MODULE: Parse phylogeny to genotype the sample sequence
+    // MODULE: Parse the phylogeny to identify the contigs, their nearest referencees and clade identity.
+    // The process can handle multiple contigs in the tree
+    //
+
+    // Channel only needs meta and treefile. The meta has the gene name added at this point.
+    PARSE_PHYLOGENY(
+        IQTREE.out.phylogeny
+    )
+    ch_versions = ch_versions.mix(PARSE_PHYLOGENY.out.versions.first())
+
+    //
+    // MODULE: Extract and combine sequences
     //
 
     // Add the gene name to the meta of ch_vigorparse ([id:, single_end:, gene:])
-    // First transpose the channel to separate the different "highest_cov" fasta files
+    // First transpose the channel to separate the different fasta files for each segment from extract from gff.
     ch_temp_2 = ch_vigorparse.transpose()
-    ch_parse_phylogeny_temp = ch_temp_2.map { item ->
+    ch_extract_combine_seqs_temp = ch_temp_2.map { item ->
         def meta = item[0] // Original meta map
         def filePath = item[1].toString() // File path as string
 
@@ -115,19 +131,24 @@ workflow MAFFT_IQTREE_GENOTYPE {
         return [updatedMeta, filePath]
     }
 
-    // Then join the ch_parse_phylogeny with the IQTREE output to have the phylogeny and the highest cov fasta for the same gene
-    ch_parse_phylogeny = ch_parse_phylogeny_temp.join(IQTREE.out.phylogeny)
-    PARSE_PHYLOGENY(
-        ch_parse_phylogeny,
+    // Then join the ch_parse_phylogeny with the PARSE_PHYLOGENY output to have the phylogeny and the segment fasta for the same gene
+    // PARSE_PHYLOGENY.out.parse_phylo has this structure: val(id:, single_end:, gene:), path(gff_extract_fasta for single gene)
+    ch_extract_combine_seqs = ch_extract_combine_seqs_temp.join(PARSE_PHYLOGENY.out.parse_phylo) // val(meta), path(gff_extract_fasta), path(parse_phylo)
+
+    EXTRACT_COMBINE_SEQS(
+        ch_extract_combine_seqs,
         ch_references
     )
-    ch_versions = ch_versions.mix(PARSE_PHYLOGENY.out.versions.first())
 
     //
-    // MODULE: PURPOSE?
+    // MODULE: Align each contig to its nearest reference sequence in the tree
     //
+
+    // EXTRACT_COMBINE_SEQS.out.combined_fasta can contain multiple combined fasta files if there are several contigs matching the same gene.
+    // THE MAFFT module needs only one fasta file at a time, so we need to transpose the channel to separate the different fasta files.
+    ch_mafft_pairwise = EXTRACT_COMBINE_SEQS.out.combined_fasta.transpose()
     MAFFT_PAIRWISE(
-        PARSE_PHYLOGENY.out.percentcalc_fasta,
+        ch_mafft_pairwise,
         [ [:], [] ],
         [ [:], [] ],
         [ [:], [] ],
@@ -138,16 +159,21 @@ workflow MAFFT_IQTREE_GENOTYPE {
     ch_versions = ch_versions.mix(MAFFT_PAIRWISE.out.versions.first())
 
     //
-    // MODULE: PURPOSE?
+    // MODULE: CALCULATE PAIRWISE ALIGNMENT METRICS
     //
-    //NB! RENAME PROCESS
-    // Need to join input channels to keep the same sample and genes together. Join on the meta map.
-    // ch_parse_phylogeny_2 = ch_parse_phylogeny_temp.join(MAFFT_PAIRWISE.out.fas)
-    ch_parse_phylogeny_2 = MAFFT_PAIRWISE.out.fas.join(PARSE_PHYLOGENY.out.ratio)
-    PARSE_PHYLOGENY_2(
-        ch_parse_phylogeny_2
+    CALCULATE_PAIRWISE_ALIGNMENT_METRICS(
+        MAFFT_PAIRWISE.out.fas
     )
-    ch_versions = ch_versions.mix(PARSE_PHYLOGENY_2.out.versions.first())
+
+    //
+    // MODULE: COLLECT GENOTYPING INFORMATION
+    //
+    // TODO: Find a way to collect all relevant info, and account for co-infections. Maybe just collect all files into the process.
+    ch_collect_genotype_info = MAFFT_PAIRWISE.out.fas.join(PARSE_PHYLOGENY.out.parse_phylo)
+    COLLECT_GENOTYPE_INFO(
+        ch_collect_genotype_info
+    )
+    ch_versions = ch_versions.mix(COLLECT_GENOTYPE_INFO.out.versions.first())
 
     CREATE_JPG(
         IQTREE.out.phylogeny
@@ -155,10 +181,10 @@ workflow MAFFT_IQTREE_GENOTYPE {
     ch_versions = ch_versions.mix(CREATE_JPG.out.versions.first())
 
     emit:
-    genotype = PARSE_PHYLOGENY_2.out.genotyping
-    ratio    = PARSE_PHYLOGENY.out.ratio
-    header   = PARSE_PHYLOGENY.out.header
-    fasta    = PARSE_PHYLOGENY.out.percentcalc_fasta
+    genotype = COLLECT_GENOTYPE_INFO.out.genotyping
+    ratio    = PARSE_PHYLOGENY.out.parse_phylo
+    //header   = PARSE_PHYLOGENY.out.header
+    fasta    = EXTRACT_COMBINE_SEQS.out.combined_fasta
     aligned  = MAFFT.out.fas
     versions = ch_versions
 

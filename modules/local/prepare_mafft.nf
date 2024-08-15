@@ -27,9 +27,11 @@ process PREPARE_MAFFT {
 
     # Loop through gene fastas, extract gene name from fasta file,
     # and merge with correspooding reference file
-    for fasta_file in $prefix*highest_cov.fasta
+    # OLD: for fasta_file in $prefix*highest_cov.fasta
+    for fasta_file in $prefix*.fasta
     do
-        gene=\$(echo \$fasta_file | cut -d'.' -f2 | cut -d'_' -f1)
+        # OLD: gene=\$(echo \$fasta_file | cut -d'.' -f2 | cut -d'_' -f1)
+        gene=\$(echo \$fasta_file | cut -d'.' -f2)
 
         # Concatenate the fasta file with the corresponding gene references
         cat \$fasta_file \$(ls References_\$gene.fasta) > ${prefix}.\${gene}_merged.fasta

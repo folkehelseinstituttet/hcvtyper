@@ -1,4 +1,4 @@
-process PARSE_PHYLOGENY_2 {
+process CALCULATE_PAIRWISE_ALIGNMENT_METRICS {
     tag "$meta.id"
     label 'process_single'
 
@@ -8,11 +8,11 @@ process PARSE_PHYLOGENY_2 {
         'docker.io/pegi3s/biopython:1.78' }"
 
     input:
-    tuple val(meta) , path(fasta), path(ratio_csv)
+    tuple val(meta) , path(fasta)
 
     output:
-    tuple val(meta), path("*genotyping_result*.csv"), emit: genotyping
-    path "versions.yml"                              , emit: versions
+    tuple val(meta), path("*alignment_metrics*.csv"), emit: genotyping
+    path "versions.yml"                             , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -21,7 +21,7 @@ process PARSE_PHYLOGENY_2 {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-    PercentageCalculationStep2.py $prefix $gene_name $fasta $ratio_csv
+    calculate_pairwise_alignment_metrics.py $prefix $gene_name $fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

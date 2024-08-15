@@ -12,11 +12,11 @@ gene_name = sys.argv[2]
 
 # Define file names
 aligned_fasta_file = sys.argv[3]
-csv_ratio          = sys.argv[4]
+csv_file          = sys.argv[4]
 
 # Extract the gene name from the input fasta and csv files. Compare this to the gene_name variable as a sanity check
 gene_name_2 = aligned_fasta_file.split(".")[1]
-gene_name_3 = csv_ratio.split(".")[-2]
+gene_name_3 = csv_file.split(".")[-2]
 
 def calculate_percent_similarity_and_update_csv(fasta_file, prefix_csv):
     sequences = list(SeqIO.parse(fasta_file, "fasta"))
@@ -24,6 +24,14 @@ def calculate_percent_similarity_and_update_csv(fasta_file, prefix_csv):
     if len(sequences) < 2:
         print("Error: The FASTA file must contain at least two sequences.")
         return
+
+    # Get the names of the two sequences calculate_pairwise_alignment_metrics
+    ref_name    = sequences[0].name
+    # Replace "|" with "_" in the full_header and keep everything before the first colon
+    sanitized_ref_name = ref_name.replace("|", "_").split(':')[0]
+    contig_name = sequences[1].name
+    # Sanitize the sequence name to keep only the first two elements. E.g. "NODE_18"
+    sanitized_contig_name = "_".join(contig_name.split("_")[:2])
 
     # Extract the two sequences
     seq1 = str(sequences[0].seq).upper()
@@ -52,7 +60,7 @@ def calculate_percent_similarity_and_update_csv(fasta_file, prefix_csv):
         existing_data = list(reader)
 
     # Output to CSV
-    csv_file = '{}.genotyping_result.{}.csv'.format(sample_name, gene_name)
+    csv_file = f"{sample_name}.genotyping_result.{gene_name}.{sanitized_contig_name}.{sanitized_ref_name}.csv"
 
     with open(csv_file, "w", newline='') as file:
         writer = csv.writer(file)
@@ -65,4 +73,4 @@ def calculate_percent_similarity_and_update_csv(fasta_file, prefix_csv):
 
 # Run the function
 if gene_name == gene_name_2 == gene_name_3:
-    calculate_percent_similarity_and_update_csv(aligned_fasta_file, csv_ratio)
+    calculate_percent_similarity_and_update_csv(aligned_fasta_file, csv_file)

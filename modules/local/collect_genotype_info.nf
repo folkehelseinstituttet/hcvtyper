@@ -1,4 +1,4 @@
-process PARSE_PHYLOGENY {
+process COLLECT_GENOTYPE_INFO {
     tag "$meta.id"
     label 'process_single'
 
@@ -8,15 +8,11 @@ process PARSE_PHYLOGENY {
         'docker.io/pegi3s/biopython:1.78' }"
 
     input:
-    tuple val(meta) , path(treefile)
-    //tuple val(meta) , path(gff_extract_fasta), path(treefile)
-    //tuple val(meta2), path(references)
+    tuple val(meta) , path(fasta), path(parse_phylo)
 
     output:
-    tuple val(meta), path("*parse_phylo*.csv")    , emit: parse_phylo
-    //tuple val(meta), path("*temp_prefix_header*.csv")   , emit: header
-    //tuple val(meta), path("*.fasta"), emit: percentcalc_fasta
-    path "versions.yml"                                 , emit: versions
+    tuple val(meta), path("*genotyping_result*.csv"), emit: genotyping
+    path "versions.yml"                             , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -25,10 +21,7 @@ process PARSE_PHYLOGENY {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-    # Parse the phylogeny (treefile), identify the clade identity for each of the de novo contigs,
-    # and identify the nearest reference sequences.
-    # Output this as a csv file
-    parse_phylo.py $prefix $treefile $gene_name
+    CalculateMappingStatisticsAndCombine.py $prefix $gene_name $fasta $parse_phylo
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
