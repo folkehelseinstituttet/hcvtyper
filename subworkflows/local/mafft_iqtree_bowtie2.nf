@@ -1,4 +1,5 @@
 include { PREPARE_BOWTIE2_BUILD                } from '../../modules/local/prepare_bowtie2_build'
+include { JOIN_CONTIGS                        } from '../../modules/local/join_contigs'
 include { BOWTIE2_BUILD                        } from '../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN                        } from '../../modules/nf-core/bowtie2/align/main'
 include { CREATE_JPG                           } from '../../modules/local/create_jpg'
@@ -184,6 +185,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         ch_mafft_pairwise
     )
     // Create a process that will take all the fasta files per sample id. Then simply concatenate them and output together with the sample id.
+    // Challenge: How to name the sample with id or something?
     JOIN_CONTIGS(
             // Collect all the contig fastas per sample
         PREPARE_BOWTIE2_BUILD.out.contig
@@ -195,7 +197,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             .groupTuple(by: 0) // Group by sample
             // How to merge all the fasta files?
     )
-
+    JOIN_CONTIGS.out.contig.view()
 
 
     BOWTIE2_BUILD(
@@ -205,11 +207,9 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //        .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
     //        .filter { meta, record -> record.header =~ /^NODE.*/ }
     //        .collectFile(name: 'contig.fasta', newLine: true) { ">${it.get(1).header}\n${it.get(1).seqString}"}
-        PREPARE_BOWTIE2_BUILD.out.contig
+        JOIN_CONTIGS.out.contig
     )
 
-    // This is a problem: there is only two samples and hence only two sets of read files (ch_classified_reads).
-    // Maybe I need to collect/join all contigs per sample?
     BOWTIE2_ALIGN (
         ch_classified_reads,
         BOWTIE2_BUILD.out.index,
