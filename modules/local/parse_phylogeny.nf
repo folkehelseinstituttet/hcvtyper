@@ -9,14 +9,10 @@ process PARSE_PHYLOGENY {
 
     input:
     tuple val(meta) , path(treefile)
-    //tuple val(meta) , path(gff_extract_fasta), path(treefile)
-    //tuple val(meta2), path(references)
 
     output:
-    tuple val(meta), path("*parse_phylo*.csv")    , emit: parse_phylo
-    //tuple val(meta), path("*temp_prefix_header*.csv")   , emit: header
-    //tuple val(meta), path("*.fasta"), emit: percentcalc_fasta
-    path "versions.yml"                                 , emit: versions
+    tuple val(meta), path("*parse_phylo*.csv"), emit: parse_phylo
+    path "versions.yml"                       , emit: versions
 
     when:
     task.ext.when == null || task.ext.when

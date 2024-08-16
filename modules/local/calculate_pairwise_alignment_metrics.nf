@@ -11,7 +11,7 @@ process CALCULATE_PAIRWISE_ALIGNMENT_METRICS {
     tuple val(meta) , path(fasta)
 
     output:
-    tuple val(meta), path("*alignment_metrics*.csv"), emit: genotyping
+    tuple val(meta), path("*alignment_metrics*.csv"), emit: metrics
     path "versions.yml"                             , emit: versions
 
     when:
