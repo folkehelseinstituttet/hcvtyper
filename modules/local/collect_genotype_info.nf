@@ -5,10 +5,11 @@ process COLLECT_GENOTYPE_INFO {
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-        'docker.io/pegi3s/biopython:1.78' }"
+        'docker.io/jonbra/tidyverse_seqinr:2.0' }"
 
     input:
-    tuple val(meta) , path(fasta), path(parse_phylo)
+    tuple val(meta) , path(parse_phylo)
+    tuple val(meta2), path(alignment_metrics)
 
     output:
     tuple val(meta), path("*genotyping_result*.csv"), emit: genotyping
@@ -21,7 +22,7 @@ process COLLECT_GENOTYPE_INFO {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-    CalculateMappingStatisticsAndCombine.py $prefix $gene_name $fasta $parse_phylo
+    collect_genotype_info.R
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
