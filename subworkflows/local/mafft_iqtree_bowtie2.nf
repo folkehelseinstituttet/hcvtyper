@@ -1,18 +1,22 @@
-include { CREATE_JPG              } from '../../modules/local/create_jpg'
+include { PREPARE_BOWTIE2_BUILD                } from '../../modules/local/prepare_bowtie2_build'
+include { BOWTIE2_BUILD                        } from '../../modules/nf-core/bowtie2/build/main'
+include { BOWTIE2_ALIGN                        } from '../../modules/nf-core/bowtie2/align/main'
+include { CREATE_JPG                           } from '../../modules/local/create_jpg'
 include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS } from '../../modules/local/calculate_pairwise_alignment_metrics'
-include { IQTREE                  } from '../../modules/nf-core/iqtree/main'
-include { MAFFT                   } from '../../modules/nf-core/mafft/main'
-include { MAFFT as MAFFT_PAIRWISE } from '../../modules/nf-core/mafft/main'
-include { PARSE_PHYLOGENY         } from '../../modules/local/parse_phylogeny'
-include { EXTRACT_COMBINE_SEQS    } from '../../modules/local/extract_combine_seqs'
-include { COLLECT_GENOTYPE_INFO   } from '../../modules/local/collect_genotype_info'
-include { PREPARE_MAFFT           } from '../../modules/local/prepare_mafft'
+include { IQTREE                               } from '../../modules/nf-core/iqtree/main'
+include { MAFFT                                } from '../../modules/nf-core/mafft/main'
+include { MAFFT as MAFFT_PAIRWISE              } from '../../modules/nf-core/mafft/main'
+include { PARSE_PHYLOGENY                      } from '../../modules/local/parse_phylogeny'
+include { EXTRACT_COMBINE_SEQS                 } from '../../modules/local/extract_combine_seqs'
+include { COLLECT_GENOTYPE_INFO                } from '../../modules/local/collect_genotype_info'
+include { PREPARE_MAFFT                        } from '../../modules/local/prepare_mafft'
 
-workflow MAFFT_IQTREE_GENOTYPING {
+workflow MAFFT_IQTREE_BOWTIE2 {
 
     take:
     ch_vigorparse   // channel: [ val(meta), path(gene_fasta) ]
     ch_references // channel: [ val(meta), path(gene_references) ]
+    ch_reads
 
     main:
     ch_versions = Channel.empty()
@@ -93,6 +97,14 @@ workflow MAFFT_IQTREE_GENOTYPING {
     )
     ch_versions = ch_versions.mix(IQTREE.out.versions.first())
 
+    //
+    // MODULE: Create a jpg image of the phylogeny
+    //
+    CREATE_JPG(
+        IQTREE.out.phylogeny
+    )
+    ch_versions = ch_versions.mix(CREATE_JPG.out.versions.first())
+
     // Here we need to join all the output from a single sample before further parsing
 
     //
@@ -166,26 +178,30 @@ workflow MAFFT_IQTREE_GENOTYPING {
     )
 
     //
-    // MODULE: COLLECT GENOTYPING INFORMATION
+    // MODULE: Map reads to the different contigs.
     //
-    // TODO: Find a way to collect all relevant info, and account for co-infections. Maybe just collect all files into the process.
-    ch_collect_genotype_info = MAFFT_PAIRWISE.out.fas.join(PARSE_PHYLOGENY.out.parse_phylo)
-    COLLECT_GENOTYPE_INFO(
-        ch_collect_genotype_info
-    )
-    ch_versions = ch_versions.mix(COLLECT_GENOTYPE_INFO.out.versions.first())
 
-    CREATE_JPG(
-        IQTREE.out.phylogeny
+    PREPARE_BOWTIE2_BUILD(
+        ch_mafft_pairwise
     )
-    ch_versions = ch_versions.mix(CREATE_JPG.out.versions.first())
+    // ch_build = ch_mafft_pairwise
+    //     .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
+    //     .filter { meta, record -> record.header =~ /^NODE.*/ }
+    // ch_build.view()
+    BOWTIE2_BUILD(
+        PREPARE_BOWTIE2_BUILD.out.contig
+    )
+
+    // BOWTIE2_ALIGN(
+    //
+    // )
+
 
     emit:
-    genotype = COLLECT_GENOTYPE_INFO.out.genotyping
-    ratio    = PARSE_PHYLOGENY.out.parse_phylo
-    //header   = PARSE_PHYLOGENY.out.header
-    fasta    = EXTRACT_COMBINE_SEQS.out.combined_fasta
-    aligned  = MAFFT.out.fas
-    versions = ch_versions
+    alignment_metrics = CALCULATE_PAIRWISE_ALIGNMENT_METRICS.out.metrics
+    parse_phylo       = PARSE_PHYLOGENY.out.parse_phylo
+    fasta             = EXTRACT_COMBINE_SEQS.out.combined_fasta
+    aligned           = MAFFT.out.fas
+    versions          = ch_versions
 
 }
