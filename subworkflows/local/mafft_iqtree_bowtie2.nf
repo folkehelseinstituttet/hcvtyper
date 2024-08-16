@@ -16,7 +16,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     take:
     ch_vigorparse   // channel: [ val(meta), path(gene_fasta) ]
     ch_references // channel: [ val(meta), path(gene_references) ]
-    ch_reads
+    ch_classified_reads
 
     main:
     ch_versions = Channel.empty()
@@ -184,17 +184,27 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     PREPARE_BOWTIE2_BUILD(
         ch_mafft_pairwise
     )
-    // ch_build = ch_mafft_pairwise
-    //     .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
-    //     .filter { meta, record -> record.header =~ /^NODE.*/ }
-    // ch_build.view()
+
     BOWTIE2_BUILD(
+    // The challenge of using the splitFasta approach is to have control of the file names.
+    // I like to use the file names to keep track of samples and genes. And also to collect files later.
+    //    ch_mafft_pairwise
+    //        .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
+    //        .filter { meta, record -> record.header =~ /^NODE.*/ }
+    //        .collectFile(name: 'contig.fasta', newLine: true) { ">${it.get(1).header}\n${it.get(1).seqString}"}
         PREPARE_BOWTIE2_BUILD.out.contig
     )
 
-    // BOWTIE2_ALIGN(
-    //
-    // )
+    BOWTIE2_ALIGN (
+        ch_classified_reads,
+        BOWTIE2_BUILD.out.index,
+        false, // Do not save unmapped reads
+        true // Sort bam file
+    )
+    ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+
+    // NEXT STEPS: collect metrics on mapped reads with duplicates and without duplicates
+
 
 
     emit:
