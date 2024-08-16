@@ -180,10 +180,23 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //
     // MODULE: Map reads to the different contigs.
     //
-
     PREPARE_BOWTIE2_BUILD(
         ch_mafft_pairwise
     )
+    // Create a process that will take all the fasta files per sample id. Then simply concatenate them and output together with the sample id.
+    JOIN_CONTIGS(
+            // Collect all the contig fastas per sample
+        PREPARE_BOWTIE2_BUILD.out.contig
+            .map {
+                meta, fasta ->
+                def sample = meta.id
+                return [sample, meta, fasta] // How to name the id "id"?
+            }
+            .groupTuple(by: 0) // Group by sample
+            // How to merge all the fasta files?
+    )
+
+
 
     BOWTIE2_BUILD(
     // The challenge of using the splitFasta approach is to have control of the file names.
@@ -195,6 +208,8 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         PREPARE_BOWTIE2_BUILD.out.contig
     )
 
+    // This is a problem: there is only two samples and hence only two sets of read files (ch_classified_reads).
+    // Maybe I need to collect/join all contigs per sample?
     BOWTIE2_ALIGN (
         ch_classified_reads,
         BOWTIE2_BUILD.out.index,
