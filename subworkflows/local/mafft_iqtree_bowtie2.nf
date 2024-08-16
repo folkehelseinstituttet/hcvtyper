@@ -12,6 +12,8 @@ include { EXTRACT_COMBINE_SEQS                 } from '../../modules/local/extra
 include { COLLECT_GENOTYPE_INFO                } from '../../modules/local/collect_genotype_info'
 include { PREPARE_MAFFT                        } from '../../modules/local/prepare_mafft'
 
+include { BAM_MARKDUPLICATES_SAMTOOLS          } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
+
 workflow MAFFT_IQTREE_BOWTIE2 {
 
     take:
@@ -217,11 +219,17 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
 
-    SAMTOOLS_STATS(
-        BOWTIE2_ALIGN.out.bam
-    )
+   // SAMTOOLS_STATS(
+     //   BOWTIE2_ALIGN.out.bam
+    //)
 
     // NEXT STEPS: collect metrics on mapped reads with duplicates and without duplicates
+    // Remove duplicate reads
+    BAM_MARKDUPLICATES_SAMTOOLS(
+        BOWTIE2_ALIGN.out.aligned,
+        JOIN_CONTIGS.out.contig
+    )
+    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
 
 
 
