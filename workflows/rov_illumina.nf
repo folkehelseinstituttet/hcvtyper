@@ -198,7 +198,8 @@ workflow ROV_ILLUMINA {
     //ch_collect_genotype_info = MAFFT_PAIRWISE.out.fas.join(PARSE_PHYLOGENY.out.parse_phylo)
     // COLLECT_GENOTYPE_INFO(
     //     MAFFT_IQTREE_BOWTIE2.out.parse_phylo.collect(),
-    //     MAFFT_IQTREE_BOWTIE2.out.alignment_metrics.collect()
+    //     MAFFT_IQTREE_BOWTIE2.out.alignment_metrics.collect(),
+    //     MAFFT_IQTREE_BOWTIE2.out.mapping_stats.collect()
 
     // )
     // ch_versions = ch_versions.mix(COLLECT_GENOTYPE_INFO.out.versions.first())
