@@ -197,8 +197,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             .groupTuple(by: 0) // Group by sample
             // How to merge all the fasta files?
     )
-    JOIN_CONTIGS.out.contig.view()
-
 
     BOWTIE2_BUILD(
     // The challenge of using the splitFasta approach is to have control of the file names.
@@ -210,6 +208,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         JOIN_CONTIGS.out.contig
     )
 
+    // TODO: Ensure that classified reads are from the same sample as Bowtie2 build output
     BOWTIE2_ALIGN (
         ch_classified_reads,
         BOWTIE2_BUILD.out.index,
@@ -217,6 +216,10 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         true // Sort bam file
     )
     ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+
+    SAMTOOLS_STATS(
+        BOWTIE2_ALIGN.out.bam
+    )
 
     // NEXT STEPS: collect metrics on mapped reads with duplicates and without duplicates
 
