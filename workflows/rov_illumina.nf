@@ -37,7 +37,7 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 include { INPUT_CHECK                        } from '../subworkflows/local/input_check'
 include { VIGOR_VIGORPARSE                   } from '../subworkflows/local/vigor_vigorparse'
-include { MAFFT_IQTREE_GENOTYPING            } from '../subworkflows/local/mafft_iqtree_genotyping'
+include { MAFFT_IQTREE_BOWTIE2               } from '../subworkflows/local/mafft_iqtree_bowtie2'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,12 +184,24 @@ workflow ROV_ILLUMINA {
     //
     // SUBWORKFLOW: Align gene sequences with MAFFT, create phylogenies with IQTREE, and parse phylogeny to genotype the sample sequence
     //
-    MAFFT_IQTREE_GENOTYPING(
+    MAFFT_IQTREE_BOWTIE2(
         VIGOR_VIGORPARSE.out.gff_extract_fasta, // val(meta), path(gene_fasta)
-        [ [], file(params.rov_references) ]
+        [ [], file(params.rov_references) ],
+        KRAKEN2_FOCUSED.out.classified_reads_fastq
     )
-    ch_versions = ch_versions.mix(MAFFT_IQTREE_GENOTYPING.out.versions.first())
+    ch_versions = ch_versions.mix(MAFFT_IQTREE_BOWTIE2.out.versions.first())
 
+    //
+    // MODULE: COLLECT GENOTYPING INFORMATION
+    //
+    // TODO: Find a way to collect all relevant info, and account for co-infections. Maybe just collect all files into the process.
+    //ch_collect_genotype_info = MAFFT_PAIRWISE.out.fas.join(PARSE_PHYLOGENY.out.parse_phylo)
+    // COLLECT_GENOTYPE_INFO(
+    //     MAFFT_IQTREE_BOWTIE2.out.parse_phylo.collect(),
+    //     MAFFT_IQTREE_BOWTIE2.out.alignment_metrics.collect()
+
+    // )
+    // ch_versions = ch_versions.mix(COLLECT_GENOTYPE_INFO.out.versions.first())
 
     //
     // MODULE: Dump software versions
