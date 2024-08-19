@@ -60,6 +60,7 @@ include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
 include { SPADES as SPADES_RNAVIRAL          } from '../modules/nf-core/spades/main'
 include { SPADES as SPADES_ISOLATE           } from '../modules/nf-core/spades/main'
+include { SUMMARIZE_ROV as SUMMARIZE         } from '../modules/local/summarize_rov'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -192,17 +193,28 @@ workflow ROV_ILLUMINA {
     ch_versions = ch_versions.mix(MAFFT_IQTREE_BOWTIE2.out.versions.first())
 
     //
-    // MODULE: COLLECT GENOTYPING INFORMATION
+    // MODULE: Summarize
     //
-    // TODO: Find a way to collect all relevant info, and account for co-infections. Maybe just collect all files into the process.
-    //ch_collect_genotype_info = MAFFT_PAIRWISE.out.fas.join(PARSE_PHYLOGENY.out.parse_phylo)
-    // COLLECT_GENOTYPE_INFO(
-    //     MAFFT_IQTREE_BOWTIE2.out.parse_phylo.collect(),
-    //     MAFFT_IQTREE_BOWTIE2.out.alignment_metrics.collect(),
-    //     MAFFT_IQTREE_BOWTIE2.out.mapping_stats.collect()
+    // Collect all the files in separate channels for clarity. Don't need the meta
+    ch_parse_phylogeny  = MAFFT_IQTREE_BOWTIE2.out.parse_phylo.collect({it[1]})
+    ch_alignment_metrics= MAFFT_IQTREE_BOWTIE2.out.alignment_metrics.collect({it[1]})
+    ch_sequence_id      = INSTRUMENT_ID.out.id.collect({it[1]})
+    ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
+    ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
+    ch_stats_withdup    = MAFFT_IQTREE_BOWTIE2.out.stats_withdup.collect({it[1]})
+    ch_stats_markdup    = MAFFT_IQTREE_BOWTIE2.out.stats_markdup.collect({it[1]})
+    ch_depth            = MAFFT_IQTREE_BOWTIE2.out.depth.collect({it[1]})
 
-    // )
-    // ch_versions = ch_versions.mix(COLLECT_GENOTYPE_INFO.out.versions.first())
+    SUMMARIZE (
+        ch_sequence_id.collect(),
+        ch_parse_phylogeny.collect(),
+        ch_alignment_metrics.collect(),
+        ch_cutadapt.collect(),
+        ch_classified_reads.collect(),
+        ch_stats_withdup.collect(),
+        ch_stats_markdup.collect(),
+        ch_depth.collect()
+    )
 
     //
     // MODULE: Dump software versions
