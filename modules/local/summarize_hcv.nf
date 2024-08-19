@@ -1,4 +1,4 @@
-process SUMMARIZE {
+process SUMMARIZE_HCV {
 
     label 'process_single'
     errorStrategy 'terminate'
