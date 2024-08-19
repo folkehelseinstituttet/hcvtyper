@@ -1,9 +1,15 @@
 include { PREPARE_BOWTIE2_BUILD                } from '../../modules/local/prepare_bowtie2_build'
-include { JOIN_CONTIGS                        } from '../../modules/local/join_contigs'
+include { JOIN_CONTIGS                         } from '../../modules/local/join_contigs'
 include { BOWTIE2_BUILD                        } from '../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN                        } from '../../modules/nf-core/bowtie2/align/main'
 include { CREATE_JPG                           } from '../../modules/local/create_jpg'
 include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS } from '../../modules/local/calculate_pairwise_alignment_metrics'
+include { SAMTOOLS_INDEX as INDEX_WITHDUP      } from '../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_INDEX as INDEX_MARKDUP      } from '../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_STATS as STATS_WITHDUP      } from '../../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_STATS as STATS_MARKDUP      } from '../../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_IDXSTATS                    } from '../../modules/nf-core/samtools/idxstats/main'
+include { SAMTOOLS_DEPTH                       } from '../../modules/nf-core/samtools/depth/main'
 include { IQTREE                               } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                                } from '../../modules/nf-core/mafft/main'
 include { MAFFT as MAFFT_PAIRWISE              } from '../../modules/nf-core/mafft/main'
@@ -199,7 +205,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             }
             .groupTuple(by: 0) // Group by sample
     )
-    JOIN_CONTIGS.out.contig.view()
+
     BOWTIE2_BUILD(
     // The challenge of using the splitFasta approach is to have control of the file names.
     // I like to use the file names to keep track of samples and genes. And also to collect files later.
@@ -219,17 +225,45 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
 
-   // SAMTOOLS_STATS(
-     //   BOWTIE2_ALIGN.out.bam
-    //)
+    // Generate stats file with duplicates included
+    INDEX_WITHDUP (
+        BOWTIE2_ALIGN.out.aligned
+    )
+    STATS_WITHDUP (
+        BOWTIE2_ALIGN.out.aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
+        JOIN_CONTIGS.out.contig // val(meta), path(fasta)
+    )
 
-    // NEXT STEPS: collect metrics on mapped reads with duplicates and without duplicates
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS(
         BOWTIE2_ALIGN.out.aligned,
         JOIN_CONTIGS.out.contig
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
+
+    INDEX_MARKDUP (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+    )
+    ch_versions = ch_versions.mix(INDEX_MARKDUP.out.versions.first())
+
+    // NEED THIS?
+    SAMTOOLS_IDXSTATS (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions.first())
+
+    // NEED THIS?
+    SAMTOOLS_DEPTH (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
+        [ [], []] // Passing empty channels instead of an interval file
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
+
+    STATS_MARKDUP (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
+        JOIN_CONTIGS.out.contig // val(meta), path(fasta)
+    )
+    ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
 
 
 
@@ -238,6 +272,9 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     parse_phylo       = PARSE_PHYLOGENY.out.parse_phylo
     fasta             = EXTRACT_COMBINE_SEQS.out.combined_fasta
     aligned           = MAFFT.out.fas
+    bam_nodups        = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+    stats_withdup     = STATS_WITHDUP.out.stats
+    stats_markdup     = STATS_MARKDUP.out.stats
+    depth             = SAMTOOLS_DEPTH.out.tsv
     versions          = ch_versions
-
 }
