@@ -186,20 +186,20 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     PREPARE_BOWTIE2_BUILD(
         ch_mafft_pairwise
     )
+
     // Create a process that will take all the fasta files per sample id. Then simply concatenate them and output together with the sample id.
-    // Challenge: How to name the sample with id or something?
     JOIN_CONTIGS(
-            // Collect all the contig fastas per sample
+        // Collect all the contig fastas per sample
         PREPARE_BOWTIE2_BUILD.out.contig
             .map {
                 meta, fasta ->
-                def sample = meta.id
-                return [sample, meta, fasta] // How to name the id "id"?
+                def id = [:] // Create a new empty map
+                id.sample = meta.id // Add the sample id to the map and name it "sample"
+                return [id, meta, fasta]
             }
             .groupTuple(by: 0) // Group by sample
-            // How to merge all the fasta files?
     )
-
+    JOIN_CONTIGS.out.contig.view()
     BOWTIE2_BUILD(
     // The challenge of using the splitFasta approach is to have control of the file names.
     // I like to use the file names to keep track of samples and genes. And also to collect files later.
