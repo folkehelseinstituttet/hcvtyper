@@ -78,7 +78,7 @@ include { HCVGLUE                             } from '../modules/local/hcvglue'
 include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
-include { SUMMARIZE                           } from '../modules/local/summarize'
+include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
