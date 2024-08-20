@@ -189,6 +189,13 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //
     // MODULE: Map reads to the different contigs.
     //
+    // This process simply extracts the contig fasta file from the fasta file that comes out of the pairwise mafft which also includes the reference sequence.
+    // We could use groovy code, but this will enter the fasta file as a string and not a file.
+    // It's also possible to save as a file, but then it's hard to control the file names as I like to use the file names to keep track of samples and genes.  And also to collect files later.
+    //    ch_mafft_pairwise
+    //        .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
+    //        .filter { meta, record -> record.header =~ /^NODE.*/ }
+    //        .collectFile(name: 'contig.fasta', newLine: true) { ">${it.get(1).header}\n${it.get(1).seqString}"}
     PREPARE_BOWTIE2_BUILD(
         ch_mafft_pairwise
     )
@@ -199,22 +206,31 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         PREPARE_BOWTIE2_BUILD.out.contig
             .map {
                 meta, fasta -> [
-                    meta.subMap( ['id'] ), fasta ] // Keep only id. I.e. remove the "single_end" and "gene" keys from the meta map
+                    meta.subMap( ['id'] ), fasta // Keep only id. I.e. remove the "single_end" and "gene" keys from the meta map
+                    ]
             }
             .groupTuple(by: 0) // Group by the meta map which only holds the sample id
     )
-//ch.map { meta, files -> [ meta.subMap( ['id','rg'] ), files ] }
+
     BOWTIE2_BUILD(
-    // The challenge of using the splitFasta approach is to have control of the file names.
-    // I like to use the file names to keep track of samples and genes. And also to collect files later.
-    //    ch_mafft_pairwise
-    //        .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
-    //        .filter { meta, record -> record.header =~ /^NODE.*/ }
-    //        .collectFile(name: 'contig.fasta', newLine: true) { ">${it.get(1).header}\n${it.get(1).seqString}"}
-        JOIN_CONTIGS.out.contig
+        //JOIN_CONTIGS.out.contig
+        PREPARE_BOWTIE2_BUILD.out.contig
     )
 
     // TODO: Ensure that classified reads are from the same sample as Bowtie2 build output
+    // TODO: It's probably better to map to each contig separately. This is because one read may map to several contigs.
+    // TODO: Create two input channels by splitting after joining classified reads and bowtie2 index output
+
+    // Can  I join on the sample id only
+    // First remove the keys "single_end" and "gene" from the meta map of BOWTIE2_BUILD.out.index, then join on the sample id
+    BOWTIE2_BUILD.out.index.map {
+        meta, path -> [
+            meta.subMap( ['id','single_end'] ), path // Keep only "id" and "single_end" keys for joining
+        ]
+    }.join(ch_classified_reads) // Join with the classified reads channel on the meta map
+    // Now define two new channels: one for the classified reads and one for the contigs. They should both contain the meta map
+
+
     BOWTIE2_ALIGN (
         ch_classified_reads,
         BOWTIE2_BUILD.out.index,
