@@ -18,6 +18,8 @@ include { PARSE_PHYLOGENY                      } from '../../modules/local/parse
 include { EXTRACT_COMBINE_SEQS                 } from '../../modules/local/extract_combine_seqs'
 include { COLLECT_GENOTYPE_INFO                } from '../../modules/local/collect_genotype_info'
 include { PREPARE_MAFFT                        } from '../../modules/local/prepare_mafft'
+include { SUMMARIZE_IDXSTATS as SUMMARIZE_IDXSTATS_WITHDUP } from '../../modules/local/summarize_idxstats'
+include { SUMMARIZE_IDXSTATS as SUMMARIZE_IDXSTATS_MARKDUP } from '../../modules/local/summarize_idxstats'
 
 include { BAM_MARKDUPLICATES_SAMTOOLS          } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
 
@@ -274,6 +276,12 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_WITHDUP.out.versions.first())
 
+    // Summarize IDXSTATS OUTPUT HERE:
+    // SHOULD BE STATS FILE MAYBE? SAMTOOLS STATS?
+    //SUMMARIZE_IDXSTATS_WITHDUP (
+    //    SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats
+    //)
+
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS(
         BOWTIE2_ALIGN.out.aligned,
@@ -290,6 +298,11 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_MARKDUP.out.versions.first())
+
+    // Summarize IDXSTATS OUTPUT HERE. CREATE OUTPUT FILES THAT HAS THE SAMPLE NAME, GENE NAME, CONTIG NAME AND REFERENCE NAME
+    //SUMMARIZE_IDXSTATS_MARKDUP (
+    //    SUMMARIZE_IDXSTATS_MARKDUP.out.idxstats
+    //)
 
     SAMTOOLS_DEPTH (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
