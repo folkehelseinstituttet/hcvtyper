@@ -53,38 +53,149 @@ for (i in 1:length(id_files)) {
 id_df <- as_tibble(id_df)
 
 
-# Parse phylogeny ---------------------------------------------------------
+# Parse phylogeny, alignment and mapping statistics -----------------------
+
+## Parse phylogeny
+
+# Summarize metrics from parsing the phylogenetic tree including all contigs for a given gene and corresponding references.
 
 # List files
 parse_phylogeny_files <- list.files(path = path_2, pattern = ".csv$", full.names = TRUE)
 
 # Empty df
-parse_phylogeny_df <- as.data.frame(matrix(nrow = length(parse_phylogeny_files), ncol = 5))
-colnames(parse_phylogeny_df) <- c("sampleName", "gene", "target_clade", "closest_sequence", "ratio")
+parse_phylogeny_df <- tribble(
+  ~"sampleName", ~"gene", ~"target_clade", ~"closest_sequence", ~"ratio",
+)
 
 for (i in 1:length(parse_phylogeny_files)) {
+  try(rm(tmp))
+  tmp <- read_csv(parse_phylogeny_files[i]) %>%
+    add_column("sampleName" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][1]) %>%
+    add_column("gene" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][3]) %>%
+    select(sampleName, gene, "target_clade" = `Target clade prefix`, "closest_sequence" = `Closest sequence`, "ratio" = `Closest Count / Total Count`)
 
-  # Get sample name
-  parse_phylogeny_df$sampleName[i] <- str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][1]
 
-  # Get gene name
-  parse_phylogeny_df$gene[i] <- str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][3]
-
-  tmp <- read_csv(parse_phylogeny_files[i])
-
-  # Get the target clade
-  parse_phylogeny_df$target_clade[i] <- tmp %>% pull(`Target clade prefix`)
-
-  # Get the closest sequence
-  parse_phylogeny_df$closest_sequence[i] <- tmp %>% pull(`Closest Count / Total Count`)
-
-  # Get the ratio
-  parse_phylogeny_df$ratio[i] <- tmp %>% pull()
-
+  # Add to df
+  parse_phylogeny_df <- bind_rows(parse_phylogeny_df, tmp)
 
 }
 
-parse_phylogeny_df <- as_tibble(parse_phylogeny_df)
+## Alignment metrics
+
+# Summarize metrics from the pairwise alignment between the de novo contig and the closest reference in the phylogeny
+
+# List files
+alignment_metrics_files <- list.files(path = path_3, pattern = ".csv$", full.names = TRUE)
+
+# Empty df
+alignment_metrics_df <- tribble(
+  ~"sampleName", ~"gene", ~"closest_sequence", ~"percent_similarity", ~"aligned_length", ~"total_length",
+)
+
+for (i in 1:length(alignment_metrics_files)) {
+  try(rm(tmp))
+  tmp <- read_csv(alignment_metrics_files[i]) %>%
+    add_column("sampleName" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][1]) %>%
+    add_column("gene" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][3]) %>%
+    # Clean up closest sequence name. Keep everything before the first ":"
+    mutate(`Closest sequence` = str_split(`Closest sequence`, ":")[[1]][1]) %>%
+    select(sampleName, gene, "closest_sequence" = `Closest sequence`, "percent_similarity" = `Percent Similarity`, "aligned_length" = `Aligned Length`, "total_length" = `Total Length`)
+
+
+  # Add to df
+  alignment_metrics_df <- bind_rows(alignment_metrics_df, tmp)
+
+}
+
+# Join parse phylogeny and alignment metrics on the both sampleName, gene and closest sequence.
+# This is to ensure that phylogeny results and alignment stats are generated on the same results.
+# use full_join to keep all observations
+joined_df <- full_join(parse_phylogeny_df, alignment_metrics_df, by = join_by(sampleName, gene, closest_sequence))
+
+
+## Mapping statistics
+
+# Summarize statistics from the bowtie2 mapping
+
+## With duplicates
+
+##NB! Need to count mapped reads per reference. All the references are merged here. samtools idxstats. This is alignments
+
+# List files
+stats_withdup_files <- list.files(path = path_6, pattern = ".stats$", full.names = TRUE)
+
+# Empty df
+tmp_df <- as.data.frame(matrix(nrow = length(stats_withdup_files), ncol = 4))
+colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_withdups_mapped")
+
+for (i in 1:length(stats_withdup_files)) {
+  try(rm(map_stats))
+  # Get sample name
+  tmp_df$sampleName[i] <- str_split(basename(stats_withdup_files[i]), "\\.")[[1]][1]
+
+  # Get reference name
+  tmp_df$reference[i] <- str_split(basename(stats_withdup_files[i]), "\\.")[[1]][2]
+
+  # Get major or minor
+  tmp_df$first_major_minor[i] <- str_split(basename(stats_withdup_files[i]), "\\.")[[1]][3]
+
+  # Read the mapping stats
+  map_stats <- read_tsv(stats_withdup_files[i], col_names = FALSE, comment = "#")
+
+  # Get number of mapped reads before duplicate removal
+  mapped_reads <- map_stats %>% filter(X2 == "reads mapped:") %>% pull(X3)
+
+  mapped_reads <- as.numeric(mapped_reads)
+  tmp_df$trimmed_reads_withdups_mapped[i] <- mapped_reads
+}
+tmp_df <- as_tibble(tmp_df)
+
+# Add number of raw and trimmed reads
+tmp_df <- left_join(tmp_df, cutadapt_df, by = "sampleName")
+
+# Add number of classified reads from Kraken2
+tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
+
+df_with_dups <- tmp_df %>%
+  # Create columns for reads mapped to major and minor genotype
+  mutate(Reads_withdup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_withdups_mapped)) %>%
+  mutate(Reads_withdup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_withdups_mapped)) %>%
+  # Don't include number of reads mapped in the first mapping. Info must be taken from another process if we should include
+  #mutate(Reads_withdup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>%
+  select(-trimmed_reads_withdups_mapped) %>%
+  # Create columns for the major and minor references
+  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
+  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
+  mutate(Major_reference = str_remove(Major_reference, "_major"),
+         Minor_reference = str_remove(Minor_reference, "_minor")) %>%
+  select(-reference) %>%
+  # Calculate percent of the trimmed reads mapped
+  #mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
+  #       Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
+  #       Reads_withdup_mapped_minor = as.integer(Reads_withdup_mapped_minor)) %>%
+  #Reads_withdup_mapped_first_mapping = as.integer(Reads_withdup_mapped_first_mapping)) %>%
+  mutate(Percent_reads_mapped_of_trimmed_with_dups_major = Reads_withdup_mapped_major / total_trimmed_reads * 100,
+         Percent_reads_mapped_of_trimmed_with_dups_minor = Reads_withdup_mapped_minor / total_trimmed_reads * 100) %>%
+  #Percent_reads_mapped_with_dups_first_mapping = Reads_withdup_mapped_first_mapping / total_trimmed_reads_with_dups * 100) %>%
+  # Create one row per sample
+  select(-first_major_minor) %>%
+  group_by(sampleName) %>%
+  # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
+  fill(everything(), .direction = "downup") %>%
+  slice(1)
+
+# Summarize data per sample. For the moment keep one sample per row.
+parse_phylogeny_df <- parse_phylogeny_df %>%
+  # Check how many genes/segments present per sample
+  group_by(sampleName, gene) %>%
+  summarise(
+    gene_count = n(), # Count the number of the same gene per sample
+    target_clade = paste(target_clade, collapse = ";"), # Make a new column with all target clades per gene
+    closest_sequence = paste(closest_sequence, collapse = ";"), # Make a new column with all closest sequences per gene
+    ratio = paste(ratio, collapse = ";") # Make a new column with all ratios per gene
+  ) %>%
+  ungroup()
+
 
 # Cutadapt ----------------------------------------------------------------
 
