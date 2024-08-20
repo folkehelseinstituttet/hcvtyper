@@ -19,6 +19,7 @@ process SUMMARIZE_ROV {
     path 'depth/'
 
     output:
+    path '*'
     // path '*long.csv'        , emit: summary
     // path '*mqc.csv'         , emit: mqc
     // path '*LW_import.csv'   , emit: lw
