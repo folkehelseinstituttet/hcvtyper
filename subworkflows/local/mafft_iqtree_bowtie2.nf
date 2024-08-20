@@ -198,14 +198,12 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         // Collect all the contig fastas per sample
         PREPARE_BOWTIE2_BUILD.out.contig
             .map {
-                meta, fasta ->
-                def id = [:] // Create a new empty map
-                id.sample = meta.id // Add the sample id to the map and name it "sample"
-                return [id, meta, fasta]
+                meta, fasta -> [
+                    meta.subMap( ['id'] ), fasta ] // Keep only id. I.e. remove the "single_end" and "gene" keys from the meta map
             }
-            .groupTuple(by: 0) // Group by sample
+            .groupTuple(by: 0) // Group by the meta map which only holds the sample id
     )
-
+//ch.map { meta, files -> [ meta.subMap( ['id','rg'] ), files ] }
     BOWTIE2_BUILD(
     // The challenge of using the splitFasta approach is to have control of the file names.
     // I like to use the file names to keep track of samples and genes. And also to collect files later.
