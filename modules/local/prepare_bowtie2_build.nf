@@ -26,6 +26,7 @@ process PREPARE_BOWTIE2_BUILD {
     def extract_node_sequences(input_fasta):
         with open(input_fasta, "r") as infile:
             for record in SeqIO.parse(infile, "fasta"):
+                # The de novo assembled contig always starts with "NODE"
                 if record.id.startswith("NODE"):
                     # Sanitize the sequence name to keep only the first two elements
                     # sanitized_contig_name = "_".join(record.id.split("_")[:2])
