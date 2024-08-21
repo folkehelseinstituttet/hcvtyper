@@ -251,7 +251,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             reads: [ meta, reads ]
         }.set { ch_bowtie2_align }
 
-
     BOWTIE2_ALIGN (
         ch_bowtie2_align.reads,
         ch_bowtie2_align.index,
@@ -265,9 +264,23 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         BOWTIE2_ALIGN.out.aligned
     )
 
+    // Ensure no sample mixup for the STATS module. Merging output from PREPARE_BOWTIE2_BUILD, BOWTIE2_ALIGN and INDEX_WITHDUP
+    PREPARE_BOWTIE2_BUILD.out.contig.map {
+        meta, contig -> [
+            meta.subMap( ['id','single_end'] ), contig // Keep only "id" and "single_end" keys for joining
+        ]
+        }
+        .join(BOWTIE2_ALIGN.out.aligned, by: 0) // Join on meta with the bam file from BOWTIE2_ALIGN
+        .join(INDEX_WITHDUP.out.bai, by: 0) // Join on meta with the bai file from INDEX_WITHDUP
+        // Split into two channels for input into the STATS module
+        .multiMap { meta, contig, bam, bai ->
+            bam_bai: [ meta, bam, bai ]
+            contig: [ meta, contig ]
+        }.set { ch_stats }
+
     STATS_WITHDUP (
-        BOWTIE2_ALIGN.out.aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
-        PREPARE_BOWTIE2_BUILD.out.contig // val(meta), path(fasta)
+        ch_stats.bam_bai, // val(meta), path(bam), path(bai)
+        ch_stats.contig // val(meta), path(fasta)
     )
     SAMTOOLS_IDXSTATS_WITHDUP (
         BOWTIE2_ALIGN.out.aligned.join(INDEX_WITHDUP.out.bai) // val(meta), path(bam), path(bai)
