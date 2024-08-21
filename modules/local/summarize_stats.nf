@@ -1,4 +1,5 @@
-process SUMMARIZE_IDXSTATS {
+process SUMMARIZE_STATS {
+    tag "$meta.id"
     label 'process_single'
 
     conda "YOUR-TOOL-HERE"
@@ -12,13 +13,12 @@ process SUMMARIZE_IDXSTATS {
     output:
     tuple val(meta), path("*.csv"), emit: csv
 
+    when:
+    task.ext.when == null || task.ext.when
+
     script:
+    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    #!/usr/bin/env Rscript
-
-    library(tidyverse)
+    summarize_stats_rov.R ${prefix} ${idxstats}
     """
-
-
-
 }
