@@ -14,8 +14,8 @@ process SUMMARIZE_ROV {
     path 'alignment_metrics/'
     path 'cutadapt/'
     path 'kraken_classified/'
-    path 'stats_withdup/*'
-    path 'stats_markdup/*'
+    //path 'stats_withdup/*'
+    //path 'stats_markdup/*'
     path 'depth/*'
 
     output:
