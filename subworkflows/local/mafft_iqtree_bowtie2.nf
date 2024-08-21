@@ -18,8 +18,8 @@ include { PARSE_PHYLOGENY                      } from '../../modules/local/parse
 include { EXTRACT_COMBINE_SEQS                 } from '../../modules/local/extract_combine_seqs'
 include { COLLECT_GENOTYPE_INFO                } from '../../modules/local/collect_genotype_info'
 include { PREPARE_MAFFT                        } from '../../modules/local/prepare_mafft'
-include { SUMMARIZE_IDXSTATS as SUMMARIZE_IDXSTATS_WITHDUP } from '../../modules/local/summarize_idxstats'
-include { SUMMARIZE_IDXSTATS as SUMMARIZE_IDXSTATS_MARKDUP } from '../../modules/local/summarize_idxstats'
+include { SUMMARIZE_STATS as SUMMARIZE_STATS_WITHDUP } from '../../modules/local/summarize_stats'
+include { SUMMARIZE_STATS as SUMMARIZE_STATS_MARKDUP } from '../../modules/local/summarize_stats'
 
 include { BAM_MARKDUPLICATES_SAMTOOLS          } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
 
@@ -251,8 +251,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             reads: [ meta, reads ]
         }.set { ch_bowtie2_align }
 
-    // Now define two new channels: one for the classified reads and one for the contigs. They should both contain the meta map
-
 
     BOWTIE2_ALIGN (
         ch_bowtie2_align.reads,
@@ -267,20 +265,19 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         BOWTIE2_ALIGN.out.aligned
     )
 
-   // STATS_WITHDUP (
-    //    BOWTIE2_ALIGN.out.aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
-    //    PREPARE_BOWTIE2_BUILD.out.contig // val(meta), path(fasta)
-   // )
+    STATS_WITHDUP (
+        BOWTIE2_ALIGN.out.aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
+        PREPARE_BOWTIE2_BUILD.out.contig // val(meta), path(fasta)
+    )
     SAMTOOLS_IDXSTATS_WITHDUP (
         BOWTIE2_ALIGN.out.aligned.join(INDEX_WITHDUP.out.bai) // val(meta), path(bam), path(bai)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_WITHDUP.out.versions.first())
 
-    // Summarize IDXSTATS OUTPUT HERE:
-    // SHOULD BE STATS FILE MAYBE? SAMTOOLS STATS?
-    //SUMMARIZE_IDXSTATS_WITHDUP (
-    //    SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats
-    //)
+    // Summarize STATS OUTPUT HERE:
+    SUMMARIZE_STATS_WITHDUP (
+        STATS_WITHDUP.out.stats
+    )
 
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS(
