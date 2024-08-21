@@ -185,10 +185,20 @@ workflow ROV_ILLUMINA {
     //
     // SUBWORKFLOW: Align gene sequences with MAFFT, create phylogenies with IQTREE, and parse phylogeny to genotype the sample sequence
     //
+
+    // NOTE:
+    // Avoid sample mixup between vigorparse and classified reads channels
+    VIGOR_VIGORPARSE.out.gff_extract_fasta
+        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq, by: 0)
+        .multiMap { meta, gene_fasta, classified_reads_fastq ->
+            gene_fasta: [ meta, gene_fasta ]
+            classified_reads: [ meta, classified_reads_fastq ]
+        }.set { ch_vigorparse_classified_reads }
+
     MAFFT_IQTREE_BOWTIE2(
-        VIGOR_VIGORPARSE.out.gff_extract_fasta, // val(meta), path(gene_fasta)
-        [ [], file(params.rov_references) ],
-        KRAKEN2_FOCUSED.out.classified_reads_fastq
+        ch_vigorparse_classified_reads.gene_fasta, // val(meta), path(gene_fasta)
+        ch_vigorparse_classified_reads.classified_reads, // val(meta), path(classified_reads)
+        [ [], file(params.rov_references) ]
     )
     ch_versions = ch_versions.mix(MAFFT_IQTREE_BOWTIE2.out.versions.first())
 
@@ -201,8 +211,8 @@ workflow ROV_ILLUMINA {
     ch_sequence_id      = INSTRUMENT_ID.out.id.collect({it[1]})
     ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
-    ch_stats_withdup    = MAFFT_IQTREE_BOWTIE2.out.stats_withdup.collect({it[1]})
-    ch_stats_markdup    = MAFFT_IQTREE_BOWTIE2.out.stats_markdup.collect({it[1]})
+    //ch_stats_withdup    = MAFFT_IQTREE_BOWTIE2.out.stats_withdup.collect({it[1]})
+    //ch_stats_markdup    = MAFFT_IQTREE_BOWTIE2.out.stats_markdup.collect({it[1]})
     ch_depth            = MAFFT_IQTREE_BOWTIE2.out.depth.collect({it[1]})
 
     SUMMARIZE (
@@ -211,8 +221,8 @@ workflow ROV_ILLUMINA {
         ch_alignment_metrics.collect(),
         ch_cutadapt.collect(),
         ch_classified_reads.collect(),
-        ch_stats_withdup.collect(),
-        ch_stats_markdup.collect(),
+        //ch_stats_withdup.collect(),
+        //ch_stats_markdup.collect(),
         ch_depth.collect()
     )
 
