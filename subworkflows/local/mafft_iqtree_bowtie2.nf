@@ -12,7 +12,6 @@ include { SAMTOOLS_INDEX as INDEX_WITHDUP      } from '../../modules/nf-core/sam
 include { SAMTOOLS_INDEX as INDEX_MARKDUP      } from '../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_STATS as STATS_WITHDUP      } from '../../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_STATS as STATS_MARKDUP      } from '../../modules/nf-core/samtools/stats/main'
-include { SAMTOOLS_IDXSTATS                    } from '../../modules/nf-core/samtools/idxstats/main'
 include { SAMTOOLS_DEPTH                       } from '../../modules/nf-core/samtools/depth/main'
 include { IQTREE                               } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                                } from '../../modules/nf-core/mafft/main'
@@ -30,8 +29,8 @@ workflow MAFFT_IQTREE_BOWTIE2 {
 
     take:
     ch_vigorparse   // channel: [ val(meta), path(gene_fasta) ]
-    ch_references // channel: [ val(meta), path(gene_references) ]
     ch_classified_reads
+    ch_references // channel: [ val(meta), path(gene_references) ]
 
     main:
     ch_versions = Channel.empty()
@@ -349,8 +348,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     fasta             = EXTRACT_COMBINE_SEQS.out.combined_fasta
     aligned           = MAFFT.out.fas
     bam_nodups        = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
-    stats_withdup     = SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats
-    stats_markdup     = SAMTOOLS_IDXSTATS_MARKDUP.out.idxstats
     depth             = SAMTOOLS_DEPTH.out.tsv
     versions          = ch_versions
 }
