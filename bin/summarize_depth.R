@@ -17,7 +17,7 @@ if (prefix != prefix_2) {
 }
 
 # Empty df
-df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 7))
+df <- as.data.frame(matrix(nrow = 1, ncol = 7))
 colnames(df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth")
 
 # Read the depth per position
