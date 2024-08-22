@@ -100,6 +100,7 @@ workflow ROV_ILLUMINA {
     INSTRUMENT_ID (
         INPUT_CHECK.out.reads
     )
+    ch_versions = ch_versions.mix(INSTRUMENT_ID.out.versions)
 
     //
     // MODULE: Run FastQC on raw reads
@@ -124,6 +125,7 @@ workflow ROV_ILLUMINA {
     FASTQC_TRIM (
         CUTADAPT.out.reads
     )
+    ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
     //
     // MODULE: Run Kraken2 to classify reads
@@ -145,6 +147,7 @@ workflow ROV_ILLUMINA {
         params.save_output_fastqs,
         params.save_reads_assignment
     )
+    ch_versions = ch_versions.mix(KRAKEN2_FOCUSED.out.versions.first().ifEmpty(null))
 
     //
     // MODULE: Normalize reads with BBnorm
@@ -152,6 +155,7 @@ workflow ROV_ILLUMINA {
     BBMAP_BBNORM (
         KRAKEN2_FOCUSED.out.classified_reads_fastq
     )
+    ch_versions = ch_versions.mix(BBMAP_BBNORM.out.versions.first().ifEmpty(null))
 
     //
     // MODULE: de novo assembly with Spades
@@ -211,8 +215,8 @@ workflow ROV_ILLUMINA {
     ch_sequence_id      = INSTRUMENT_ID.out.id.collect({it[1]})
     ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
-    //ch_stats_withdup    = MAFFT_IQTREE_BOWTIE2.out.stats_withdup.collect({it[1]})
-    //ch_stats_markdup    = MAFFT_IQTREE_BOWTIE2.out.stats_markdup.collect({it[1]})
+    ch_stats_withdup    = MAFFT_IQTREE_BOWTIE2.out.stats_withdup.collect({it[1]})
+    ch_stats_markdup    = MAFFT_IQTREE_BOWTIE2.out.stats_markdup.collect({it[1]})
     ch_depth            = MAFFT_IQTREE_BOWTIE2.out.depth.collect({it[1]})
 
     SUMMARIZE (
@@ -221,8 +225,8 @@ workflow ROV_ILLUMINA {
         ch_alignment_metrics.collect(),
         ch_cutadapt.collect(),
         ch_classified_reads.collect(),
-        //ch_stats_withdup.collect(),
-        //ch_stats_markdup.collect(),
+        ch_stats_withdup.collect(),
+        ch_stats_markdup.collect(),
         ch_depth.collect()
     )
 
@@ -249,6 +253,7 @@ workflow ROV_ILLUMINA {
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
 
 
