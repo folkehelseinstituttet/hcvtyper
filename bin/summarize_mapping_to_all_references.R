@@ -14,50 +14,54 @@ sampleName <- args[3]
 references <- args[4]
 
 # Create empty dataframe to populate
-df_final <- as.data.frame(matrix(nrow = 1, ncol = 7))
-colnames(df_final) <- c("sample", "major_ref", "major_read_pairs", "major_cov", "minor_ref", "minor_read_pairs", "minor_cov")
+df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
+colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_read_pairs", "major_cov", "minor_ref", "minor_read_pairs", "minor_cov")
 
 df_final$sample[1] <- sampleName
 
 # Read the summary of the first mapping
-df <- read_tsv(idxstats, col_names = FALSE) %>% 
+df <- read_table(idxstats, col_names = FALSE) %>%
   # Identify genotype and subtype
-  separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) %>% 
-  # Discard the unmapped reads marked by an *
+  separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) %>%
+  # Discard the unmapped reads marked by an * (more precisely these are unmapped reads without coordinates)
   filter(X1 != "*")
 
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
+
+# First get the total number of mapped reads to all references
+df_final$total_mapped_reads[1] <- sum(df$X3, na.rm = TRUE)
+
 # Count number of reads per subtype
-summary <- df %>% 
-  group_by(Subtype) %>% 
-  summarise(read_pairs = sum(X3)) %>% 
+summary <- df %>%
+  group_by(Subtype) %>%
+  summarise(read_pairs = sum(X3)) %>%
   arrange(desc(read_pairs))
 
 ## Major
 # Find major reference to use
-major_tmp <- summary$Subtype[1] 
-major_ref <- df %>% 
-  filter(Subtype == major_tmp) %>% 
+major_tmp <- summary$Subtype[1]
+major_ref <- df %>%
+  filter(Subtype == major_tmp) %>%
   # Choose the reference with most mapped reads
-  arrange(desc(X3)) %>% 
-  head(n = 1) %>% 
+  arrange(desc(X3)) %>%
+  head(n = 1) %>%
   pull(X1)
 
 df_final$major_ref[1] <- major_ref
 
 # How many read pairs mapped to the minor subtype
-major_read_pairs <- summary %>% 
-  filter(Subtype == major_tmp) %>% 
+major_read_pairs <- summary %>%
+  filter(Subtype == major_tmp) %>%
   pull(read_pairs)
 
 df_final$major_read_pairs[1] <- major_read_pairs
 
-# Read the depth file from the first mapping. 
+# Read the depth file from the first mapping.
 # The file can be empty and the reading fails
-  cov <- read_tsv(depth, col_names = FALSE) %>% 
+  cov <- read_tsv(depth, col_names = FALSE) %>%
   # Filter out the minority subtype
-  filter(X1 == major_ref) 
+  filter(X1 == major_ref)
 
 
 # Reference length
@@ -66,7 +70,7 @@ ref_length <- nrow(cov)
 # Calculate percentage of positions with a coverage of 5 or more
 # Nr. of positions with coverage >= 5
 pos <- nrow(
-  cov %>% 
+  cov %>%
     filter(X3 > 4)
 )
 
@@ -78,28 +82,28 @@ df_final$major_cov[1] <- breadth_int
 
 ## Minor
 # Only execute if two or more references have reads mapped
-if(nrow(df) > 1) { 
-minor_tmp <- summary$Subtype[2] 
-minor_ref <- df %>% 
-  filter(Subtype == minor_tmp) %>% 
+if(nrow(df) > 1) {
+minor_tmp <- summary$Subtype[2]
+minor_ref <- df %>%
+  filter(Subtype == minor_tmp) %>%
   # Choose the reference with most mapped reads
-  arrange(desc(X3)) %>% 
-  head(n = 1) %>% 
+  arrange(desc(X3)) %>%
+  head(n = 1) %>%
   pull(X1)
 
 df_final$minor_ref[1] <- minor_ref
 
 # How many reads mapped to the minor subtype
-minor_read_pairs <- summary %>% 
-  filter(Subtype == minor_tmp) %>% 
+minor_read_pairs <- summary %>%
+  filter(Subtype == minor_tmp) %>%
   pull(read_pairs)
 
 df_final$minor_read_pairs[1] <- minor_read_pairs
 
 # Read the depth file from the first mapping
-cov <- read_tsv(depth, col_names = FALSE) %>% 
+cov <- read_tsv(depth, col_names = FALSE) %>%
   # Filter out the minority subtype
-  filter(X1 == minor_ref) 
+  filter(X1 == minor_ref)
 
 # Reference length
 ref_length <- nrow(cov)
@@ -107,7 +111,7 @@ ref_length <- nrow(cov)
 # Calculate percentage of positions with a coverage of 5 or more
 # Nr. of positions with coverage >= 5
 pos <- nrow(
-  cov %>% 
+  cov %>%
     filter(X3 > 4)
 )
 
