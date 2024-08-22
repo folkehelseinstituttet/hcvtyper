@@ -22,6 +22,7 @@ include { COLLECT_GENOTYPE_INFO                } from '../../modules/local/colle
 include { PREPARE_MAFFT                        } from '../../modules/local/prepare_mafft'
 include { SUMMARIZE_STATS as SUMMARIZE_STATS_WITHDUP } from '../../modules/local/summarize_stats'
 include { SUMMARIZE_STATS as SUMMARIZE_STATS_MARKDUP } from '../../modules/local/summarize_stats'
+include { SUMMARIZE_DEPTH } from '../../modules/local/summarize_depth'
 
 include { BAM_MARKDUPLICATES_SAMTOOLS          } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
 
@@ -320,6 +321,14 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         [ [], []] // Passing empty channels instead of an interval file
     )
     ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
+
+    //
+    // MODULE: Summarize samtools depth without duplicates
+    //
+    SUMMARIZE_DEPTH(
+        SAMTOOLS_DEPTH.out.tsv
+    )
+    ch_versions = ch_versions.mix(SUMMARIZE_DEPTH.out.versions.first())
 
     // NOTE:
     // Ensure no sample mixup for the STATS module. Merging output from PREPARE_BOWTIE2_BUILD, BAM_MARKDUPLICATES_SAMTOOLS and INDEX_MARKDUP
