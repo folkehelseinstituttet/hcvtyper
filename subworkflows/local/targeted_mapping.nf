@@ -7,6 +7,7 @@ include { SAMTOOLS_IDXSTATS } from '../../modules/nf-core/samtools/idxstats/main
 include { SAMTOOLS_DEPTH    } from '../../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../modules/nf-core/samtools/stats/main'
+include { IVAR_CONSENSUS } from '../../modules/nf-core/ivar/consensus/main'
 
 include { BAM_MARKDUPLICATES_SAMTOOLS } from '../nf-core/bam_markduplicates_samtools/main'
 
@@ -19,13 +20,18 @@ workflow TARGETED_MAPPING {
     ch_build = ch_major_mapping
         .map { meta, fasta, reads ->
         return [meta, fasta]
-        }
+    }
+
+    // Extract only the fasta path
+    ch_fasta = ch_major_mapping
+        .map { meta, fasta, reads ->
+        return [fasta]
+    }
 
     // Extract val(meta), path(reads). Add the reference name to the meta map
     ch_align = ch_major_mapping
-        .map {
-        meta, fasta, reads ->
-        new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
+        .map { meta, fasta, reads ->
+            new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
         return [new_meta, reads]
     }
 
@@ -57,6 +63,7 @@ workflow TARGETED_MAPPING {
     INDEX_WITHDUP (
         ch_aligned
     )
+
     STATS_WITHDUP (
         ch_aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
         ch_build // val(meta), path(fasta)
@@ -93,13 +100,22 @@ workflow TARGETED_MAPPING {
         ch_build // val(meta), path(fasta)
     )
     ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
-        // stats_markdup = BOWTIE2_ALIGN.out.stats_markdup
-        // stats_withdup = BOWTIE2_ALIGN.out.stats_withdup
+
+    //
+    // MODULE: Create consensus sequence
+    //
+    IVAR_CONSENSUS(
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
+        ch_fasta,
+        false // Don't need the mpileup file
+    )
+    ch_versions = ch_versions.mix(IVAR_CONSENSUS.out.versions.first())
+
     emit:
     aligned = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
     versions = ch_versions
     depth = SAMTOOLS_DEPTH.out.tsv
     stats_withdup = STATS_WITHDUP.out.stats
     stats_markdup = STATS_MARKDUP.out.stats
-
+    consensus = IVAR_CONSENSUS.out.fasta
 }
