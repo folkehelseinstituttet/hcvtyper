@@ -29,6 +29,7 @@ process VIGOR_HIGH_COVERAGE {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
+        BioPython: \$(python -c "import Bio; print(Bio.__version__)")
         Python: \$(python --version 2>&1 | cut -d' ' -f2)
     END_VERSIONS
     """

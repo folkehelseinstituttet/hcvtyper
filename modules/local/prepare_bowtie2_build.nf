@@ -12,6 +12,7 @@ process PREPARE_BOWTIE2_BUILD {
 
     output:
     tuple val(meta), path("*_cov_*.fasta"), emit: contig, optional: true
+    path "versions.yml"                   , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -20,23 +21,13 @@ process PREPARE_BOWTIE2_BUILD {
     def prefix = task.ext.prefix ?: "${meta.id}"
     def gene_name = "${meta.gene}"
     """
-    #!/usr/bin/env python3
-    from Bio import SeqIO
+    prepare_bowtie2_build.py ${fasta} ${prefix} ${gene_name}
 
-    def extract_node_sequences(input_fasta):
-        with open(input_fasta, "r") as infile:
-            for record in SeqIO.parse(infile, "fasta"):
-                # The de novo assembled contig always starts with "NODE"
-                if record.id.startswith("NODE"):
-                    # Sanitize the sequence name to keep only the first two elements
-                    # sanitized_contig_name = "_".join(record.id.split("_")[:2])
-                    output_fasta = f"${prefix}.${gene_name}.{record.id}.fasta"
-                    with open(output_fasta, "w") as outfile:
-                        SeqIO.write(record, outfile, "fasta")
-
-    if __name__ == "__main__":
-        input_fasta = "$fasta"
-        extract_node_sequences(input_fasta)
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        BioPython: \$(python -c "import Bio; print(Bio.__version__)")
+        Python: \$(python --version 2>&1 | cut -d' ' -f2)
+    END_VERSIONS
     """
 
     stub:

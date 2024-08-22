@@ -13,7 +13,7 @@ process EXTRACT_COMBINE_SEQS {
 
     output:
     tuple val(meta), path("*NODE*.fasta"), emit: combined_fasta
-    path "versions.yml"             , emit: versions
+    path "versions.yml"                  , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -33,6 +33,7 @@ process EXTRACT_COMBINE_SEQS {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
+        BioPython: \$(python -c "import Bio; print(Bio.__version__)")
         Python: \$(python --version 2>&1 | cut -d' ' -f2)
     END_VERSIONS
     """

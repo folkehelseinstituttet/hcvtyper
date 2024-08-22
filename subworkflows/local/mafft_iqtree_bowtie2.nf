@@ -42,6 +42,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         ch_vigorparse,
         ch_references
     )
+    ch_versions = ch_versions.mix(PREPARE_MAFFT.out.versions.first())
 
     //
     // MODULE: Align gene sequences with MAFFT
@@ -154,6 +155,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         ch_extract_combine_seqs_temp.join(PARSE_PHYLOGENY.out.parse_phylo), // val(meta), path(gff_extract_fasta), path(parse_phylo),
         ch_references
     )
+    ch_versions = ch_versions.mix(EXTRACT_COMBINE_SEQS.out.versions.first())
 
     //
     // MODULE: Align each contig to its nearest reference sequence in the tree using mafft
@@ -180,6 +182,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     CALCULATE_PAIRWISE_ALIGNMENT_METRICS(
         MAFFT_PAIRWISE.out.fas
     )
+    ch_versions = ch_versions.mix(CALCULATE_PAIRWISE_ALIGNMENT_METRICS.out.versions.first())
 
     //
     // MODULE: Map reads to the different contigs.
@@ -196,6 +199,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     PREPARE_BOWTIE2_BUILD(
         ch_mafft_pairwise
     )
+    ch_versions = ch_versions.mix(PREPARE_BOWTIE2_BUILD.out.versions.first())
 
     //
     // MODULE: Create a bowtie2 index
@@ -203,6 +207,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     BOWTIE2_BUILD(
         PREPARE_BOWTIE2_BUILD.out.contig
     )
+    ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions.first())
 
     //
     // MODULE: Map reads to the contigs with BOWTIE2
@@ -236,6 +241,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     INDEX_WITHDUP (
         BOWTIE2_ALIGN.out.aligned
     )
+    ch_versions = ch_versions.mix(INDEX_WITHDUP.out.versions.first())
 
     //
     // MODULE: Run samtools stats on the bam files with duplicates included
@@ -260,6 +266,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         ch_stats.bam_bai, // val(meta), path(bam), path(bai)
         ch_stats.contig // val(meta), path(fasta)
     )
+    ch_versions = ch_versions.mix(STATS_WITHDUP.out.versions.first())
 
     //
     // MODULE: Summarize the samtools stats output
@@ -267,6 +274,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     SUMMARIZE_STATS_WITHDUP (
         STATS_WITHDUP.out.stats
     )
+    ch_versions = ch_versions.mix(SUMMARIZE_STATS_WITHDUP.out.versions.first())
 
     //
     // MODULE: Remove duplicate reads
@@ -340,6 +348,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     SUMMARIZE_STATS_MARKDUP (
         STATS_MARKDUP.out.stats
     )
+    ch_versions = ch_versions.mix(SUMMARIZE_STATS_MARKDUP.out.versions.first())
 
 
     emit:
@@ -347,6 +356,8 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     parse_phylo       = PARSE_PHYLOGENY.out.parse_phylo
     fasta             = EXTRACT_COMBINE_SEQS.out.combined_fasta
     aligned           = MAFFT.out.fas
+    stats_withdup     = SUMMARIZE_STATS_WITHDUP.out.csv
+    stats_markdup     = SUMMARIZE_STATS_MARKDUP.out.csv
     bam_nodups        = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
     depth             = SAMTOOLS_DEPTH.out.tsv
     versions          = ch_versions

@@ -24,6 +24,7 @@ workflow VIGOR_VIGORPARSE {
     VIGOR_GFF_EXTRACT(
         VIGOR.out.gff3.join(VIGOR.out.contigs) // Create a tuple channel with meta, gff3 and contigs
     )
+    ch_versions = ch_versions.mix(VIGOR_GFF_EXTRACT.out.versions.first())
 
     //
     // MODULE: Find contig with highest coverage per segment
@@ -32,7 +33,7 @@ workflow VIGOR_VIGORPARSE {
         // Create tuple channels with with meta and fasta for each fasta file from gff extract
         VIGOR_GFF_EXTRACT.out.gene_fasta
     )
-    ch_versions = ch_versions.mix(VIGOR.out.versions.first())
+    ch_versions = ch_versions.mix(VIGOR_HIGH_COVERAGE.out.versions.first())
 
     emit:
     gff_extract_fasta = VIGOR_GFF_EXTRACT.out.gene_fasta

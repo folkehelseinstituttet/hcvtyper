@@ -12,6 +12,7 @@ process INSTRUMENT_ID {
 
     output:
     tuple val(meta), path("*sequencerID.tsv"), emit: id
+    path "versions.yml"                      , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -19,10 +20,14 @@ process INSTRUMENT_ID {
     script:
     def args   = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-
     """
     # Get the first line of the fastq file
     sqid=\$(seqkit head -n 1 ${reads[0]} | awk 'FNR <= 1')
     echo \${sqid} > ${prefix}.sequencerID.tsv
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        seqkit: \$(seqkit version | cut -d' ' -f2)
+    END_VERSIONS
     """
 }
