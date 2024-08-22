@@ -14,8 +14,8 @@ process SUMMARIZE_ROV {
     path 'alignment_metrics/'
     path 'cutadapt/'
     path 'kraken_classified/'
-    //path 'stats_withdup/*'
-    //path 'stats_markdup/*'
+    path 'stats_withdup/'
+    path 'stats_markdup/'
     path 'depth/*'
 
     output:
@@ -23,7 +23,7 @@ process SUMMARIZE_ROV {
     // path '*long.csv'        , emit: summary
     // path '*mqc.csv'         , emit: mqc
     // path '*LW_import.csv'   , emit: lw
-    // path "versions.yml"     , emit: versions
+    path "versions.yml"     , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
