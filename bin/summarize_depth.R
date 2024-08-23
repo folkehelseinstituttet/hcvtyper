@@ -17,8 +17,11 @@ if (prefix != prefix_2) {
 }
 
 # Empty df
-df <- as.data.frame(matrix(nrow = 1, ncol = 7))
-colnames(df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth")
+df <- as.data.frame(matrix(nrow = 1, ncol = 6))
+colnames(df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "avg_depth")
+
+# Add the sample name
+df$sampleName <- prefix
 
 # Read the depth per position
 cov <- read_tsv(depth, col_names = FALSE)
@@ -67,4 +70,4 @@ if (ref_length > 0) {
 
 df <- tibble(df)
 
-write_csv(df, paste0(prefix, ".", reference, "markdup", ".csv"))
+write_csv(df, paste0(prefix, ".", reference, ".markdup", ".csv"))
