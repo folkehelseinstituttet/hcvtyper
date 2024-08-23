@@ -10,13 +10,13 @@ process SUMMARIZE_ROV {
 
     input:
     path 'id/'
-    path 'parse_phylogeny/'
-    path 'alignment_metrics/'
-    path 'cutadapt/'
-    path 'kraken_classified/'
-    path 'stats_withdup/'
-    path 'stats_markdup/'
-    path 'depth/*'
+    //path 'parse_phylogeny/'
+    //path 'alignment_metrics/'
+    //path 'cutadapt/'
+    //path 'kraken_classified/'
+    //path 'stats_withdup/'
+    //path 'stats_markdup/'
+    //path 'depth/*'
 
     output:
     path '*'
@@ -32,7 +32,7 @@ process SUMMARIZE_ROV {
     def args = task.ext.args ?: ''
 
     """
-
+    summarize_rov.R
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

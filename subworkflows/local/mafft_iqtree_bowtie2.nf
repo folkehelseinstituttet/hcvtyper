@@ -315,17 +315,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     ch_versions = ch_versions.mix(INDEX_MARKDUP.out.versions.first())
 
     //
-    //MODULE: Get reads coverage per position with samtools coverage
-    //
-    // SAMTOOLS_COVERAGE(
-    //     BAM_MARKDUPLICATES_SAMTOOLS.out.bam.map { meta, path -> return meta + [path] },
-    //     [ [:], [] ],
-    //     [ [:], [] ],
-    //     [ [:], [] ]
-
-    // )
-    // ch_versions = ch_versions.mix(SAMTOOLS_COVERAGE.out.versions.first())
-    //
     // MODULE: Get reads coverage per position with samtools depth
     //
     SAMTOOLS_DEPTH (
