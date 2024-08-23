@@ -369,6 +369,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     stats_withdup     = SUMMARIZE_STATS_WITHDUP.out.csv
     stats_markdup     = SUMMARIZE_STATS_MARKDUP.out.csv
     bam_nodups        = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
-    depth             = SAMTOOLS_DEPTH.out.tsv
+    depth             = SUMMARIZE_DEPTH.out.csv
     versions          = ch_versions
 }

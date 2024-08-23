@@ -12,11 +12,12 @@ script_name <- "viralseq"
 path_1 <- "id/"
 path_2 <- "parse_phylogeny/"
 path_3 <- "alignment_metrics/"
-path_4 <- "cutadapt/"
-path_5 <- "kraken_classified/"
-path_6 <- "stats_withdup/"
-path_7 <- "stats_markdup/"
-path_8 <- "depth/"
+path_4 <- "depth/"
+path_5 <- "cutadapt/"
+path_6 <- "kraken_classified/"
+path_7 <- "stats_withdup/"
+path_8 <- "stats_markdup/"
+
 
 # Sequencer ID ------------------------------------------------------------
 id_files <- list.files(path = path_1, pattern = "sequencerID.tsv$", full.names = TRUE)
@@ -64,7 +65,7 @@ parse_phylogeny_files <- list.files(path = path_2, pattern = ".csv$", full.names
 
 # Empty df
 parse_phylogeny_df <- tribble(
-  ~"sampleName", ~"gene", ~"target_clade", ~"closest_sequence", ~"ratio",
+  ~"sampleName", ~"gene", ~"contig_name", ~"target_clade", ~"closest_sequence", ~"ratio",
 )
 
 for (i in 1:length(parse_phylogeny_files)) {
@@ -74,10 +75,10 @@ for (i in 1:length(parse_phylogeny_files)) {
     add_column("gene" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][3]) %>%
     select(sampleName,
            gene,
+           "contig_name" = Sequence,
            "target_clade" = `Target clade prefix`,
            "closest_sequence" = `Closest sequence`,
            "ratio" = `Closest Count / Total Count`)
-
 
   # Add to df
   parse_phylogeny_df <- bind_rows(parse_phylogeny_df, tmp)
@@ -95,7 +96,7 @@ alignment_metrics_files <- list.files(path = path_3, pattern = ".csv$", full.nam
 
 # Empty df
 alignment_metrics_df <- tribble(
-  ~"sampleName", ~"gene", ~"closest_sequence", ~"percent_similarity", ~"aligned_length", ~"total_length",
+  ~"sampleName", ~"gene", ~"contig_name", ~"closest_sequence", ~"percent_similarity", ~"aligned_length", ~"total_length",
 )
 
 for (i in 1:length(alignment_metrics_files)) {
@@ -105,7 +106,13 @@ for (i in 1:length(alignment_metrics_files)) {
     add_column("gene" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][3]) %>%
     # Clean up closest sequence name. Keep everything before the first ":"
     mutate(`Closest sequence` = str_split(`Closest sequence`, ":")[[1]][1]) %>%
-    select(sampleName, gene, "closest_sequence" = `Closest sequence`, "percent_similarity" = `Percent Similarity`, "aligned_length" = `Aligned Length`, "total_length" = `Total Length`)
+    select(sampleName,
+          gene,
+          "contig_name" = Sequence,
+          "closest_sequence" = `Closest sequence`,
+          "percent_similarity" = `Percent Similarity`,
+          "aligned_length" = `Aligned Length`,
+          "total_length" = `Total Length`)
 
 
   # Add to df
@@ -113,15 +120,36 @@ for (i in 1:length(alignment_metrics_files)) {
 
 }
 
-# Join parse phylogeny and alignment metrics on the both sampleName, gene and closest sequence.
+# Join parse phylogeny and alignment metrics on the both sampleName, gene, contig name and closest sequence.
 # This is to ensure that phylogeny results and alignment stats are generated on the same results.
 # use full_join to keep all observations
-joined_df <- full_join(parse_phylogeny_df, alignment_metrics_df, by = join_by(sampleName, gene, closest_sequence))
+joined_df <- full_join(parse_phylogeny_df, alignment_metrics_df, by = join_by(sampleName, gene, contig_name, closest_sequence))
 
-write_csv(joined_df, file = "joined_df.csv")
-# ## Mapping statistics
 
-# # Summarize statistics from the bowtie2 mapping
+## Mapping statistics
+
+# Summarize statistics from the bowtie2 mapping
+
+# Breadth of coverage without duplicates
+# Input files has the following format: <sampleName>.<reference>.markdup.csv
+# And the content is:
+# sampleName,reference,cov_breadth_min_1,cov_breadth_min_5,cov_breadth_min_10,avg_depth
+# ROV2,NODE_19_length_792_cov_86.636090,100,100,100,,222.98175787728027
+# The problem here is that I need to know also the contig name in the info above.
+
+# List files
+depth_files <- list.files(path = path_4, pattern = "markdup.csv$", full.names = TRUE)
+
+# Empty df
+depth_df <- read_csv(depth_files) %>%
+    rename(contig_name = reference)
+
+# Join
+joined_df <- full_join(joined_df, depth_df, by = join_by(sampleName, contig_name))
+
+write_csv(joined_df, "joined_df.csv")
+
+
 
 # ## With duplicates
 
