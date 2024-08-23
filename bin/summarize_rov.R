@@ -13,9 +13,10 @@ path_1 <- "id/"
 path_2 <- "parse_phylogeny/"
 path_3 <- "alignment_metrics/"
 path_4 <- "depth/"
-path_5 <- "cutadapt/"
-path_6 <- "kraken_classified/"
-path_7 <- "stats_withdup/"
+path_5 <- "stats_withdup/"
+path_6 <- "cutadapt/"
+path_7 <- "kraken_classified/"
+
 path_8 <- "stats_markdup/"
 
 
@@ -78,7 +79,9 @@ for (i in 1:length(parse_phylogeny_files)) {
            "contig_name" = Sequence,
            "target_clade" = `Target clade prefix`,
            "closest_sequence" = `Closest sequence`,
-           "ratio" = `Closest Count / Total Count`)
+           "ratio" = `Closest Count / Total Count`) %>%
+    # Remove everything after "." in the contig name
+    separate(contig_name, into = c("contig_name", NA), sep = "\\.")
 
   # Add to df
   parse_phylogeny_df <- bind_rows(parse_phylogeny_df, tmp)
@@ -112,7 +115,10 @@ for (i in 1:length(alignment_metrics_files)) {
           "closest_sequence" = `Closest sequence`,
           "percent_similarity" = `Percent Similarity`,
           "aligned_length" = `Aligned Length`,
-          "total_length" = `Total Length`)
+          "total_length" = `Total Length`) %>%
+    # Remove everything after "." in the contig name
+    separate(contig_name, into = c("contig_name", NA), sep = "\\.")
+
 
 
   # Add to df
@@ -130,7 +136,7 @@ joined_df <- full_join(parse_phylogeny_df, alignment_metrics_df, by = join_by(sa
 
 # Summarize statistics from the bowtie2 mapping
 
-# Breadth of coverage without duplicates
+# Breadth of coverage without duplicates:
 # Input files has the following format: <sampleName>.<reference>.markdup.csv
 # And the content is:
 # sampleName,reference,cov_breadth_min_1,cov_breadth_min_5,cov_breadth_min_10,avg_depth
@@ -142,23 +148,29 @@ depth_files <- list.files(path = path_4, pattern = "markdup.csv$", full.names = 
 
 # Empty df
 depth_df <- read_csv(depth_files) %>%
-    rename(contig_name = reference)
+    rename(contig_name = reference) %>%
+    # Remove everything after "." in the contig name
+    separate(contig_name, into = c("contig_name", NA), sep = "\\.")
 
 # Join
 joined_df <- full_join(joined_df, depth_df, by = join_by(sampleName, contig_name))
 
+## Mapped reads with duplicates
+
+# List files
+stats_withdup_files <- list.files(path = path_5, pattern = ".*withdup.*\\.csv$", full.names = TRUE)
+
+stats_withdup_df <- read_csv(stats_withdup_files) %>%
+  select(sampleName,
+         gene,
+         "contig_name" = contig,
+         "trimmed_reads_withdups_mapped" = mapped_reads)
+
+# Join
+joined_df <- full_join(joined_df, stats_withdup_df, by = join_by(sampleName, gene, contig_name))
+
 write_csv(joined_df, "joined_df.csv")
 
-
-
-# ## With duplicates
-
-# ##NB! Need to count mapped reads per reference. All the references are merged here. samtools idxstats. This is alignments
-
-# # List files
-# stats_withdup_files <- list.files(path = path_6, pattern = ".stats$", full.names = TRUE)
-
-# # Empty df
 # tmp_df <- as.data.frame(matrix(nrow = length(stats_withdup_files), ncol = 4))
 # colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_withdups_mapped")
 

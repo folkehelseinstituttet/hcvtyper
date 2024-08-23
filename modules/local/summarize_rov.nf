@@ -13,9 +13,10 @@ process SUMMARIZE_ROV {
     path 'parse_phylogeny/'
     path 'alignment_metrics/'
     path 'depth/'
+    path 'stats_withdup/'
     //path 'cutadapt/'
     //path 'kraken_classified/'
-    //path 'stats_withdup/'
+
     //path 'stats_markdup/'
 
 
