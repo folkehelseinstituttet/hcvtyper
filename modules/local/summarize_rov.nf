@@ -10,7 +10,7 @@ process SUMMARIZE_ROV {
 
     input:
     path 'id/'
-    //path 'parse_phylogeny/'
+    path 'parse_phylogeny/'
     //path 'alignment_metrics/'
     //path 'cutadapt/'
     //path 'kraken_classified/'

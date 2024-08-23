@@ -52,7 +52,6 @@ for (i in 1:length(id_files)) {
 
 id_df <- as_tibble(id_df)
 
-write_csv(id_df, file = "sequencer_id.csv")
 
 # Parse phylogeny, alignment and mapping statistics -----------------------
 
@@ -61,25 +60,32 @@ write_csv(id_df, file = "sequencer_id.csv")
 # Summarize metrics from parsing the phylogenetic tree including all contigs for a given gene and corresponding references.
 
 # List files
-# parse_phylogeny_files <- list.files(path = path_2, pattern = ".csv$", full.names = TRUE)
+parse_phylogeny_files <- list.files(path = path_2, pattern = ".csv$", full.names = TRUE)
 
-# # Empty df
-# parse_phylogeny_df <- tribble(
-#   ~"sampleName", ~"gene", ~"target_clade", ~"closest_sequence", ~"ratio",
-# )
+# Empty df
+parse_phylogeny_df <- tribble(
+  ~"sampleName", ~"gene", ~"target_clade", ~"closest_sequence", ~"ratio",
+)
 
-# for (i in 1:length(parse_phylogeny_files)) {
-#   try(rm(tmp))
-#   tmp <- read_csv(parse_phylogeny_files[i]) %>%
-#     add_column("sampleName" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][1]) %>%
-#     add_column("gene" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][3]) %>%
-#     select(sampleName, gene, "target_clade" = `Target clade prefix`, "closest_sequence" = `Closest sequence`, "ratio" = `Closest Count / Total Count`)
+for (i in 1:length(parse_phylogeny_files)) {
+  try(rm(tmp))
+  tmp <- read_csv(parse_phylogeny_files[i]) %>%
+    add_column("sampleName" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][1]) %>%
+    add_column("gene" = str_split(basename(parse_phylogeny_files[i]), "\\.")[[1]][3]) %>%
+    select(sampleName,
+           gene,
+           "target_clade" = `Target clade prefix`,
+           "closest_sequence" = `Closest sequence`,
+           "ratio" = `Closest Count / Total Count`)
 
 
-#   # Add to df
-#   parse_phylogeny_df <- bind_rows(parse_phylogeny_df, tmp)
+  # Add to df
+  parse_phylogeny_df <- bind_rows(parse_phylogeny_df, tmp)
+}
 
-# }
+joined_df <- full_join(id_df, parse_phylogeny_df, by = join_by(sampleName))
+
+write_csv(joined_df, file = "joined_df.csv")
 
 # ## Alignment metrics
 

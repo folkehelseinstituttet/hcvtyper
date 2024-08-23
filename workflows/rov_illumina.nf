@@ -221,7 +221,7 @@ workflow ROV_ILLUMINA {
 
     SUMMARIZE (
         ch_sequence_id.collect(),
-        //ch_parse_phylogeny.collect(),
+        ch_parse_phylogeny.collect(),
         //ch_alignment_metrics.collect(),
         //ch_cutadapt.collect(),
         //ch_classified_reads.collect(),
