@@ -83,43 +83,42 @@ for (i in 1:length(parse_phylogeny_files)) {
   parse_phylogeny_df <- bind_rows(parse_phylogeny_df, tmp)
 }
 
+# Join with sequencer ID
 joined_df <- full_join(id_df, parse_phylogeny_df, by = join_by(sampleName))
 
+## Alignment metrics
+
+# Summarize metrics from the pairwise alignment between the de novo contig and the closest reference in the phylogeny
+
+# List files
+alignment_metrics_files <- list.files(path = path_3, pattern = ".csv$", full.names = TRUE)
+
+# Empty df
+alignment_metrics_df <- tribble(
+  ~"sampleName", ~"gene", ~"closest_sequence", ~"percent_similarity", ~"aligned_length", ~"total_length",
+)
+
+for (i in 1:length(alignment_metrics_files)) {
+  try(rm(tmp))
+  tmp <- read_csv(alignment_metrics_files[i]) %>%
+    add_column("sampleName" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][1]) %>%
+    add_column("gene" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][3]) %>%
+    # Clean up closest sequence name. Keep everything before the first ":"
+    mutate(`Closest sequence` = str_split(`Closest sequence`, ":")[[1]][1]) %>%
+    select(sampleName, gene, "closest_sequence" = `Closest sequence`, "percent_similarity" = `Percent Similarity`, "aligned_length" = `Aligned Length`, "total_length" = `Total Length`)
+
+
+  # Add to df
+  alignment_metrics_df <- bind_rows(alignment_metrics_df, tmp)
+
+}
+
+# Join parse phylogeny and alignment metrics on the both sampleName, gene and closest sequence.
+# This is to ensure that phylogeny results and alignment stats are generated on the same results.
+# use full_join to keep all observations
+joined_df <- full_join(parse_phylogeny_df, alignment_metrics_df, by = join_by(sampleName, gene, closest_sequence))
+
 write_csv(joined_df, file = "joined_df.csv")
-
-# ## Alignment metrics
-
-# # Summarize metrics from the pairwise alignment between the de novo contig and the closest reference in the phylogeny
-
-# # List files
-# alignment_metrics_files <- list.files(path = path_3, pattern = ".csv$", full.names = TRUE)
-
-# # Empty df
-# alignment_metrics_df <- tribble(
-#   ~"sampleName", ~"gene", ~"closest_sequence", ~"percent_similarity", ~"aligned_length", ~"total_length",
-# )
-
-# for (i in 1:length(alignment_metrics_files)) {
-#   try(rm(tmp))
-#   tmp <- read_csv(alignment_metrics_files[i]) %>%
-#     add_column("sampleName" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][1]) %>%
-#     add_column("gene" = str_split(basename(alignment_metrics_files[i]), "\\.")[[1]][3]) %>%
-#     # Clean up closest sequence name. Keep everything before the first ":"
-#     mutate(`Closest sequence` = str_split(`Closest sequence`, ":")[[1]][1]) %>%
-#     select(sampleName, gene, "closest_sequence" = `Closest sequence`, "percent_similarity" = `Percent Similarity`, "aligned_length" = `Aligned Length`, "total_length" = `Total Length`)
-
-
-#   # Add to df
-#   alignment_metrics_df <- bind_rows(alignment_metrics_df, tmp)
-
-# }
-
-# # Join parse phylogeny and alignment metrics on the both sampleName, gene and closest sequence.
-# # This is to ensure that phylogeny results and alignment stats are generated on the same results.
-# # use full_join to keep all observations
-# joined_df <- full_join(parse_phylogeny_df, alignment_metrics_df, by = join_by(sampleName, gene, closest_sequence))
-
-
 # ## Mapping statistics
 
 # # Summarize statistics from the bowtie2 mapping

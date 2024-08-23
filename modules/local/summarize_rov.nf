@@ -11,7 +11,7 @@ process SUMMARIZE_ROV {
     input:
     path 'id/'
     path 'parse_phylogeny/'
-    //path 'alignment_metrics/'
+    path 'alignment_metrics/'
     //path 'cutadapt/'
     //path 'kraken_classified/'
     //path 'stats_withdup/'
