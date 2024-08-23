@@ -8,6 +8,7 @@ include { BOWTIE2_BUILD                        } from '../../modules/nf-core/bow
 include { BOWTIE2_ALIGN                        } from '../../modules/nf-core/bowtie2/align/main'
 include { CREATE_JPG                           } from '../../modules/local/create_jpg'
 include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS } from '../../modules/local/calculate_pairwise_alignment_metrics'
+include { SAMTOOLS_COVERAGE } from '../../modules/nf-core/samtools/coverage/main'
 include { SAMTOOLS_INDEX as INDEX_WITHDUP      } from '../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_INDEX as INDEX_MARKDUP      } from '../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_STATS as STATS_WITHDUP      } from '../../modules/nf-core/samtools/stats/main'
@@ -313,6 +314,17 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(INDEX_MARKDUP.out.versions.first())
 
+    //
+    //MODULE: Get reads coverage per position with samtools coverage
+    //
+    // SAMTOOLS_COVERAGE(
+    //     BAM_MARKDUPLICATES_SAMTOOLS.out.bam.map { meta, path -> return meta + [path] },
+    //     [ [:], [] ],
+    //     [ [:], [] ],
+    //     [ [:], [] ]
+
+    // )
+    // ch_versions = ch_versions.mix(SAMTOOLS_COVERAGE.out.versions.first())
     //
     // MODULE: Get reads coverage per position with samtools depth
     //

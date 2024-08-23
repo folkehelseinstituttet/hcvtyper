@@ -74,6 +74,11 @@
                         "git_sha": "04fbbc7c43cebc0b95d5b126f6d9fe4effa33519",
                         "installed_by": ["bam_markduplicates_samtools"]
                     },
+                    "samtools/coverage": {
+                        "branch": "master",
+                        "git_sha": "04fbbc7c43cebc0b95d5b126f6d9fe4effa33519",
+                        "installed_by": ["modules"]
+                    },
                     "samtools/depth": {
                         "branch": "master",
                         "git_sha": "a64788f5ad388f1d2ac5bd5f1f3f8fc81476148c",
