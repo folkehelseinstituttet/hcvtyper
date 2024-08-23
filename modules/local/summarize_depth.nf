@@ -12,7 +12,7 @@ process SUMMARIZE_DEPTH {
 
     output:
     tuple val(meta), path("*markdup*.csv"), emit: csv
-    path "versions.yml"           , emit: versions
+    path "versions.yml"                   , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
