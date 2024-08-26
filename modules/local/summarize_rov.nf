@@ -14,16 +14,13 @@ process SUMMARIZE_ROV {
     path 'alignment_metrics/'
     path 'depth/'
     path 'stats_withdup/'
-    //path 'cutadapt/'
-    //path 'kraken_classified/'
-
-    //path 'stats_markdup/'
-
+    path 'stats_markdup/'
+    path 'cutadapt/'
+    path 'kraken_classified/'
 
     output:
-    path '*'
-    // path '*long.csv'        , emit: summary
-    // path '*mqc.csv'         , emit: mqc
+    path '*long.csv'        , emit: summary
+     path '*mqc.csv'         , emit: mqc
     // path '*LW_import.csv'   , emit: lw
     path "versions.yml"     , emit: versions
 
