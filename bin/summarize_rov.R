@@ -14,10 +14,10 @@ path_2 <- "parse_phylogeny/"
 path_3 <- "alignment_metrics/"
 path_4 <- "depth/"
 path_5 <- "stats_withdup/"
-path_6 <- "cutadapt/"
-path_7 <- "kraken_classified/"
+path_6 <- "stats_markdup/"
+path_7 <- "cutadapt/"
+path_8 <- "kraken_classified/"
 
-path_8 <- "stats_markdup/"
 
 
 # Sequencer ID ------------------------------------------------------------
@@ -168,6 +168,21 @@ stats_withdup_df <- read_csv(stats_withdup_files) %>%
 
 # Join
 joined_df <- full_join(joined_df, stats_withdup_df, by = join_by(sampleName, gene, contig_name))
+
+
+## Mapped reads without duplicates
+
+# List files
+stats_markdup_files <- list.files(path = path_6, pattern = ".*markdup.*\\.csv$", full.names = TRUE)
+
+stats_markdup_df <- read_csv(stats_markdup_files) %>%
+  select(sampleName,
+         gene,
+         "contig_name" = contig,
+         "trimmed_reads_nodups_mapped" = mapped_reads)
+
+# Join
+joined_df <- full_join(joined_df, stats_markdup_df, by = join_by(sampleName, gene, contig_name))
 
 write_csv(joined_df, "joined_df.csv")
 
