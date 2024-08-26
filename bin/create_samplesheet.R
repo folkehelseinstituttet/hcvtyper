@@ -18,7 +18,15 @@ fastq <- list.files(folder,
            pattern = "gz$")
 
 # Filter on agens
-fastq <- fastq[str_detect(fastq, agens)]
+if (agens == "HCV") {
+    fastq <- fastq[str_detect(fastq, agens)]
+} else if (agens == "ROV" | agens == "RoV") {
+    agens <- "R[Oo]V" # Set agens to allow both RoV and ROV
+    fastq <- fastq[str_detect(fastq, agens)]
+} else {
+    print("Agens is not correct")
+}
+
 
 R1 <- sort(fastq[grep("R1", fastq)])
 R2 <- sort(fastq[grep("R2", fastq)])
