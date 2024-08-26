@@ -27,7 +27,8 @@ prefix_2 <- tmp %>% pull(sample)
 gene <- tmp %>% pull(`gene,`)
 
 # Compare the input prefix with prefix_2. Error if they are not identical
-if (str_remove(prefix, "\\.withdup") != prefix_2) {
+# Allow for the possibility of the input prefix having a suffix of ".withdup" or ".markdup"
+if (str_remove(prefix, "\\.withdup|\\.markdup") != prefix_2) {
     stop("Prefixes do not match: ", prefix, " vs ", prefix_2, call.=FALSE)
 }
 
