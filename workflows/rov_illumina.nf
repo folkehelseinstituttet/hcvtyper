@@ -225,11 +225,9 @@ workflow ROV_ILLUMINA {
         ch_alignment_metrics.collect(),
         ch_depth.collect(),
         ch_stats_withdup.collect(),
-        //ch_cutadapt.collect(),
-        //ch_classified_reads.collect(),
-
-        //ch_stats_markdup.collect(),
-
+        ch_stats_markdup.collect(),
+        ch_cutadapt.collect(),
+        ch_classified_reads.collect(),
     )
 
     //
@@ -257,6 +255,7 @@ workflow ROV_ILLUMINA {
     ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
 
 
     MULTIQC (
