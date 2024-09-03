@@ -15,17 +15,20 @@ references <- args[4]
 
 # Create empty dataframe to populate
 df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
-colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_read_pairs", "major_cov", "minor_ref", "minor_read_pairs", "minor_cov")
+colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
 
 df_final$sample[1] <- sampleName
 
 # Read the summary of the first mapping
 df <- read_table(idxstats, col_names = FALSE) %>%
-  # Identify genotype and subtype
+  # Separate subtype and reference from the sequence names
   separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) %>%
   # Discard the unmapped reads marked by an * (more precisely these are unmapped reads without coordinates)
-  filter(X1 != "*")
-
+  filter(X1 != "*") %>% 
+  # Separate the genotype from the subtype.
+  # For 2k1b we use the whole name for genotype also
+  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1)))
+  
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
 
@@ -34,9 +37,10 @@ df_final$total_mapped_reads[1] <- sum(df$X3, na.rm = TRUE)
 
 # Count number of reads per subtype
 summary <- df %>%
-  group_by(Subtype) %>%
-  summarise(read_pairs = sum(X3)) %>%
-  arrange(desc(read_pairs))
+  # Group by Genotype also to retain that column
+  group_by(Subtype, Genotype) %>%
+  summarise(reads = sum(X3)) %>%
+  arrange(desc(reads))
 
 ## Major
 # Find major reference to use
@@ -50,12 +54,12 @@ major_ref <- df %>%
 
 df_final$major_ref[1] <- major_ref
 
-# How many read pairs mapped to the minor subtype
-major_read_pairs <- summary %>%
+# How many read pairs mapped to the major subtype
+major_reads <- summary %>%
   filter(Subtype == major_tmp) %>%
-  pull(read_pairs)
+  pull(reads)
 
-df_final$major_read_pairs[1] <- major_read_pairs
+df_final$major_reads[1] <- major_reads
 
 # Read the depth file from the first mapping.
 # The file can be empty and the reading fails
@@ -82,23 +86,34 @@ df_final$major_cov[1] <- breadth_int
 
 ## Minor
 # Only execute if two or more references have reads mapped
-if(nrow(df) > 1) {
-minor_tmp <- summary$Subtype[2]
-minor_ref <- df %>%
-  filter(Subtype == minor_tmp) %>%
+# And require that the reference with second most reads belong to a different genotype than the major
+major_genotype <- head(summary$Genotype, n = 1)
+minor_tmp <- df %>% 
+  # Remove major Genotype
+  filter(Genotype != major_genotype) %>% 
   # Choose the reference with most mapped reads
   arrange(desc(X3)) %>%
   head(n = 1) %>%
-  pull(X1)
+  pull(Subtype)
 
-df_final$minor_ref[1] <- minor_ref
+minor_ref <- df %>% 
+ # Remove major Genotype
+ filter(Genotype != major_genotype) %>% 
+ # Choose the reference with most mapped reads
+ arrange(desc(X3)) %>%
+ head(n = 1) %>%
+ pull(X1)
+
+if (length(minor_ref > 0)) {
+  df_final$minor_ref[1] <- minor_ref
+}
 
 # How many reads mapped to the minor subtype
-minor_read_pairs <- summary %>%
+minor_reads <- summary %>%
   filter(Subtype == minor_tmp) %>%
-  pull(read_pairs)
+  pull(reads)
 
-df_final$minor_read_pairs[1] <- minor_read_pairs
+df_final$minor_reads[1] <- minor_reads
 
 # Read the depth file from the first mapping
 cov <- read_tsv(depth, col_names = FALSE) %>%
@@ -131,10 +146,10 @@ write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
 # Read the reference fasta file
 fasta <- read.fasta(file = references)
 write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
-if (nrow(df) > 1) {
+if (length(minor_ref > 0)) {
 write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
 }
-}
+
 # Write out sessionInfo() to track versions
 # session <- capture.output(sessionInfo())
 # write_lines(session, file = "R_versions.txt")
