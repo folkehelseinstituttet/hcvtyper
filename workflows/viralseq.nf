@@ -61,15 +61,19 @@ include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/
 include { SPADES                             } from '../modules/nf-core/spades/main'
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
-include { SAMTOOLS_INDEX                     } from '../modules/nf-core/samtools/index/main'
-include { SAMTOOLS_IDXSTATS                  } from '../modules/nf-core/samtools/idxstats/main'
-include { SAMTOOLS_DEPTH                     } from '../modules/nf-core/samtools/depth/main'
+include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_WITHDUP } from '../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_MARKDUP } from '../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_IDXSTATS as SAMTOOLS_IDXSTATS_WITHDUP } from '../modules/nf-core/samtools/idxstats/main'
+include { SAMTOOLS_IDXSTATS as SAMTOOLS_IDXSTATS_MARKDUP } from '../modules/nf-core/samtools/idxstats/main'
+include { SAMTOOLS_DEPTH as SAMTOOLS_DEPTH_WITHDUP } from '../modules/nf-core/samtools/depth/main'
+include { SAMTOOLS_DEPTH as SAMTOOLS_DEPTH_MARKDUP } from '../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_STATS                     } from '../modules/nf-core/samtools/stats/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
 // Local modules
 //
+include { INSTRUMENT_ID                       } from '../modules/local/instrument_id'
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
@@ -106,6 +110,13 @@ workflow VIRALSEQ {
     // TODO: OPTIONAL, you can use nf-validation plugin to create an input channel from the samplesheet with Channel.fromSamplesheet("input")
     // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
     // ! There is currently no tooling to help you write a sample sheet schema
+
+    //
+    // MODULE: Identify the instrument ID
+    //
+    INSTRUMENT_ID (
+        INPUT_CHECK.out.reads
+    )
 
     //
     // MODULE: Run Bowtie2_build to create a reference index
@@ -145,7 +156,7 @@ workflow VIRALSEQ {
     // MODULE: Run FastQC on trimmed reads
     //
     FASTQC_TRIM (
-        INPUT_CHECK.out.reads
+        CUTADAPT.out.reads
     )
 
     //
@@ -233,43 +244,59 @@ workflow VIRALSEQ {
         ch_aligned = TANOTI_ALIGN.out.aligned
     }
 
+    SAMTOOLS_INDEX_WITHDUP (
+        ch_aligned
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_INDEX_WITHDUP.out.versions.first())
+
+    SAMTOOLS_IDXSTATS_WITHDUP (
+        ch_aligned.join(SAMTOOLS_INDEX_WITHDUP.out.bai) // val(meta), path(bam), path(bai)
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_WITHDUP.out.versions.first())
+
+    SAMTOOLS_DEPTH_WITHDUP (
+        ch_aligned,
+        [ [], []] // Passing empty channels instead of an interval file
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH_WITHDUP.out.versions.first())
+
+    //
+    // MODULE: Identify the two references with most mapped reads, duplicates included
+    //
+    PARSEFIRSTMAPPING (
+        // Join idxstats and depth on the meta map
+        SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv), // val(meta), path(idxstats), path(tsv)
+        file(params.references)
+    )
+
     // Remove duplicate reads
     BAM_MARKDUPLICATES_SAMTOOLS (
         ch_aligned,
-        Channel.value(file(params.references)) // Need to explicitly turn the file into a value channel so not to be consumed.
+        [ [], file(params.references) ]
     )
     ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
 
-    //
-    // MODULE: Identify the two references with most mapped reads
-    //
-    SAMTOOLS_INDEX (
+    SAMTOOLS_INDEX_MARKDUP (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first())
+    ch_versions = ch_versions.mix(SAMTOOLS_INDEX_MARKDUP.out.versions.first())
 
-    SAMTOOLS_IDXSTATS (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai) // val(meta), path(bam), path(bai)
+    SAMTOOLS_IDXSTATS_MARKDUP (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS.out.versions.first())
+    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_MARKDUP.out.versions.first())
 
-    SAMTOOLS_DEPTH (
+    SAMTOOLS_DEPTH_MARKDUP (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
         [ [], []] // Passing empty channels instead of an interval file
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
+    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH_MARKDUP.out.versions.first())
 
     SAMTOOLS_STATS (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX.out.bai), // val(meta), path(bam), path(bai)
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
         Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
     )
     ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
-
-    // Join idxstats and depth on the meta map
-    PARSEFIRSTMAPPING (
-        SAMTOOLS_IDXSTATS.out.idxstats.join(SAMTOOLS_DEPTH.out.tsv), // val(meta), path(idxstats), path(tsv)
-        file(params.references)
-    )
 
     //
     // SUBWORKFLOW: Map reads against the majority reference
@@ -280,7 +307,7 @@ workflow VIRALSEQ {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     }
 
-    MAJOR_MAPPING (
+    MAJOR_MAPPING(
         ch_major_mapping, // val(meta), path(fasta), path(reads)
     )
     ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
@@ -306,9 +333,9 @@ workflow VIRALSEQ {
         // This will result in a channel with values that meet the read nr and coverage criteria
         ch_map_minor_filtered = ch_map_minor
         .filter { entry ->
-            def minorReads = entry[0]['minor_read_pairs'].toInteger()
+            def mappedReads = entry[0]['total_mapped_reads'].toInteger()
             def minorCov = entry[0]['minor_cov'].toInteger()
-            minorReads > params.minAgensRead && minorCov > params.minAgensCov
+            mappedReads > params.minAgensRead && minorCov > params.minAgensCov
         }
     } else if (params.strategy == "denovo") {
         ch_join = BLASTPARSE.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
@@ -370,6 +397,7 @@ workflow VIRALSEQ {
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarixty. Don't need the meta
+    ch_sequence_id      = INSTRUMENT_ID.out.id.collect({it[1]})
     ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
@@ -386,15 +414,17 @@ workflow VIRALSEQ {
         ch_glue = file("dummy_file")
     }
 
-
     SUMMARIZE (
+        params.tanoti_stringency_1,
+        params.tanoti_stringency_2,
         ch_cutadapt.collect(),
         ch_classified_reads.collect(),
         ch_stats_withdup.collect(),
         ch_stats_markdup.collect(),
         ch_depth.collect(),
         ch_blast,
-        ch_glue
+        ch_glue,
+        ch_sequence_id.collect()
     )
 
     //
@@ -426,7 +456,9 @@ workflow VIRALSEQ {
         ch_multiqc_files.collect(),
         ch_multiqc_config.toList(),
         ch_multiqc_custom_config.toList(),
-        ch_multiqc_logo.toList()
+        ch_multiqc_logo.toList(),
+        [],
+        []
     )
     multiqc_report = MULTIQC.out.report.toList()
 }
