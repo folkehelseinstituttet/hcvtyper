@@ -107,6 +107,16 @@ include { NEXTCLADE_RUN                 } from '../modules/nf-core/nextclade/run
 include { CUSTOM_DUMPSOFTWAREVERSIONS   } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 include { MOSDEPTH as MOSDEPTH_GENOME   } from '../modules/nf-core/mosdepth/main'
 include { MOSDEPTH as MOSDEPTH_AMPLICON } from '../modules/nf-core/mosdepth/main'
+include { IVAR_TRIM } from '../modules/nf-core/ivar/trim/main'
+include { IVAR_CONSENSUS } from '../modules/nf-core/ivar/consensus/main'
+include { MINIMAP2_ALIGN } from '../modules/nf-core/minimap2/align/main'
+include { MINIMAP2_INDEX } from '../modules/nf-core/minimap2/index/main'
+include { SAMTOOLS_SORT } from '../modules/nf-core/samtools/sort/main'
+include { SAMTOOLS_INDEX } from '../modules/nf-core/samtools/index/main'
+include { PORECHOP_PORECHOP } from '../modules/nf-core/porechop/porechop/main'
+include { BAM_MARKDUPLICATES_SAMTOOLS } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
+include { MEDAKA } from '../modules/nf-core/medaka/main'
+
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -317,8 +327,69 @@ workflow HBV_NANOPORE {
     }
 
     //
+    // MODULE: Map reads to reference genome with Minimap2
+    //
+    //Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
+    MINIMAP2_ALIGN (
+        ARTIC_GUPPYPLEX.out.fastq.filter { it[-1].countFastq() > params.min_guppyplex_reads },
+        PREPARE_GENOME.out.fasta.collect().map { [ [:], it ] }, // Add empty meta map before the reference file path
+        true,
+        false,
+        false,
+        false
+    )
+    ch_versions = ch_versions.mix(MINIMAP2_ALIGN.out.versions.first().ifEmpty(null))
+
+    //
+    // MODULE: Sort bam file
+    //
+    SAMTOOLS_SORT (
+        MINIMAP2_ALIGN.out.bam,
+        PREPARE_GENOME.out.fasta.collect().map { [ [:], it ] } // Add empty meta map before the reference file path
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions.first().ifEmpty(null))
+
+    SAMTOOLS_INDEX (
+        SAMTOOLS_SORT.out.bam
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_INDEX.out.versions.first().ifEmpty(null))
+
+    //
+    // MODULE: Trim primers with iVar trim
+    //
+    IVAR_TRIM (
+        SAMTOOLS_SORT.out.bam.join(SAMTOOLS_INDEX.out.bai),
+        PREPARE_GENOME.out.primer_bed.collect()
+    )
+    ch_versions = ch_versions.mix(IVAR_TRIM.out.versions.first().ifEmpty(null))
+
+    //
+    // MODULE: Remove duplicates
+    //
+    BAM_MARKDUPLICATES_SAMTOOLS (
+        IVAR_TRIM.out.bam,
+        PREPARE_GENOME.out.fasta.collect().map { [ [:], it ] } // Add empty meta map before the reference file path
+    )
+    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first().ifEmpty(null))
+
+    IVAR_CONSENSUS (
+        BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
+        PREPARE_GENOME.out.fasta.collect(),
+        false // Do not save mpileup file
+    )
+    ch_versions = ch_versions.mix(IVAR_CONSENSUS.out.versions.first().ifEmpty(null))
+
+    MEDAKA (
+        // NB: The module input is locally changed from the nf-core version.
+        // It takes two input channels, one for the reads and one for the reference genome.
+        ARTIC_GUPPYPLEX.out.fastq.filter { it[-1].countFastq() > params.min_guppyplex_reads },
+        PREPARE_GENOME.out.fasta.collect()
+    )
+
+    //
     // MODULE: Run Artic minion
     //
+    if (!params.skip_minion) {
     ARTIC_MINION (
         ARTIC_GUPPYPLEX.out.fastq.filter { it[-1].countFastq() > params.min_guppyplex_reads },
         ch_fast5_dir,
@@ -369,6 +440,7 @@ workflow HBV_NANOPORE {
         []
     )
     ch_versions = ch_versions.mix(FILTER_BAM_SAMTOOLS.out.versions)
+    }
 
     //
     // MODULE: Genome-wide and amplicon-specific coverage QC plots
@@ -536,6 +608,16 @@ workflow HBV_NANOPORE {
         workflow_summary    = WorkflowCommons.paramsSummaryMultiqc(workflow, summary_params)
         ch_workflow_summary = Channel.value(workflow_summary)
 
+        if (!params.skip_minion) {
+            ch_minion = ARTIC_MINION.out.json.collect{it[1]}.ifEmpty([])
+            ch_filtbamsam = FILTER_BAM_SAMTOOLS.out.flagstat.collect{it[1]}.ifEmpty([])
+            ch_bcftoolsstats = BCFTOOLS_STATS.out.stats.collect{it[1]}.ifEmpty([])
+        } else {
+            ch_minion = []
+            ch_filtbamsam = []
+            ch_bcftoolsstats = []
+        }
+
         MULTIQC (
             ch_multiqc_config,
             ch_multiqc_custom_config,
@@ -547,9 +629,9 @@ workflow HBV_NANOPORE {
             ch_custom_fail_guppyplex_count_multiqc.collectFile(name: 'fail_guppyplex_count_samples_mqc.tsv').ifEmpty([]),
             ch_amplicon_heatmap_multiqc.ifEmpty([]),
             ch_pycoqc_multiqc.collect{it[1]}.ifEmpty([]),
-            ARTIC_MINION.out.json.collect{it[1]}.ifEmpty([]),
-            FILTER_BAM_SAMTOOLS.out.flagstat.collect{it[1]}.ifEmpty([]),
-            BCFTOOLS_STATS.out.stats.collect{it[1]}.ifEmpty([]),
+            ch_minion,
+            ch_filtbamsam,
+            ch_bcftoolsstats,
             ch_mosdepth_multiqc.collect{it[1]}.ifEmpty([]),
             ch_quast_multiqc.collect().ifEmpty([]),
             ch_snpeff_multiqc.collect{it[1]}.ifEmpty([]),
