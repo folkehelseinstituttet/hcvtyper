@@ -52,6 +52,11 @@
                         "git_sha": "82024cf6325d2ee194e7f056d841ecad2f6856e9",
                         "installed_by": ["modules"]
                     },
+                    "custom/getchromsizes": {
+                        "branch": "master",
+                        "git_sha": "1b0ffa4e5aed5b7e3cd4311af31bd3b2c8345051",
+                        "installed_by": ["modules"]
+                    },
                     "cutadapt": {
                         "branch": "master",
                         "git_sha": "6618151ed69274863dc6fe6d2920afa90abaca1f",
@@ -63,9 +68,19 @@
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/fastqc/fastqc.diff"
                     },
+                    "gunzip": {
+                        "branch": "master",
+                        "git_sha": "3a5fef109d113b4997c9822198664ca5f2716208",
+                        "installed_by": ["modules"]
+                    },
                     "ivar/consensus": {
                         "branch": "master",
                         "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
+                        "installed_by": ["modules"]
+                    },
+                    "ivar/trim": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
                         "installed_by": ["modules"]
                     },
                     "kraken2/kraken2": {
@@ -73,6 +88,21 @@
                         "git_sha": "d6549f46c3c1c3fe3def110f3d18059a68a65cc6",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/kraken2/kraken2/kraken2-kraken2.diff"
+                    },
+                    "medaka": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
+                        "installed_by": ["modules"]
+                    },
+                    "minimap2/align": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
+                        "installed_by": ["modules"]
+                    },
+                    "minimap2/index": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
+                        "installed_by": ["modules"]
                     },
                     "mosdepth": {
                         "branch": "master",
@@ -102,6 +132,11 @@
                     "pangolin": {
                         "branch": "master",
                         "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
+                        "installed_by": ["modules"]
+                    },
+                    "porechop/porechop": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
                         "installed_by": ["modules"]
                     },
                     "pycoqc": {
@@ -167,6 +202,26 @@
                     "spades": {
                         "branch": "master",
                         "git_sha": "b3f04d8392f4571d5869eb3a345892dd2cbea225",
+                        "installed_by": ["modules"]
+                    },
+                    "tabix/bgzip": {
+                        "branch": "master",
+                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
+                        "installed_by": ["modules"]
+                    },
+                    "tabix/tabix": {
+                        "branch": "master",
+                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
+                        "installed_by": ["modules"]
+                    },
+                    "untar": {
+                        "branch": "master",
+                        "git_sha": "5caf7640a9ef1d18d765d55339be751bb0969dfa",
+                        "installed_by": ["modules"]
+                    },
+                    "vcflib/vcfuniq": {
+                        "branch": "master",
+                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
                         "installed_by": ["modules"]
                     }
                 }
