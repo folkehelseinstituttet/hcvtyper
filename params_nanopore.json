@@ -23,5 +23,6 @@
     "skip_variants_long_table": true,
     "skip_mosdepth": true,
     "skip_snpeff": true,
-    "skip_minion": true
+    "skip_minion": true,
+    "skip_medaka": true
 }
