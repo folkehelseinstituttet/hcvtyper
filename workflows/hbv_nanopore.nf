@@ -642,6 +642,7 @@ workflow HBV_NANOPORE {
         multiqc_report = MULTIQC.out.report.toList()
     }
 }
+}
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
