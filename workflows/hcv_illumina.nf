@@ -94,7 +94,7 @@ include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize
 // Info required for completion email and summary
 def multiqc_report = []
 
-workflow VIRALSEQ {
+workflow HCV_ILLUMINA {
 
     ch_versions = Channel.empty()
 
