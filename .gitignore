@@ -12,3 +12,4 @@ Run911_HCV_tanoti/
 Run911_HCV_bowtie/
 HCV_1_year_missing_samples/
 .Rproj.user
+data/fastq_pass/
