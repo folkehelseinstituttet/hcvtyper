@@ -379,12 +379,13 @@ workflow HBV_NANOPORE {
     )
     ch_versions = ch_versions.mix(IVAR_CONSENSUS.out.versions.first().ifEmpty(null))
 
-    MEDAKA (
-        // NB: The module input is locally changed from the nf-core version.
-        // It takes two input channels, one for the reads and one for the reference genome.
-        ARTIC_GUPPYPLEX.out.fastq.filter { it[-1].countFastq() > params.min_guppyplex_reads },
-        PREPARE_GENOME.out.fasta.collect()
-    )
+    if (!params.skip_medaka) {
+        MEDAKA (
+            // NB: The module input is locally changed from the nf-core version.
+            // It takes two input channels, one for the reads and one for the reference genome.
+            ARTIC_GUPPYPLEX.out.fastq.filter { it[-1].countFastq() > params.min_guppyplex_reads },
+            PREPARE_GENOME.out.fasta.collect()
+        )
 
     //
     // MODULE: Run Artic minion
