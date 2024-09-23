@@ -42,14 +42,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     ch_versions = Channel.empty()
 
     //
-    // MODULE: Combine all gff fastas from a single sample into one fasta file
-    //
-    COMBINE_GFF_FASTA (
-        ch_vigorparse
-    )
-    ch_versions = ch_versions.mix(COMBINE_GFF_FASTA.out.versions.first())
-
-    //
     // MODULE: Combine all contigs from a given segment with the corresponding reference dataset for MAFFT input
     //
     PREPARE_MAFFT(
@@ -348,16 +340,24 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         }.set { ch_bam_markdup_samtools }
 
 
+    //
+    // MODULE: Combine all gff fastas from a single sample into one multi fasta file
+    //
+    COMBINE_GFF_FASTA (
+        ch_vigorparse
+    )
+    ch_versions = ch_versions.mix(COMBINE_GFF_FASTA.out.versions.first())
 
     PREPARE_MARKDUPLICATES (
-        // Combine the contigs from the gff extrac with the bam file from the same sample
+        // Combine the contigs from the gff extract with the bam file from the same sample
         BOWTIE2_ALIGN.out.aligned
         .combine(COMBINE_GFF_FASTA.out.collected_gffs, by: 0)
     )
 
+    // Split the output from PREPARE_MARKDUPLICATES into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
     ch_markdup = PREPARE_MARKDUPLICATES.out.bam_contig
         .multiMap {meta, bam, contig ->
-            bam: [meta, bam]
+            bam:    [meta, bam]
             contig: [meta, contig]
             }
 
