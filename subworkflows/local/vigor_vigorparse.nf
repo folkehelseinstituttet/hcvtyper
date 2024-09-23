@@ -21,6 +21,10 @@ workflow VIGOR_VIGORPARSE {
     //
     // MODULE:Extract Rotavirus segments from Vigor output
     //
+
+    // NOTE:
+    // The fastas outputted here are not identical to the contigs. They correspond to the gff3 file.
+    // They can be shorter and they can be reverse complemented.
     VIGOR_GFF_EXTRACT(
         VIGOR.out.gff3.join(VIGOR.out.contigs) // Create a tuple channel with meta, gff3 and contigs
     )
