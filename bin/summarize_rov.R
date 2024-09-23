@@ -162,12 +162,13 @@ stats_withdup_files <- list.files(path = path_5, pattern = ".*withdup.*\\.csv$",
 
 stats_withdup_df <- read_csv(stats_withdup_files) %>%
   select(sampleName,
-         gene,
+         #gene,
          "contig_name" = contig,
          "trimmed_reads_withdups_mapped" = mapped_reads)
 
 # Join
-joined_df <- full_join(joined_df, stats_withdup_df, by = join_by(sampleName, gene, contig_name))
+#joined_df <- full_join(joined_df, stats_withdup_df, by = join_by(sampleName, gene, contig_name))
+joined_df <- full_join(joined_df, stats_withdup_df, by = join_by(sampleName, contig_name))
 
 
 ## Mapped reads without duplicates
@@ -177,12 +178,13 @@ stats_markdup_files <- list.files(path = path_6, pattern = ".*markdup.*\\.csv$",
 
 stats_markdup_df <- read_csv(stats_markdup_files) %>%
   select(sampleName,
-         gene,
+         #gene,
          "contig_name" = contig,
          "trimmed_reads_nodups_mapped" = mapped_reads)
 
 # Join
-joined_df <- full_join(joined_df, stats_markdup_df, by = join_by(sampleName, gene, contig_name))
+#joined_df <- full_join(joined_df, stats_markdup_df, by = join_by(sampleName, gene, contig_name))
+joined_df <- full_join(joined_df, stats_markdup_df, by = join_by(sampleName, contig_name))
 
 # Cutadapt ----------------------------------------------------------------
 

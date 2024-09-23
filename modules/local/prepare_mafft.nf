@@ -23,7 +23,7 @@ process PREPARE_MAFFT {
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    # Untar the different reference fiiles
+    # Untar the different reference files
     tar -xzf $references
 
     # Loop through gene fastas, extract gene name from fasta file,
