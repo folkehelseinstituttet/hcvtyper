@@ -192,6 +192,7 @@ workflow ROV_ILLUMINA {
 
     // NOTE:
     // Avoid sample mixup between vigorparse and classified reads channels
+    // Joins all the extracted contigs for each sample with the reads from the same sample
     VIGOR_VIGORPARSE.out.gff_extract_fasta
         .join(KRAKEN2_FOCUSED.out.classified_reads_fastq, by: 0)
         .multiMap { meta, gene_fasta, classified_reads_fastq ->
