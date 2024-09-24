@@ -2,34 +2,31 @@
 // Align with mafft, create phylogeny with iqtree, map with Bowtie2, sort, stats and markdup using Samtools
 //
 
-include { PREPARE_BOWTIE2_BUILD                } from '../../modules/local/prepare_bowtie2_build'
-include { JOIN_CONTIGS                         } from '../../modules/local/join_contigs'
-include { COMBINE_GFF_FASTA                    } from '../../modules/local/combine_gff_fasta'
-include { BOWTIE2_BUILD                        } from '../../modules/nf-core/bowtie2/build/main'
-include { BOWTIE2_ALIGN                        } from '../../modules/nf-core/bowtie2/align/main'
-include { CREATE_JPG                           } from '../../modules/local/create_jpg'
-include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS } from '../../modules/local/calculate_pairwise_alignment_metrics'
-include { SAMTOOLS_COVERAGE } from '../../modules/nf-core/samtools/coverage/main'
-include { SAMTOOLS_INDEX as INDEX_WITHDUP      } from '../../modules/nf-core/samtools/index/main'
-include { SAMTOOLS_INDEX as INDEX_MARKDUP      } from '../../modules/nf-core/samtools/index/main'
-//include { SAMTOOLS_STATS as STATS_WITHDUP      } from '../../modules/nf-core/samtools/stats/main'
-include { BAM_STATS as STATS_WITHDUP      } from '../../modules/local/bam_stats'
-include { BAM_STATS as STATS_MARKDUP      } from '../../modules/local/bam_stats'
-//include { SAMTOOLS_STATS as STATS_MARKDUP      } from '../../modules/nf-core/samtools/stats/main'
-include { SAMTOOLS_DEPTH                       } from '../../modules/nf-core/samtools/depth/main'
-include { IQTREE                               } from '../../modules/nf-core/iqtree/main'
-include { MAFFT                                } from '../../modules/nf-core/mafft/main'
-include { MAFFT as MAFFT_PAIRWISE              } from '../../modules/nf-core/mafft/main'
-include { PARSE_PHYLOGENY                      } from '../../modules/local/parse_phylogeny'
-include { PREPARE_MARKDUPLICATES               } from '../../modules/local/prepare_markduplicates'
-include { EXTRACT_COMBINE_SEQS                 } from '../../modules/local/extract_combine_seqs'
-include { COLLECT_GENOTYPE_INFO                } from '../../modules/local/collect_genotype_info'
-include { PREPARE_MAFFT                        } from '../../modules/local/prepare_mafft'
+include { PREPARE_BOWTIE2_BUILD                      } from '../../modules/local/prepare_bowtie2_build'
+include { JOIN_CONTIGS                               } from '../../modules/local/join_contigs'
+include { COMBINE_GFF_FASTA                          } from '../../modules/local/combine_gff_fasta'
+include { BOWTIE2_BUILD                              } from '../../modules/nf-core/bowtie2/build/main'
+include { BOWTIE2_ALIGN                              } from '../../modules/nf-core/bowtie2/align/main'
+include { CREATE_JPG                                 } from '../../modules/local/create_jpg'
+include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS       } from '../../modules/local/calculate_pairwise_alignment_metrics'
+include { SAMTOOLS_COVERAGE                          } from '../../modules/nf-core/samtools/coverage/main'
+include { SAMTOOLS_INDEX as INDEX_WITHDUP            } from '../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_INDEX as INDEX_MARKDUP            } from '../../modules/nf-core/samtools/index/main'
+include { BAM_STATS as STATS_WITHDUP                 } from '../../modules/local/bam_stats'
+include { BAM_STATS as STATS_MARKDUP                 } from '../../modules/local/bam_stats'
+include { SAMTOOLS_DEPTH                             } from '../../modules/nf-core/samtools/depth/main'
+include { IQTREE                                     } from '../../modules/nf-core/iqtree/main'
+include { MAFFT                                      } from '../../modules/nf-core/mafft/main'
+include { MAFFT as MAFFT_PAIRWISE                    } from '../../modules/nf-core/mafft/main'
+include { PARSE_PHYLOGENY                            } from '../../modules/local/parse_phylogeny'
+include { PREPARE_MARKDUPLICATES                     } from '../../modules/local/prepare_markduplicates'
+include { EXTRACT_COMBINE_SEQS                       } from '../../modules/local/extract_combine_seqs'
+include { COLLECT_GENOTYPE_INFO                      } from '../../modules/local/collect_genotype_info'
+include { PREPARE_MAFFT                              } from '../../modules/local/prepare_mafft'
 include { SUMMARIZE_STATS as SUMMARIZE_STATS_WITHDUP } from '../../modules/local/summarize_stats'
 include { SUMMARIZE_STATS as SUMMARIZE_STATS_MARKDUP } from '../../modules/local/summarize_stats'
-include { SUMMARIZE_DEPTH } from '../../modules/local/summarize_depth'
-
-include { BAM_MARKDUPLICATES_SAMTOOLS          } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
+include { SUMMARIZE_DEPTH                            } from '../../modules/local/summarize_depth'
+include { BAM_MARKDUPLICATES_SAMTOOLS                } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
 
 workflow MAFFT_IQTREE_BOWTIE2 {
 
@@ -44,7 +41,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //
     // MODULE: Combine all contigs from a given segment with the corresponding reference dataset for MAFFT input
     //
-    PREPARE_MAFFT(
+    PREPARE_MAFFT (
         ch_vigorparse,
         ch_references
     )
@@ -78,7 +75,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
         return [updatedMeta, filePath]
     }
 
-    MAFFT(
+    MAFFT (
         ch_mafft,
         [ [:], [] ],
         [ [:], [] ],
@@ -120,7 +117,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //
     // MODULE: Parse the phylogeny to identify the contigs, their nearest referencees and clade identity. The process can handle multiple contigs in the tree
     //
-    PARSE_PHYLOGENY(
+    PARSE_PHYLOGENY (
         IQTREE.out.phylogeny
     )
     ch_versions = ch_versions.mix(PARSE_PHYLOGENY.out.versions.first())
@@ -132,12 +129,9 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     // NOTE:
     // Add the gene name to the meta of ch_vigorparse ([id:, single_end:, gene:])
     // First transpose the channel to separate the different fasta files for each segment from extract from gff.
-    //ch_temp_2 = ch_vigorparse.transpose()
-    //ch_extract_combine_seqs_temp = ch_temp_2.map { item ->
     ch_extract_combine_seqs_temp = ch_vigorparse.transpose()
         .map { meta, contigs ->
-        //def meta = item[0] // Original meta map
-        //def filePath = item[1].toString() // File path as string
+
         def filePath = contigs.toString() // File path as string
 
         // Use getName to get the filename from the file path
@@ -155,9 +149,9 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     }
 
     // NOTE:
-    // Then join the ch_parse_phylogeny with the PARSE_PHYLOGENY output to have the phylogeny and the segment fasta for the same gene
+    // Then join with the PARSE_PHYLOGENY output to have the phylogeny and the segment fasta for the same gene
     // PARSE_PHYLOGENY.out.parse_phylo has this structure: val(id:, single_end:, gene:), path(gff_extract_fasta for single gene)
-    EXTRACT_COMBINE_SEQS(
+    EXTRACT_COMBINE_SEQS (
         ch_extract_combine_seqs_temp.join(PARSE_PHYLOGENY.out.parse_phylo), // val(meta), path(gff_extract_fasta), path(parse_phylo),
         ch_references
     )
@@ -171,7 +165,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     // EXTRACT_COMBINE_SEQS.out.combined_fasta can contain multiple combined fasta files if there are several contigs matching the same gene.
     // THE MAFFT module needs only one fasta file at a time, so we need to transpose the channel to separate the different fasta files.
     ch_mafft_pairwise = EXTRACT_COMBINE_SEQS.out.combined_fasta.transpose()
-    MAFFT_PAIRWISE(
+    MAFFT_PAIRWISE (
         ch_mafft_pairwise,
         [ [:], [] ],
         [ [:], [] ],
@@ -185,7 +179,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //
     // MODULE: CALCULATE PAIRWISE ALIGNMENT METRICS
     //
-    CALCULATE_PAIRWISE_ALIGNMENT_METRICS(
+    CALCULATE_PAIRWISE_ALIGNMENT_METRICS (
         MAFFT_PAIRWISE.out.fas
     )
     ch_versions = ch_versions.mix(CALCULATE_PAIRWISE_ALIGNMENT_METRICS.out.versions.first())
@@ -202,16 +196,15 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //        .splitFasta(record: [header: true, seqString: true]) // Split fasta into records
     //        .filter { meta, record -> record.header =~ /^NODE.*/ }
     //        .collectFile(name: 'contig.fasta', newLine: true) { ">${it.get(1).header}\n${it.get(1).seqString}"}
-    PREPARE_BOWTIE2_BUILD(
+    PREPARE_BOWTIE2_BUILD (
         ch_mafft_pairwise
     )
     ch_versions = ch_versions.mix(PREPARE_BOWTIE2_BUILD.out.versions.first())
-    //PREPARE_BOWTIE2_BUILD.out.contig.groupTuple().view()
-    //
-    // MODULE: Create a bowtie2 index
-    //
 
-    BOWTIE2_BUILD(
+    //
+    // MODULE: Create a bowtie2 index for each of the contigs
+    //
+    BOWTIE2_BUILD (
         PREPARE_BOWTIE2_BUILD.out.contig
     )
     ch_versions = ch_versions.mix(BOWTIE2_BUILD.out.versions.first())
@@ -257,38 +250,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     STATS_WITHDUP (
         BOWTIE2_ALIGN.out.aligned
     )
-
-    // NOTE:
-    // Ensure no sample mixup for the STATS module. Merging output from PREPARE_BOWTIE2_BUILD, BOWTIE2_ALIGN and INDEX_WITHDUP
-    //PREPARE_BOWTIE2_BUILD.out.contig.map {
-    //    meta, contig -> [
-    //        meta.subMap( ['id','single_end'] ), contig // Keep only "id" and "single_end" keys for joining
-    //    ]
-    //    }
-    //    // NB! This will not work. Name is only ROV1.bam. Can't joint with the index. But can I take
-    //    .join(BOWTIE2_ALIGN.out.aligned, by: 0) // Join on meta with the bam file from BOWTIE2_ALIGN
-    //    .join(INDEX_WITHDUP.out.bai, by: 0) // Join on meta with the bai file from INDEX_WITHDUP
-    //    // Split into two channels for input into the STATS module
-    //    .multiMap { meta, contig, bam, bai ->
-    //        bam_bai: [ meta, bam, bai ]
-    //        contig: [ meta, contig ]
-    //    }.set { ch_stats }
-
-    // One solution is to run samtools status without the fasta file. Just using the bam file.
-    // Samtools stats don't need the index file either. Can be empty
-
-//    STATS_WITHDUP (
-//        // Create empty path to bam index like this: val(meta), path(bam), path(bai)
-//        BOWTIE2_ALIGN.out.aligned
-//            .map { meta, bam ->
-//                def empty = file("dummy")
-//                return [meta, bam, empty]
-//            },
-//        [ [], [] ] // Empty fasta file. Do not use the fasta for samtools index
-//        //[ [], file("dummy_fasta") ]
-//        //ch_stats.bam_bai, // val(meta), path(bam), path(bai)
-//        //ch_stats.contig // val(meta), path(fasta)
-//    )
     ch_versions = ch_versions.mix(STATS_WITHDUP.out.versions.first())
 
     //
@@ -300,59 +261,31 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     ch_versions = ch_versions.mix(SUMMARIZE_STATS_WITHDUP.out.versions.first())
 
     //
-    // MODULE: Remove duplicate reads
-    //
-
-    //
-    // SUBWORKFLOW: Collate, fixmate, sort and markdup using Samtools
+    // SUBWORKFLOW: Collate, fixmate, sort and remove duplicate reads using Samtools
     //
 
     // NOTE:
     // I need to ensure that the correct contig is entered into the subworkflow with the corresponding bam file.
     // There is no information in the bam file name about this so I will get it from the bam header.
-    // Then extract the corresponding fasta sequence for the contig.
-
-    // Idea: Channel vigorparse already contains all contigs per sample
-    // Join with the bam file from the sample sample. This will input a bam file and all contigs for the sample in each task.
-    // Then tease out the contig that corresponds to the contig in the bam header.
-    // Challenge: The fasta files are per sample and gene. And for each gene there can be multiple contigs. So I need to go into the actual fasta heders and extract.
-
-    // Need to put in all the contigs from prepare bowtie2 build. But collect them per sample...
-
-
-
-
-    // Ensure that the two input channels are from the same sample
-    // NB! I don't think this is correct. The bam file is not matched with the right fasta file.
-    // I have to extract the contig name from the bam header, and then use the name to get the fasta file
-    // I can do that by using the COMBINE_GFF_FASTA output. But then I need a module with both samtools and biopython available.
-
-    PREPARE_BOWTIE2_BUILD.out.contig.map {
-        meta, contig -> [
-            meta.subMap( ['id','single_end'] ), contig // Keep only "id" and "single_end" keys for joining
-        ]
-        }
-        .join(BOWTIE2_ALIGN.out.aligned, by: 0) // Join on meta with the bam file from BOWTIE2_ALIGN
-        // Split into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
-        .multiMap { meta, contig, bam ->
-            bam: [ meta, bam ]
-            contig: [ meta, contig ]
-        }.set { ch_bam_markdup_samtools }
-
+    // Then I extract the corresponding fasta sequence for the contig.
 
     //
-    // MODULE: Combine all gff fastas from a single sample into one multi fasta file
+    // MODULE: Combine all fastas from VIGOR_GFF_EXTRACT from each sample into one multi fasta file
     //
     COMBINE_GFF_FASTA (
         ch_vigorparse
     )
     ch_versions = ch_versions.mix(COMBINE_GFF_FASTA.out.versions.first())
 
+    //
+    // MODULE: Get the mapped contig name from the bam header and extract the corresponding contig fasta sequence
+    //
     PREPARE_MARKDUPLICATES (
         // Combine the contigs from the gff extract with the bam file from the same sample
         BOWTIE2_ALIGN.out.aligned
         .combine(COMBINE_GFF_FASTA.out.collected_gffs, by: 0)
     )
+    ch_versions = ch_versions.mix(PREPARE_MARKDUPLICATES.out.versions.first())
 
     // Split the output from PREPARE_MARKDUPLICATES into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
     ch_markdup = PREPARE_MARKDUPLICATES.out.bam_contig
@@ -360,7 +293,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             bam:    [meta, bam]
             contig: [meta, contig]
             }
-
+    // Run the markduplicates nf-core subworkflow
     BAM_MARKDUPLICATES_SAMTOOLS(
         ch_markdup.bam,
         ch_markdup.contig
@@ -392,25 +325,11 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(SUMMARIZE_DEPTH.out.versions.first())
 
-    // NOTE:
-    // Ensure no sample mixup for the STATS module. Merging output from PREPARE_BOWTIE2_BUILD, BAM_MARKDUPLICATES_SAMTOOLS and INDEX_MARKDUP
-    PREPARE_BOWTIE2_BUILD.out.contig.map {
-        meta, contig -> [
-            meta.subMap( ['id','single_end'] ), contig // Keep only "id" and "single_end" keys for joining
-        ]
-        }
-        .join(BAM_MARKDUPLICATES_SAMTOOLS.out.bam, by: 0) // Join on meta with the bam file from BOWTIE2_ALIGN
-        .join(INDEX_MARKDUP.out.bai, by: 0) // Join on meta with the bai file from INDEX_WITHDUP
-        // Split into two channels for input into the STATS module
-        .multiMap { meta, contig, bam, bai ->
-            bam_bai: [ meta, bam, bai ]
-            contig: [ meta, contig ]
-        }.set { ch_stats_markdup }
-
+    //
+    // MODULE: Run samtools stats on the bam files with duplicates removed
+    //
     STATS_MARKDUP (
         BAM_MARKDUPLICATES_SAMTOOLS.out.bam
-        //ch_stats_markdup.bam_bai, // val(meta), path(bam), path(bai)
-        //ch_stats_markdup.contig // val(meta), path(fasta)
     )
     ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
 
