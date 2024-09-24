@@ -35,6 +35,8 @@ process PREPARE_MARKDUPLICATES {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+        BioPython: \$(python -c "import Bio; print(Bio.__version__)")
+        Python: \$(python --version 2>&1 | cut -d' ' -f2)
     END_VERSIONS
     """
 
