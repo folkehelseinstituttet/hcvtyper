@@ -74,8 +74,6 @@ include { INSTRUMENT_ID                      } from '../modules/local/instrument
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// TODO: Make subworkflows for all refs, major and minor
-
 // Info required for completion email and summary
 def multiqc_report = []
 
@@ -193,12 +191,12 @@ workflow ROV_ILLUMINA {
     // NOTE:
     // Avoid sample mixup between vigorparse and classified reads channels
     // Joins all the extracted contigs for each sample with the reads from the same sample
-    VIGOR_VIGORPARSE.out.gff_extract_fasta
+    ch_vigorparse_classified_reads = VIGOR_VIGORPARSE.out.gff_extract_fasta
         .join(KRAKEN2_FOCUSED.out.classified_reads_fastq, by: 0)
         .multiMap { meta, gene_fasta, classified_reads_fastq ->
             gene_fasta: [ meta, gene_fasta ]
             classified_reads: [ meta, classified_reads_fastq ]
-        }.set { ch_vigorparse_classified_reads }
+        }
 
     MAFFT_IQTREE_BOWTIE2(
         ch_vigorparse_classified_reads.gene_fasta, // val(meta), path(gene_fasta)
