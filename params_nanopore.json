@@ -10,7 +10,7 @@
     "genome": "HBV_B_NC_003977",
     "fasta": "data/primer-schemes/Ringlander/V4/Ringlander.reference.fasta",
     "fastq_dir": "data/fastq_pass",
-    "primer_set": "artic",
+    "primer_set": "Ringlander",
     "primer_set_version": 1,
     "artic_minion_aligner": "minimap2",
     "artic_minion_caller": "medaka",
