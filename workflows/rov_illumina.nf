@@ -150,8 +150,19 @@ workflow ROV_ILLUMINA {
     //
     // MODULE: Normalize reads with BBnorm
     //
+
+    // NOTE:
+    // In some cases there are empty fastq files after classification. Remove these from BBMAP normalization
+    ch_bbmap = KRAKEN2_FOCUSED.out.classified_reads_fastq
+        .map { meta, fastq ->
+            n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+            return [meta, fastq, n] // Add the count as the last element in the tuple
+        }
+        .filter { n > 1 } // Filter out empty fastq files
+        .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for BBMAP_BBNORM
+
     BBMAP_BBNORM (
-        KRAKEN2_FOCUSED.out.classified_reads_fastq
+        ch_bbmap
     )
     ch_versions = ch_versions.mix(BBMAP_BBNORM.out.versions.first().ifEmpty(null))
 
@@ -169,12 +180,12 @@ workflow ROV_ILLUMINA {
     )
     ch_versions = ch_versions.mix(SPADES_RNAVIRAL.out.versions.first())
 
-    SPADES_ISOLATE (
-        ch_reads,
-        [], // Empty input channel. Can be used to specify hmm profile
-        []  // Empty input channel. Placeholder for separate specification of reads.
-    )
-    ch_versions = ch_versions.mix(SPADES_ISOLATE.out.versions.first())
+    // SPADES_ISOLATE (
+    //     ch_reads,
+    //     [], // Empty input channel. Can be used to specify hmm profile
+    //     []  // Empty input channel. Placeholder for separate specification of reads.
+    // )
+    // ch_versions = ch_versions.mix(SPADES_ISOLATE.out.versions.first())
 
     //
     // SUBWORKFLOW: Run VIGOR4 and parse output
