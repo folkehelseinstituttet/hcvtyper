@@ -8,18 +8,18 @@ process COMBINE_GFF_FASTA {
         'docker.io/pegi3s/biopython:1.78' }"
 
     input:
-    tuple val(meta), path("*.fasta")
+    tuple val(meta), path(fasta)
 
     output:
-    tuple val(meta), path("*.fasta"), emit: collected_gffs, optional: true
-    path  "versions.yml"            , emit: versions
+    tuple val(meta), path("*collected_gffs.fasta"), emit: collected_gffs, optional: true
+    path  "versions.yml"                          , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
     """
-    cat *.fasta > ${meta.id}_collected_gffs.fasta
+    cat $fasta > ${meta.id}_collected_gffs.fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
