@@ -50,12 +50,12 @@ def extract_sequences(name, thresholds):
             seq_diffs = [seq for seq in seq_diffs if lower_threshold <= len(seq.seq) <= upper_threshold]
             seq_diffs.sort(key=lambda x: len(x.seq), reverse=True)
 
-            # Save all sequences in a single file
+            # Save all sequences in a single file if there are any sequences that meet the criteria
             # Modify output file name
-            #output_file = name.replace("vigor4_out.gff3", "vigorparse") + ".fasta"
-            output_file = f"{sample_id}.{name}.fasta"
-            with open(output_file, "w") as out_file:
-                SeqIO.write(seq_diffs, out_file, "fasta")
+            if seq_diffs:
+                output_file = f"{sample_id}.{name}.fasta"
+                with open(output_file, "w") as out_file:
+                    SeqIO.write(seq_diffs, out_file, "fasta")
 
     except FileNotFoundError:
         print("One of the files was not found. Please check the file paths.")
