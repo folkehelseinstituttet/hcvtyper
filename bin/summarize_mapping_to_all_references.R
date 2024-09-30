@@ -24,11 +24,11 @@ df <- read_table(idxstats, col_names = FALSE) %>%
   # Separate subtype and reference from the sequence names
   separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) %>%
   # Discard the unmapped reads marked by an * (more precisely these are unmapped reads without coordinates)
-  filter(X1 != "*") %>% 
+  filter(X1 != "*") %>%
   # Separate the genotype from the subtype.
   # For 2k1b we use the whole name for genotype also
   mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1)))
-  
+
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
 
@@ -88,17 +88,17 @@ df_final$major_cov[1] <- breadth_int
 # Only execute if two or more references have reads mapped
 # And require that the reference with second most reads belong to a different genotype than the major
 major_genotype <- head(summary$Genotype, n = 1)
-minor_tmp <- df %>% 
+minor_tmp <- df %>%
   # Remove major Genotype
-  filter(Genotype != major_genotype) %>% 
+  filter(Genotype != major_genotype) %>%
   # Choose the reference with most mapped reads
   arrange(desc(X3)) %>%
   head(n = 1) %>%
   pull(Subtype)
 
-minor_ref <- df %>% 
+minor_ref <- df %>%
  # Remove major Genotype
- filter(Genotype != major_genotype) %>% 
+ filter(Genotype != major_genotype) %>%
  # Choose the reference with most mapped reads
  arrange(desc(X3)) %>%
  head(n = 1) %>%
@@ -133,6 +133,11 @@ pos <- nrow(
 # Coverage breadth. Convert to integer to be used in a bash if statement later
 breadth <- round(pos / ref_length * 100, digits = 2)
 breadth_int <- as.integer(pos / ref_length * 100)
+
+# If breadth_int is NA, set it to 0
+if (is.na(breadth_int)) {
+  breadth_int <- 0
+}
 
 df_final$minor_cov[1] <- breadth_int
 }
