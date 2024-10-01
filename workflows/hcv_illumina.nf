@@ -157,11 +157,21 @@ workflow HCV_ILLUMINA {
         CUTADAPT.out.reads
     )
 
+    // NOTE:
+    // In some cases there are empty fastq files after trimming. Remove these before Kraken2 
+    ch_kraken = CUTADAPT.out.reads
+        .map { meta, fastq ->
+            n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+            return [meta, fastq, n] // Add the count as the last element in the tuple
+        }
+        .filter { n > 1 } // Filter out empty fastq files
+        .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for BBMAP_BBNORM
+
     //
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2 (
-        CUTADAPT.out.reads,
+        ch_kraken,
         Channel.value(file(params.kraken_all_db)),
         false,
         false
@@ -172,7 +182,7 @@ workflow HCV_ILLUMINA {
     // MODULE: Run Kraken2 to identify target viral reads
     //
     KRAKEN2_FOCUSED (
-        CUTADAPT.out.reads,
+        ch_kraken,
         Channel.value(file(params.kraken_focused)),
         params.save_output_fastqs,
         params.save_reads_assignment
