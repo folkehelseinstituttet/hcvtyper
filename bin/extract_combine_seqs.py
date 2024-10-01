@@ -50,8 +50,8 @@ def extract_and_combine_sequences(csv_file, references_file, gff_extract_fasta):
         # Extract the third column that holds the name of the nearest reference sequence to the de novo sequence
         full_header = columns[2]
 
-        # Replace "|" with "_" in the full_header
-        sanitized_header = full_header.replace("|", "_")
+        # Replace "|" and "/" with "_" in the full_header
+        sanitized_header = full_header.replace("|", "_").replace("/", "_")
 
         # Extract the sequence name from the first column
         sequence_name = columns[0]
