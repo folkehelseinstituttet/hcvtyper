@@ -1,3 +1,9 @@
+NB! Calculate coverage for all references
+Sortere etter dekning. Etter Major er genotypen med høyest dekning. 
+Rekombinant - hvordan ta hensyn? Ta bort både 1 og 2 genotyper?
+Man kan ta bort hele gt 1 og 2k1b for å finne minor. Da kan vi ikke detektere ko-infeksjon mellom rekombinant og gt 1. 
+Men vi kan detektere koinfeksjon mellom 2k1b og gt 2. Men dette må undersøkes nærmere. 
+
 #!/usr/bin/env Rscript
 
 library(tidyverse)
@@ -13,13 +19,19 @@ depth      <- args[2]
 sampleName <- args[3]
 references <- args[4]
 
-# Create empty dataframe to populate
-df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
-colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
+# First calculate coverage for all references
+# Read the depth file from the first mapping.
+# The file can be empty and the reading fails
+cov <- read_tsv(depth, col_names = FALSE) %>% 
+  group_by(X1) %>% # Group by name of the reference
+  summarise(
+    total_rows = n(), # Get the total number of positions for the reference (genome length)
+    count_gt_4 = sum(X3 > 4), # Get the number of positions with coverage >= 5
+    percent_gt_4 = (count_gt_4 / total_rows) * 100
+  )
 
-df_final$sample[1] <- sampleName
-
-# Read the summary of the first mapping
+# Then read mapped reads from the first mapping
+# Read the idsxtats output of the first mapping
 df <- read_table(idxstats, col_names = FALSE) %>%
   # Separate subtype and reference from the sequence names
   separate(X1, into = c("Subtype", "Reference"), sep = "_", remove = FALSE) %>%
@@ -28,6 +40,15 @@ df <- read_table(idxstats, col_names = FALSE) %>%
   # Separate the genotype from the subtype.
   # For 2k1b we use the whole name for genotype also
   mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1)))
+
+# Prepare final dataframe
+# Create empty dataframe to populate
+df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
+colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
+
+df_final$sample[1] <- sampleName
+
+
 
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
