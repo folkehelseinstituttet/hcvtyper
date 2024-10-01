@@ -39,16 +39,21 @@ df <- read_table(idxstats, col_names = FALSE) %>%
   filter(X1 != "*") %>%
   # Separate the genotype from the subtype.
   # For 2k1b we use the whole name for genotype also
-  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1)))
+  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1))) %>%
+  # Rename Genotype 2k1b to 1 as a preparation for detecting minor genotypes
+  mutate(Genotype = str_replace(Genotype, "2k1b", "1"))
 
-# Prepare final dataframe
-# Create empty dataframe to populate
+# Join the percent coverage to the mapping statistics
+df <- left_join(df, cov, by = c("X1" = "X1"))
+
+HIT
+
+# Create empty final dataframe to populate
 df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
 colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
 
+# Add sample name
 df_final$sample[1] <- sampleName
-
-
 
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
