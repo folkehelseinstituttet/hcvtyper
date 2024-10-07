@@ -25,8 +25,8 @@ def calculate_percent_similarity_and_update_csv(fasta_file):
 
     # Get the names of the two sequences calculate_pairwise_alignment_metrics
     ref_name    = sequences[0].name
-    # Replace "|" with "_" in the full_header and keep everything before the first colon
-    sanitized_ref_name = ref_name.replace("|", "_").split(':')[0]
+    # Replace "|" and "/" with "_" in the full_header and keep everything before the first colon
+    sanitized_ref_name = ref_name.replace("|", "_").replace("/", "_").split(':')[0]
     contig_name = sequences[1].name
     # Sanitize the sequence name to keep only the first two elements. E.g. "NODE_18"
     sanitized_contig_name = "_".join(contig_name.split("_")[:2])
