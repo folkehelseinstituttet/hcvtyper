@@ -1,9 +1,3 @@
-NB! Calculate coverage for all references
-Sortere etter dekning. Etter Major er genotypen med høyest dekning. 
-Rekombinant - hvordan ta hensyn? Ta bort både 1 og 2 genotyper?
-Man kan ta bort hele gt 1 og 2k1b for å finne minor. Da kan vi ikke detektere ko-infeksjon mellom rekombinant og gt 1. 
-Men vi kan detektere koinfeksjon mellom 2k1b og gt 2. Men dette må undersøkes nærmere. 
-
 #!/usr/bin/env Rscript
 
 library(tidyverse)
@@ -27,7 +21,8 @@ cov <- read_tsv(depth, col_names = FALSE) %>%
   summarise(
     total_rows = n(), # Get the total number of positions for the reference (genome length)
     count_gt_4 = sum(X3 > 4), # Get the number of positions with coverage >= 5
-    percent_gt_4 = (count_gt_4 / total_rows) * 100
+    percent_gt_4 = (count_gt_4 / total_rows) * 100,
+    percent_gt_4_int = round(percent_gt_4, digits = 0) # Round to nearest integer. Need integer for groovy/nextflow filtering later
   )
 
 # Then read mapped reads from the first mapping
@@ -39,14 +34,12 @@ df <- read_table(idxstats, col_names = FALSE) %>%
   filter(X1 != "*") %>%
   # Separate the genotype from the subtype.
   # For 2k1b we use the whole name for genotype also
-  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1))) %>%
+  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1))) #%>%
   # Rename Genotype 2k1b to 1 as a preparation for detecting minor genotypes
-  mutate(Genotype = str_replace(Genotype, "2k1b", "1"))
+  #mutate(Genotype = str_replace(Genotype, "2k1b", "1"))
 
 # Join the percent coverage to the mapping statistics
 df <- left_join(df, cov, by = c("X1" = "X1"))
-
-HIT
 
 # Create empty final dataframe to populate
 df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
@@ -87,48 +80,32 @@ major_reads <- summary %>%
 
 df_final$major_reads[1] <- major_reads
 
-# Read the depth file from the first mapping.
-# The file can be empty and the reading fails
-  cov <- read_tsv(depth, col_names = FALSE) %>%
-  # Filter out the minority subtype
-  filter(X1 == major_ref)
-
-
-# Reference length
-ref_length <- nrow(cov)
-
-# Calculate percentage of positions with a coverage of 5 or more
-# Nr. of positions with coverage >= 5
-pos <- nrow(
-  cov %>%
-    filter(X3 > 4)
-)
-
-# Coverage breadth. Convert to integer to be used in a bash if statement later
-breadth <- round(pos / ref_length * 100, digits = 2)
-breadth_int <- as.integer(pos / ref_length * 100)
-
-df_final$major_cov[1] <- breadth_int
+# Add the major ref coverage
+df_final$major_cov[1] <- df %>% filter(X1 == major_ref) %>% pull(percent_gt_4_int)
 
 ## Minor
 # Only execute if two or more references have reads mapped
 # And require that the reference with second most reads belong to a different genotype than the major
 major_genotype <- head(summary$Genotype, n = 1)
-minor_tmp <- df %>%
-  # Remove major Genotype
-  filter(Genotype != major_genotype) %>%
-  # Choose the reference with most mapped reads
-  arrange(desc(X3)) %>%
-  head(n = 1) %>%
-  pull(Subtype)
 
-minor_ref <- df %>%
- # Remove major Genotype
- filter(Genotype != major_genotype) %>%
- # Choose the reference with most mapped reads
- arrange(desc(X3)) %>%
- head(n = 1) %>%
- pull(X1)
+if (major_genotype == "1" | major_genotype == "2k1b") { # If major genotype is 1 or 2k1b, discard gt 1 and 2k1b as potential minor
+  tmp <- df %>%
+    # Remove major Genotype
+    filter(Genotype != major_genotype) %>%
+    filter(Genotype != "2k1b") %>%
+    # Choose the reference with the higest coverage
+    arrange(desc(percent_gt_4)) %>%
+    head(n = 1)
+} else { # If the major gt is not 1 or 2k1b, then allow for these genotypes to be present among potential minor
+  tmp <- df %>%
+    # Remove major Genotype
+    filter(Genotype != major_genotype) %>%
+    # Choose the reference with the highest coverage
+    arrange(desc(percent_gt_4)) %>%
+    head(n = 1)
+}
+minor_tmp <- tmp %>% pull(Subtype)
+minor_ref <- tmp %>% pull(X1)
 
 if (length(minor_ref > 0)) {
   df_final$minor_ref[1] <- minor_ref
@@ -141,37 +118,12 @@ minor_reads <- summary %>%
 
 df_final$minor_reads[1] <- minor_reads
 
-# Read the depth file from the first mapping
-cov <- read_tsv(depth, col_names = FALSE) %>%
-  # Filter out the minority subtype
-  filter(X1 == minor_ref)
-
-# Reference length
-ref_length <- nrow(cov)
-
-# Calculate percentage of positions with a coverage of 5 or more
-# Nr. of positions with coverage >= 5
-pos <- nrow(
-  cov %>%
-    filter(X3 > 4)
-)
-
-# Coverage breadth. Convert to integer to be used in a bash if statement later
-breadth <- round(pos / ref_length * 100, digits = 2)
-breadth_int <- as.integer(pos / ref_length * 100)
-
-# If breadth_int is NA, set it to 0
-if (is.na(breadth_int)) {
-  breadth_int <- 0
-}
-
-df_final$minor_cov[1] <- breadth_int
+# Add minor coverage
+df_final$minor_cov[1] <- df %>% filter(X1 == minor_ref) %>% pull(percent_gt_4_int)
 }
 
 # Write results
 write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
-#write_lines(major_ref                         , file = paste0(sampleName, ".major_ref.txt"))
-#write_lines(c(minor_ref, minor_reads, breadth_int, breadth), file = paste0(sampleName, ".minor_ref.txt"))
 
 # Write out the fasta sequences
 # Read the reference fasta file
@@ -180,7 +132,3 @@ write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(s
 if (length(minor_ref > 0)) {
 write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
 }
-
-# Write out sessionInfo() to track versions
-# session <- capture.output(sessionInfo())
-# write_lines(session, file = "R_versions.txt")
