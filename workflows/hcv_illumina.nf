@@ -52,7 +52,7 @@ include { TARGETED_MAPPING as MINOR_MAPPING } from '../subworkflows/local/target
 //include { fromSamplesheet                    } from 'plugin/nf-validation'
 include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
 include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
-include { FASTQC                             } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
@@ -136,10 +136,10 @@ workflow HCV_ILLUMINA {
     //
     // MODULE: Run FastQC
     //
-    FASTQC (
+    FASTQC_RAW (
         INPUT_CHECK.out.reads
     )
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+    ch_versions = ch_versions.mix(FASTQC_RAW.out.versions.first())
 
     //
     // MODULE: Trim reads with Cutadapt
@@ -156,9 +156,10 @@ workflow HCV_ILLUMINA {
     FASTQC_TRIM (
         CUTADAPT.out.reads
     )
+    ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
     // NOTE:
-    // In some cases there are empty fastq files after trimming. Remove these before Kraken2 
+    // In some cases there are empty fastq files after trimming. Remove these before Kraken2
     ch_kraken = CUTADAPT.out.reads
         .map { meta, fastq ->
             n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
@@ -455,11 +456,13 @@ workflow HCV_ILLUMINA {
     ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
+
+    ch_multiqc_files.view()
 
     MULTIQC (
         ch_multiqc_files.collect(),
