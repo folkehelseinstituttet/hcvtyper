@@ -53,7 +53,7 @@ include { BBMAP_BBNORM                       } from '../modules/nf-core/bbmap/bb
 include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
-include { FASTQC                             } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
@@ -103,10 +103,10 @@ workflow ROV_ILLUMINA {
     //
     // MODULE: Run FastQC on raw reads
     //
-    FASTQC (
+    FASTQC_RAW (
         INPUT_CHECK.out.reads
     )
-    ch_versions = ch_versions.mix(FASTQC.out.versions.first())
+    ch_versions = ch_versions.mix(FASTQC_RAW.out.versions.first())
 
     //
     // MODULE: Trim reads with Cutadapt
@@ -159,7 +159,7 @@ workflow ROV_ILLUMINA {
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { n > 1 } // Filter out empty fastq files
-        .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for BBMAP_BBNORM
+        .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for BBMAP_BBNORM
 
     BBMAP_BBNORM (
         ch_bbmap
@@ -170,9 +170,18 @@ workflow ROV_ILLUMINA {
     // MODULE: de novo assembly with Spades
     //
 
+    // NOTE:
     // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
-    ch_reads = BBMAP_BBNORM.out.fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
+    // First filter out empty fastq files from BBMAP normalization
+    ch_reads = BBMAP_BBNORM.out.fastq
+        .map { meta, fastq ->
+            n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+            return [meta, fastq, n] // Add the count as the last element in the tuple
+        }
+        .filter { n > 1 } // Filter out empty fastq files
+        .map { meta, fastq, n -> [ meta, fastq, [], [] ] } // Remove the count and add empty elements for pacbio and nanopore reads
+
     SPADES_RNAVIRAL (
         ch_reads,
         [], // Empty input channel. Can be used to specify hmm profile
@@ -260,7 +269,7 @@ workflow ROV_ILLUMINA {
     ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect())
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
