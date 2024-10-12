@@ -15,6 +15,7 @@ include { SAMTOOLS_INDEX as INDEX_MARKDUP            } from '../../modules/nf-co
 include { BAM_STATS as STATS_WITHDUP                 } from '../../modules/local/bam_stats'
 include { BAM_STATS as STATS_MARKDUP                 } from '../../modules/local/bam_stats'
 include { SAMTOOLS_DEPTH                             } from '../../modules/nf-core/samtools/depth/main'
+include { SAMTOOLS_SORMADUP                          } from '../../modules/nf-core/samtools/sormadup/main'
 include { IQTREE                                     } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                                      } from '../../modules/nf-core/mafft/main'
 include { MAFFT as MAFFT_PAIRWISE                    } from '../../modules/nf-core/mafft/main'
@@ -26,7 +27,6 @@ include { PREPARE_MAFFT                              } from '../../modules/local
 include { SUMMARIZE_STATS as SUMMARIZE_STATS_WITHDUP } from '../../modules/local/summarize_stats'
 include { SUMMARIZE_STATS as SUMMARIZE_STATS_MARKDUP } from '../../modules/local/summarize_stats'
 include { SUMMARIZE_DEPTH                            } from '../../modules/local/summarize_depth'
-include { BAM_MARKDUPLICATES_SAMTOOLS                } from '../../subworkflows/nf-core/bam_markduplicates_samtools/main'
 
 workflow MAFFT_IQTREE_BOWTIE2 {
 
@@ -288,23 +288,31 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     ch_versions = ch_versions.mix(PREPARE_MARKDUPLICATES.out.versions.first())
 
     // Split the output from PREPARE_MARKDUPLICATES into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
+    //NB! For some reason this does not work. The input channel is not passed through the workflow as desired...
     ch_markdup = PREPARE_MARKDUPLICATES.out.bam_contig
         .multiMap {meta, bam, contig ->
             bam:    [meta, bam]
             contig: [meta, contig]
             }
-    // Run the markduplicates nf-core subworkflow
-    BAM_MARKDUPLICATES_SAMTOOLS(
+
+    SAMTOOLS_SORMADUP(
         ch_markdup.bam,
         ch_markdup.contig
     )
-    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
+
+
+//    // Run the markduplicates nf-core subworkflow
+//    BAM_MARKDUPLICATES_SAMTOOLS(
+//        ch_markdup.bam,
+//        ch_markdup.contig
+//    )
+//    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
 
     //
     // MODULE: Index the bam file with samtools index
     //
     INDEX_MARKDUP (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+        SAMTOOLS_SORMADUP.out.bam
     )
     ch_versions = ch_versions.mix(INDEX_MARKDUP.out.versions.first())
 
@@ -312,7 +320,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     // MODULE: Get reads coverage per position with samtools depth
     //
     SAMTOOLS_DEPTH (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
+        SAMTOOLS_SORMADUP.out.bam,
         [ [], []] // Passing empty channels instead of an interval file
     )
     ch_versions = ch_versions.mix(SAMTOOLS_DEPTH.out.versions.first())
@@ -329,7 +337,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     // MODULE: Run samtools stats on the bam files with duplicates removed
     //
     STATS_MARKDUP (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+        SAMTOOLS_SORMADUP.out.bam
     )
     ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
 
@@ -348,7 +356,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     aligned           = MAFFT.out.fas
     stats_withdup     = SUMMARIZE_STATS_WITHDUP.out.csv
     stats_markdup     = SUMMARIZE_STATS_MARKDUP.out.csv
-    bam_nodups        = BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+    bam_nodups        = SAMTOOLS_SORMADUP.out.bam
     depth             = SUMMARIZE_DEPTH.out.csv
     versions          = ch_versions
 }
