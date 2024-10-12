@@ -15,6 +15,11 @@
                         "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
                         "installed_by": ["modules"]
                     },
+                    "bbmap/bbnorm": {
+                        "branch": "master",
+                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
+                        "installed_by": ["modules"]
+                    },
                     "bcftools/query": {
                         "branch": "master",
                         "git_sha": "44096c08ffdbc694f5f92ae174ea0f7ba0f37e09",
@@ -23,11 +28,6 @@
                     "bcftools/stats": {
                         "branch": "master",
                         "git_sha": "44096c08ffdbc694f5f92ae174ea0f7ba0f37e09",
-                        "installed_by": ["modules"]
-                    },
-                    "bbmap/bbnorm": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
                         "installed_by": ["modules"]
                     },
                     "blast/blastn": {
@@ -54,7 +54,7 @@
                     },
                     "custom/dumpsoftwareversions": {
                         "branch": "master",
-                        "git_sha": "82024cf6325d2ee194e7f056d841ecad2f6856e9",
+                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
                         "installed_by": ["modules"]
                     },
                     "custom/getchromsizes": {
@@ -78,6 +78,11 @@
                         "git_sha": "3a5fef109d113b4997c9822198664ca5f2716208",
                         "installed_by": ["modules"]
                     },
+                    "iqtree": {
+                        "branch": "master",
+                        "git_sha": "6bcf632393182c27eb0714ff1085194be67d5949",
+                        "installed_by": ["modules"]
+                    },
                     "ivar/consensus": {
                         "branch": "master",
                         "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
@@ -88,16 +93,16 @@
                         "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
                         "installed_by": ["modules"]
                     },
-                    "iqtree": {
-                        "branch": "master",
-                        "git_sha": "6bcf632393182c27eb0714ff1085194be67d5949",
-                        "installed_by": ["modules"]
-                    },
                     "kraken2/kraken2": {
                         "branch": "master",
                         "git_sha": "d6549f46c3c1c3fe3def110f3d18059a68a65cc6",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/kraken2/kraken2/kraken2-kraken2.diff"
+                    },
+                    "mafft": {
+                        "branch": "master",
+                        "git_sha": "faf557ba56156ac0e5de76a25c1e3df11c944f59",
+                        "installed_by": ["modules"]
                     },
                     "medaka": {
                         "branch": "master",
@@ -119,49 +124,9 @@
                         "git_sha": "69e3eb17fb31b772b18f134d6e8f8b93ee980e65",
                         "installed_by": ["modules"]
                     },
-                    "mafft": {
-                        "branch": "master",
-                        "git_sha": "faf557ba56156ac0e5de76a25c1e3df11c944f59",
-                        "installed_by": ["modules"]
-                    },
                     "multiqc": {
                         "branch": "master",
-                        "git_sha": "b80f5fd12ff7c43938f424dd76392a2704fa2396",
-                        "installed_by": ["modules"]
-                    },
-                    "nanoplot": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
-                        "installed_by": ["modules"]
-                    },
-                    "nextclade/datasetget": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
-                        "installed_by": ["modules"]
-                    },
-                    "nextclade/run": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
-                        "installed_by": ["modules"]
-                    },
-                    "pangolin": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
-                        "installed_by": ["modules"]
-                    },
-                    "porechop/porechop": {
-                        "branch": "master",
-                        "git_sha": "06c8865e36741e05ad32ef70ab3fac127486af48",
-                        "installed_by": ["modules"]
-                    },
-                    "pycoqc": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
-                        "installed_by": ["modules"]
-                    },
-                    "quast": {
-                        "branch": "master",
-                        "git_sha": "3f5420aa22e00bd030a2556dfdffc9e164ec0ec5",
+                        "git_sha": "b8d36829fa84b6e404364abff787e8b07f6d058c",
                         "installed_by": ["modules"]
                     },
                     "nanoplot": {
@@ -238,6 +203,11 @@
                         "branch": "master",
                         "git_sha": "04fbbc7c43cebc0b95d5b126f6d9fe4effa33519",
                         "installed_by": ["bam_markduplicates_samtools"]
+                    },
+                    "samtools/sormadup": {
+                        "branch": "master",
+                        "git_sha": "b13f07be4c508d6ff6312d354d09f2493243e208",
+                        "installed_by": ["modules"]
                     },
                     "samtools/sort": {
                         "branch": "master",
