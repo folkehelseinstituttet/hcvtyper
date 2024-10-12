@@ -25,12 +25,17 @@ process PREPARE_MARKDUPLICATES {
     contig=\$(samtools head ${bam} | awk 'NR==2 {print \$2}' | sed 's/^SN://')
     echo \$contig > ${prefix}.contig
 
+    # Extract the gene name from the header.
+    # Pull out first "@PG" line, then get everythng after "-x", split on "." and get element three.
+    # This is needed to avoid name collision later if the same contigs was assigned to different genes by Vigor.
+    gene=\$(samtools head ${bam} | awk '/^@PG/ {print \$0}' | grep -oP '(?<=-x ).*?(?= )' | cut -d'.' -f3)
+    echo \$gene > ${prefix}.gene
+
     # Then extract the corresponding contig from the contigs file
     prepare_markduplicates.py $contigs \$contig
 
-    mv ${prefix}.bam ${prefix}.\$contig.bam
-
-    # Rename the bam file
+    # Add gene and contig name to the bam file name
+    mv ${prefix}.bam ${prefix}.\$gene.\$contig.bam
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
