@@ -68,6 +68,7 @@ include { SAMTOOLS_IDXSTATS as SAMTOOLS_IDXSTATS_MARKDUP } from '../modules/nf-c
 include { SAMTOOLS_DEPTH as SAMTOOLS_DEPTH_WITHDUP } from '../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_DEPTH as SAMTOOLS_DEPTH_MARKDUP } from '../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_STATS                     } from '../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_SORMADUP                  } from '../modules/nf-core/samtools/sormadup/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -279,30 +280,30 @@ workflow HCV_ILLUMINA {
     )
 
     // Remove duplicate reads
-    BAM_MARKDUPLICATES_SAMTOOLS (
+    SAMTOOLS_SORMADUP (
         ch_aligned,
         [ [], file(params.references) ]
     )
-    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
+    ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
 
     SAMTOOLS_INDEX_MARKDUP (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam
+        SAMTOOLS_SORMADUP.out.bam
     )
     ch_versions = ch_versions.mix(SAMTOOLS_INDEX_MARKDUP.out.versions.first())
 
     SAMTOOLS_IDXSTATS_MARKDUP (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
+        SAMTOOLS_SORMADUP.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_MARKDUP.out.versions.first())
 
     SAMTOOLS_DEPTH_MARKDUP (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam,
+        SAMTOOLS_SORMADUP.out.bam,
         [ [], []] // Passing empty channels instead of an interval file
     )
     ch_versions = ch_versions.mix(SAMTOOLS_DEPTH_MARKDUP.out.versions.first())
 
     SAMTOOLS_STATS (
-        BAM_MARKDUPLICATES_SAMTOOLS.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
+        SAMTOOLS_SORMADUP.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
         Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
     )
     ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
@@ -461,8 +462,6 @@ workflow HCV_ILLUMINA {
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
-
-    ch_multiqc_files.view()
 
     MULTIQC (
         ch_multiqc_files.collect(),
