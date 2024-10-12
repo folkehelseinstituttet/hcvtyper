@@ -12,3 +12,34 @@ report_section_order:
     order: -1002
 
 export_plots: true
+
+# Don't read version information from software output. Read from the collected version file instead
+disable_version_detection: true
+
+# Run only these modules
+run_modules:
+  - custom_content
+  - fastqc
+  - cutadapt
+  - kraken
+  - software_versions
+
+module_order:
+  - fastqc:
+      name: "FastQC (raw)"
+      path_filters:
+        - "*.raw_*.zip"
+  - cutadapt:
+      name: "Cutadapt"
+      path_filters:
+        - "*.cutadapt.log"
+  - fastqc:
+      name: "FastQC (trimmed)"
+      path_filters:
+        - "*.trimmed_*.zip"
+  - kraken:
+      name: "Kraken2"
+  - software_versions:
+      name: "Software versions"
+      path_filters:
+        - "software_versions_mqc.yml"
