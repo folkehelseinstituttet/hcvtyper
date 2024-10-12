@@ -60,3 +60,26 @@ This pipeline uses code and infrastructure developed and maintained by the [nf-c
 > Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
 >
 > _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
+
+## Notes
+
+Rotavirus IQTREE evolutionary models based on analyzing 50 samples:
+
+   gene  best_fit_model count
+   <chr> <chr>          <int>
+ 1 NSP1  GTR+F+I+G4        41
+ 2 NSP2  GTR+F+I+G4        38
+ 3 NSP2  GTR+F+G4           1
+ 4 NSP2  TIM3+F+G4          1
+ 5 NSP2  TIM3+F+I+G4        1
+ 6 NSP3  GTR+F+G4          31
+ 7 NSP3  GTR+F+I+G4         9
+ 8 NSP4  GTR+F+G4          34
+ 9 NSP5  TPM2u+F+G4        40
+10 VP1   TIM3+F+I+G4       39
+11 VP2   GTR+F+I+G4        37
+12 VP3   TIM3+F+I+G4       40
+13 VP4   TIM3+F+I+G4       32
+14 VP4   GTR+F+I+G4         7
+15 VP6   GTR+F+I+G4        42
+16 VP7   GTR+F+I+G4        41
