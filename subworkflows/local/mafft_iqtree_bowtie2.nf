@@ -226,7 +226,6 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             index: [ meta, index ]
             reads: [ meta, reads ]
         }
-        //}.set { ch_bowtie2_align } // Output into channel ch_bowtie2_align
 
     BOWTIE2_ALIGN (
         ch_bowtie2_align.reads,
