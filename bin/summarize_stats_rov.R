@@ -8,7 +8,8 @@ if (length(args) < 2) {
 }
 
 prefix <- args[1]
-stats  <- args[2]
+gene   <- args[2]
+stats  <- args[3]
 
 df <- as.data.frame(matrix(nrow = 1, ncol = 3))
 colnames(df) <- c("sampleName", "contig", "mapped_reads")
@@ -48,4 +49,4 @@ df$mapped_reads <- mapped_reads
 
 df <- tibble(df)
 
-write_csv(df, paste0(prefix, ".", mapped_seq, ".csv"))
+write_csv(df, paste0(prefix, ".", gene, ".", mapped_seq, ".csv"))

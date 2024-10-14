@@ -8,7 +8,8 @@ if (length(args) < 2) {
 }
 
 prefix <- args[1]
-depth  <- args[2]
+gene   <- args[2]
+depth  <- args[3]
 
 # Get the sample name from the depth file. Compare with the prefix
 prefix_2 <- unlist(str_split(basename(depth), pattern = "\\."))[1]
@@ -70,4 +71,4 @@ if (ref_length > 0) {
 
 df <- tibble(df)
 
-write_csv(df, paste0(prefix, ".", reference, ".markdup", ".csv"))
+write_csv(df, paste0(prefix, ".", gene, ".", reference, ".markdup", ".csv"))
