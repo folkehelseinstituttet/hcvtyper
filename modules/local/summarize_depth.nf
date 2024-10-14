@@ -19,8 +19,9 @@ process SUMMARIZE_DEPTH {
 
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def gene = "${meta.gene}"
     """
-    summarize_depth.R ${prefix} ${depth}
+    summarize_depth.R ${prefix} ${gene} ${depth}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

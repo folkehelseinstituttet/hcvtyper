@@ -19,8 +19,9 @@ process SUMMARIZE_STATS {
 
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def gene = "${meta.gene}"
     """
-    summarize_stats_rov.R ${prefix} ${stats}
+    summarize_stats_rov.R ${prefix} ${gene} ${stats}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
