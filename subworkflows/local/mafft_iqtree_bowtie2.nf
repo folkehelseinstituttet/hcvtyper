@@ -12,15 +12,15 @@ include { CALCULATE_PAIRWISE_ALIGNMENT_METRICS       } from '../../modules/local
 include { SAMTOOLS_COVERAGE                          } from '../../modules/nf-core/samtools/coverage/main'
 include { SAMTOOLS_INDEX as INDEX_WITHDUP            } from '../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_INDEX as INDEX_MARKDUP            } from '../../modules/nf-core/samtools/index/main'
-include { BAM_STATS as STATS_WITHDUP                 } from '../../modules/local/bam_stats'
-include { BAM_STATS as STATS_MARKDUP                 } from '../../modules/local/bam_stats'
+include { SAMTOOLS_STATS as STATS_WITHDUP            } from '../../modules/nf-core/samtools/stats'
+include { SAMTOOLS_STATS as STATS_MARKDUP            } from '../../modules/nf-core/samtools/stats'
 include { SAMTOOLS_DEPTH                             } from '../../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_SORMADUP                          } from '../../modules/nf-core/samtools/sormadup/main'
 include { IQTREE                                     } from '../../modules/nf-core/iqtree/main'
 include { MAFFT                                      } from '../../modules/nf-core/mafft/main'
 include { MAFFT as MAFFT_PAIRWISE                    } from '../../modules/nf-core/mafft/main'
 include { PARSE_PHYLOGENY                            } from '../../modules/local/parse_phylogeny'
-include { PREPARE_MARKDUPLICATES                     } from '../../modules/local/prepare_markduplicates'
+include { RENAME_BAM_JOIN_CONTIG                     } from '../../modules/local/rename_bam_join_contig'
 include { EXTRACT_COMBINE_SEQS                       } from '../../modules/local/extract_combine_seqs'
 include { COLLECT_GENOTYPE_INFO                      } from '../../modules/local/collect_genotype_info'
 include { PREPARE_MAFFT                              } from '../../modules/local/prepare_mafft'
@@ -235,42 +235,18 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
 
-    //
-    // MODULE: Index the bam file with samtools index
-    //
-    INDEX_WITHDUP (
-        BOWTIE2_ALIGN.out.aligned
-    )
-    ch_versions = ch_versions.mix(INDEX_WITHDUP.out.versions.first())
-
-    //
-    // MODULE: Run samtools stats on the bam files with duplicates included
-    //
-    STATS_WITHDUP (
-        BOWTIE2_ALIGN.out.aligned
-    )
-    ch_versions = ch_versions.mix(STATS_WITHDUP.out.versions.first())
-
-    //
-    // MODULE: Summarize the samtools stats output
-    //
-    SUMMARIZE_STATS_WITHDUP (
-        STATS_WITHDUP.out.stats
-    )
-    ch_versions = ch_versions.mix(SUMMARIZE_STATS_WITHDUP.out.versions.first())
-
-    //
-    // SUBWORKFLOW: Collate, fixmate, sort and remove duplicate reads using Samtools
-    //
-
     // NOTE:
-    // I need to ensure that the correct contig is entered into the subworkflow with the corresponding bam file.
-    // There is no information in the bam file name about this so I will get it from the bam header.
-    // Then I extract the corresponding fasta sequence for the contig.
+    // Later we need to ensure that the correct contig reference is input together with the corresponding bam file.
+    // There is no information in the bam file from BOWTIE2_ALIGN name about this so we get it from the bam header.
+    // We can also use the contig name to add that to the meta map for the later steps.
+    // Then we extract the corresponding fasta sequence for the contig and output together with the bam file.
 
     //
     // MODULE: Combine all fastas from VIGOR_GFF_EXTRACT from each sample into one multi fasta file
     //
+
+    // NOTE:
+    // This is a preparation for renaming of the bam file
     COMBINE_GFF_FASTA (
         ch_vigorparse
     )
@@ -279,18 +255,18 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     //
     // MODULE: Get the mapped contig name from the bam header and extract the corresponding contig fasta sequence
     //
-    PREPARE_MARKDUPLICATES (
+    RENAME_BAM_JOIN_CONTIG (
         // Combine the contigs from the gff extract with the bam file from the same sample
         BOWTIE2_ALIGN.out.aligned
         .combine(COMBINE_GFF_FASTA.out.collected_gffs, by: 0)
     )
-    ch_versions = ch_versions.mix(PREPARE_MARKDUPLICATES.out.versions.first())
+    ch_versions = ch_versions.mix(RENAME_BAM_JOIN_CONTIG.out.versions.first())
 
     // NOTE:
-    // Split the output from PREPARE_MARKDUPLICATES into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
-    // Add both the gene name and the contig name from the bam file to the meta map.
+    // Add both the gene name and the contig name from the bam file to the meta map of RENAME_BAM_JOIN_CONTIG output.
     // This is to avoid name conflicts in SUMMARIZE if two different contigs from the same sample are assigned to the same gene in the Vigor gff.
-    ch_markdup = PREPARE_MARKDUPLICATES.out.bam_contig
+    // Also split the output from RENAME_BAM_JOIN_CONTIG into two channels for input into the SAMTOOLS_SORMADUO module
+    ch_aligned = RENAME_BAM_JOIN_CONTIG.out.bam_contig
         .map { meta, bam, contig ->
             def filePath = bam.toString() // File path as string
 
@@ -311,23 +287,41 @@ workflow MAFFT_IQTREE_BOWTIE2 {
             // Emit the updated item
             return [updatedMeta, bam, contig]
         }
-        .multiMap { meta, bam, contig ->
-            bam:    [meta, bam]
-            contig: [meta, contig]
-        }
 
-    SAMTOOLS_SORMADUP(
-        ch_markdup.bam,
-        ch_markdup.contig
+    //
+    // MODULE: Index the bam file with samtools index
+    //
+    INDEX_WITHDUP (
+        ch_aligned.map { meta, bam, contig -> tuple(meta, bam) } // Drop the contig
     )
+    ch_versions = ch_versions.mix(INDEX_WITHDUP.out.versions.first())
 
+    //
+    // MODULE: Run samtools stats on the bam files with duplicates included
+    //
+    STATS_WITHDUP (
+        ch_aligned.map { meta, bam, contig -> tuple(meta, bam) } // Drop the contig
+            .join(INDEX_WITHDUP.out.bai, by: 0), // Join with the index file
+        [[], []] // Pass empty channel for the referene file
+    )
+    ch_versions = ch_versions.mix(STATS_WITHDUP.out.versions.first())
 
-//    // Run the markduplicates nf-core subworkflow
-//    BAM_MARKDUPLICATES_SAMTOOLS(
-//        ch_markdup.bam,
-//        ch_markdup.contig
-//    )
-//    ch_versions = ch_versions.mix(BAM_MARKDUPLICATES_SAMTOOLS.out.versions.first())
+    //
+    // MODULE: Summarize the samtools stats output
+    //
+    SUMMARIZE_STATS_WITHDUP (
+        STATS_WITHDUP.out.stats
+    )
+    ch_versions = ch_versions.mix(SUMMARIZE_STATS_WITHDUP.out.versions.first())
+
+    //
+    // MODULE: Collate, fixmate, sort and remove duplicate reads using Samtools
+    //
+    SAMTOOLS_SORMADUP(
+        ch_aligned.map { meta, bam, contig -> tuple(meta, bam) }, // Drop the contig
+        ch_aligned.map { meta, bam, contig -> tuple(meta, contig) } // Drop the bam file
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
 
     //
     // MODULE: Index the bam file with samtools index
@@ -358,7 +352,8 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     // MODULE: Run samtools stats on the bam files with duplicates removed
     //
     STATS_MARKDUP (
-        SAMTOOLS_SORMADUP.out.bam
+        SAMTOOLS_SORMADUP.out.bam.join(INDEX_MARKDUP.out.bai, by: 0), // Join with the index file
+        [[], []] // Pass empty channel for the referene file
     )
     ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
 
