@@ -286,13 +286,35 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     )
     ch_versions = ch_versions.mix(PREPARE_MARKDUPLICATES.out.versions.first())
 
+    // NOTE:
     // Split the output from PREPARE_MARKDUPLICATES into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
-    // Can I add both the gene name and the contig name from the bam file to the meta?
+    // Add both the gene name and the contig name from the bam file to the meta map.
+    // This is to avoid name conflicts in SUMMARIZE if two different contigs from the same sample are assigned to the same gene in the Vigor gff.
     ch_markdup = PREPARE_MARKDUPLICATES.out.bam_contig
-        .multiMap {meta, bam, contig ->
+        .map { meta, bam, contig ->
+            def filePath = bam.toString() // File path as string
+
+            // Use getName to get the filename from the file path
+            def fileName = new File(filePath).getName()
+
+            // Extract the gene name from the file path
+            def geneName = fileName.split("_")[0].split("\\.")[1]
+
+            // Extract the contig name from the file path
+            def contigName = fileName.split("\\.")[2]
+
+            // Add the gene name and the contig name to the meta map
+            def updatedMeta = meta.clone() // Clone the original meta map to avoid modifying the original
+            updatedMeta.gene = geneName // Add the gene name
+            updatedMeta.contig = contigName // Add the contig name
+
+            // Emit the updated item
+            return [updatedMeta, bam, contig]
+        }
+        .multiMap { meta, bam, contig ->
             bam:    [meta, bam]
             contig: [meta, contig]
-            }
+        }
 
     SAMTOOLS_SORMADUP(
         ch_markdup.bam,
