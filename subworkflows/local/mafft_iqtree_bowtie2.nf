@@ -288,7 +288,7 @@ workflow MAFFT_IQTREE_BOWTIE2 {
     ch_versions = ch_versions.mix(PREPARE_MARKDUPLICATES.out.versions.first())
 
     // Split the output from PREPARE_MARKDUPLICATES into two channels for input into the BAM_MARKDUPLICATES_SAMTOOLS subworkflow
-    //NB! For some reason this does not work. The input channel is not passed through the workflow as desired...
+    // Can I add both the gene name and the contig name from the bam file to the meta?
     ch_markdup = PREPARE_MARKDUPLICATES.out.bam_contig
         .multiMap {meta, bam, contig ->
             bam:    [meta, bam]
