@@ -1,4 +1,4 @@
-process PREPARE_MARKDUPLICATES {
+process RENAME_BAM_JOIN_CONTIG {
     tag "$meta.id"
     label 'process_single'
 
