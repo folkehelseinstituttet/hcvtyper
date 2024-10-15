@@ -39,7 +39,3 @@ module_order:
         - "*.trimmed_*.zip"
   - kraken:
       name: "Kraken2"
-  - software_versions:
-      name: "Software versions"
-      path_filters:
-        - "software_versions_mqc.yml"
