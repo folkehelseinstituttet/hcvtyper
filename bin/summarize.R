@@ -447,8 +447,7 @@ final <- final %>%
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
          abundance_minor,
-         everything()) %>%
-  select(-Reference)
+         everything())
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
