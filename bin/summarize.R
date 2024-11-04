@@ -7,7 +7,7 @@ args = commandArgs(trailingOnly=TRUE)
 # Define variables --------------------------------------------------------
 
 # NB! Script name is currently hard coded. Needs to be changed
-script_name <- "viralseq"
+script_name_version <- "viralseq v. dev"
 stringency_1 <- args[1]
 stringency_2 <- args[2]
 
@@ -402,17 +402,9 @@ final <- final %>%
   mutate(abundance_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
   mutate(abundance_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
 
-# Add tanoti mapping stringencies
-# Merge the stringencies and add script name.
-script_string <- paste0(
-  script_name,
-  "(",
-  paste(stringency_1, stringency_2, sep = "/"),
-  ")"
-)
-
+# Add script name and version
 final <- final %>%
-  add_column("script_name_stringency" = script_string)
+  add_column("script_name_stringency" = script_name_version)
 
 
 # Decide if a sample is "typbar" or not
