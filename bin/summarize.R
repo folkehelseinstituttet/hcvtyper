@@ -447,8 +447,8 @@ final <- final %>%
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
          abundance_minor,
-         everything()) #%>%
-  #select(-Reference, -Major_minor)
+         everything()) %>%
+  select(-Reference)
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
@@ -477,9 +477,6 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 
 
 # Create LW import --------------------------------------------------------
-
-# NEED TO ADD:
-#  - "Majority quality:" og "Minor quality" (typbar/ikke typbar)
 
 lw_import <- final %>%
   select("Sample" = sampleName,
