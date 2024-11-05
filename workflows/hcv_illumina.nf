@@ -83,6 +83,7 @@ include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse
 include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
+include { SORT_IDXSTATS                       } from '../modules/local/idxstats_sort.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -263,6 +264,11 @@ workflow HCV_ILLUMINA {
         ch_aligned.join(SAMTOOLS_INDEX_WITHDUP.out.bai) // val(meta), path(bam), path(bai)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_WITHDUP.out.versions.first())
+
+    SORT_IDXSTATS (
+        SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats
+    )
+    ch_versions = ch_versions.mix(SORT_IDXSTATS.out.versions)
 
     SAMTOOLS_DEPTH_WITHDUP (
         ch_aligned,
