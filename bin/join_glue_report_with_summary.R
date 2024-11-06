@@ -25,4 +25,4 @@ if (nrow(glue_report) > 0) {
 }
 
 # Write file
-write_csv(final, file = "Genotype_mapping_summary_long_LW_import_with_glue.csv")
+write_tsv(final, file = "Genotype_mapping_summary_long_LW_import_with_glue.tsv")
