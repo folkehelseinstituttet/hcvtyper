@@ -478,7 +478,7 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 # Create LW import --------------------------------------------------------
 
 lw_import <- final %>%
-  select("Sample" = sampleName,
+  select("Parameters:" = sampleName,
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
          "Number of mapped reads:" = Reads_withdup_mapped_major,
