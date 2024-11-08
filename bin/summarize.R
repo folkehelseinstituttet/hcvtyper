@@ -480,7 +480,7 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 lw_import <- final %>%
     # Change "." to ","
     mutate(
-        Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major`, "\\.", ","),
+        Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
         Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
         Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
         Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
