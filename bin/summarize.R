@@ -536,6 +536,6 @@ if ("^Major_minor$" %in% colnames(lw_import)) {
 }
 
 # Write file
-write_csv2(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
+write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
 
 
