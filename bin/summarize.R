@@ -523,11 +523,11 @@ lw_import <- final %>%
          -Reads_nodup_mapped_first_mapping,
          -Minor_cov_breadth_min_1
          ) %>%
-    # Convert "YES" to "Typbar" and "NO" to "Ikke typbar" in the "Majority quality:" and "Minor quality:" columns
-    mutate(`Majority quality:` = case_when(`Majority quality:` == "YES" ~ "Typbar",
-                                           `Majority quality:` == "NO" ~ "Ikke typbar")) %>%
-    mutate(`Minor quality:` = case_when(`Minor quality:` == "YES" ~ "Typbar",
-                                        `Minor quality:` == "NO" ~ "Ikke typbar"))
+  # Convert "YES" to "Typbar" and "NO" to "Ikke typbar" in the "Majority quality:" and "Minor quality:" columns
+  mutate(`Majority quality:` = case_when(`Majority quality:` == "YES" ~ "Typbar",
+                                         `Majority quality:` == "NO" ~ "Ikke typbar")) %>%
+  mutate(`Minor quality:` = case_when(`Minor quality:` == "YES" ~ "Typbar",
+                                      `Minor quality:` == "NO" ~ "Ikke typbar"))
 
 # Remove column "Major_minor" if exists
 # This column is not present if GLUE is dropped
