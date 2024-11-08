@@ -479,18 +479,18 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 
 lw_import <- final %>%
     # Change "." to ","
-    mutate(
-        Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
-        Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
-        Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
-        Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
-        Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
-        abundance_minor = str_replace(abundance_minor, "\\.", ","),
-        Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
-        Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
-        Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
-        Minor_cov_breadth_min_10 = str_replace(Minor_cov_breadth_min_10, "\\.", ",")
-  ) %>%
+    #mutate(
+    #    Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
+    #    Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
+    #    Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
+    #    Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
+    #    Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
+    #    abundance_minor = str_replace(abundance_minor, "\\.", ","),
+    #    Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
+    #    Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
+    #    Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
+    #    Minor_cov_breadth_min_10 = str_replace(Minor_cov_breadth_min_10, "\\.", ",")
+  #) %>%
   select("Sample" = sampleName,
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
@@ -536,6 +536,6 @@ if ("^Major_minor$" %in% colnames(lw_import)) {
 }
 
 # Write file
-write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
+write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv", dec = ",")
 
 
