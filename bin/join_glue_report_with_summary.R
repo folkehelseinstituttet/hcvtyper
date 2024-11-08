@@ -24,5 +24,9 @@ if (nrow(glue_report) > 0) {
     select(-Major_minor)
 }
 
+# Convert "." to "," as decimal separators
+final <- final %>%
+    mutate(across(where(is.numeric), ~ format(., decimal.mark = ",", scientific = FALSE)))
+
 # Write file
-write_csv2(final, file = "Genotype_mapping_summary_long_LW_import_with_glue.csv")
+write_tsv(final, file = "Genotype_mapping_summary_long_LW_import_with_glue.tsv")
