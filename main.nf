@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    niph/viralseq
+    folkehelseinstituttet/viralseq
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/niph/viralseq
+    Github : https://github.com/folkehelseinstituttet/viralseq
 ----------------------------------------------------------------------------------------
 */
 
@@ -72,9 +72,9 @@ if (params.platform == 'illumina' & params.agens == 'HCV') {
 }
 
 //
-// WORKFLOW: Run main niph/viralseq analysis pipeline
+// WORKFLOW: Run main folkehelseinstituttet/viralseq analysis pipeline
 //
-workflow NIPH_VIRALSEQ {
+workflow VIRALSEQ {
 
     //
     // WORKFLOW: HCV genome assembly and analysis from Illumina capture data
@@ -107,7 +107,7 @@ workflow NIPH_VIRALSEQ {
 // See: https://github.com/nf-core/rnaseq/issues/619
 //
 workflow {
-    NIPH_VIRALSEQ ()
+    VIRALSEQ ()
 }
 
 /*
