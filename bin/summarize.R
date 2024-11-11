@@ -7,7 +7,7 @@ args = commandArgs(trailingOnly=TRUE)
 # Define variables --------------------------------------------------------
 
 # NB! Script name is currently hard coded. Needs to be changed
-script_name_version <- "viralseq v. dev"
+script_name_version <- "viralseq v1.0"
 stringency_1 <- args[1]
 stringency_2 <- args[2]
 
