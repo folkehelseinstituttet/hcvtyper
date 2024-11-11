@@ -1,4 +1,4 @@
-# ![folkehelseinstituttet/viralseq](docs/images/logo-engelsk-hele-navnet.jpg#gh-light-mode-only) ![niph/viralseq](docs/images/logo-engelsk-hele-navnet-hvit.png#gh-dark-mode-only)
+# ![folkehelseinstituttet/viralseq](docs/images/logo-engelsk-hele-navnet.jpg#gh-light-mode-only) ![folkehelseinstituttet/viralseq](docs/images/logo-engelsk-hele-navnet-hvit.png#gh-dark-mode-only)
 
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
@@ -21,7 +21,7 @@ nextflow run folkehelseinstituttet/viralseq/main.nf -r master -profile docker,te
 ## Citations
 
 <!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use  niph/viralseq for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
+<!-- If you use  folkehelseinstituttet/viralseq for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
 
 <!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
 
