@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased  
 
 ### `Added`  
+
+### `Fixed`  
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.0.1 - 2024.11.24  
+
+### `Added`  
 Adhere versioning to Semantic Versioning. 
 
 ### `Fixed`  
