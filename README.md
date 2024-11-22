@@ -14,7 +14,7 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 ## Usage
 To run a minimal test:
 ```
-nextflow run folkehelseinstituttet/viralseq/main.nf -r master -profile docker,test_illumina
+nextflow run folkehelseinstituttet/viralseq -r v1.0 -profile docker,test_illumina
 ```
 
 
