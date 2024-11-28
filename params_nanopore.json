@@ -1,0 +1,30 @@
+{
+    "agens": "HBV",
+    "//agens_comment": "HCV, ROV, HBV, PE",
+    "platform": "nanopore",
+    "//platform_comment": "illumina or nanopore",
+    "input": "Grid465_samplesheet.csv",
+    "outdir": "TEST",
+    "parameter_file": "params_nanopore.json",
+    "//parameter_file_comment": "The name of this file. Used for copying inside the workflow",
+    "genome": "HBV_B_NC_003977",
+    "fasta": "data/primer-schemes/Ringlander/V4/Ringlander.reference.fasta",
+    "fastq_dir": "data/fastq_pass",
+    "primer_set": "Ringlander",
+    "primer_set_version": 1,
+    "artic_minion_aligner": "minimap2",
+    "artic_minion_caller": "medaka",
+    "artic_minion_medaka_model": "r1041_e82_400bps_hac_g615",
+    "artic_scheme": "Ringlander",
+    "skip_pangolin": true,
+    "skip_nextclade": true,
+    "skip_asciigenome": true,
+    "skip_variants_quast": true,
+    "skip_variants_long_table": true,
+    "skip_mosdepth": true,
+    "skip_snpeff": true,
+    "skip_minion": true,
+    "skip_medaka": true
+}
+
+

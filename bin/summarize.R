@@ -2,7 +2,15 @@
 
 library(tidyverse)
 
-# Number of mapped reads --------------------------------------------------
+args = commandArgs(trailingOnly=TRUE)
+
+# Define variables --------------------------------------------------------
+
+# NB! Script name is currently hard coded. Needs to be changed
+script_name_version <- "viralseq v1.0.1"
+stringency_1 <- args[1]
+stringency_2 <- args[2]
+
 path_1 <- "cutadapt/"
 path_2 <- "kraken_classified/"
 path_3 <- "stats_withdup/"
@@ -10,6 +18,7 @@ path_4 <- "stats_markdup/"
 path_5 <- "depth/"
 path_6 <- "blast/"
 path_7 <- "glue/"
+path_8 <- "id/"
 
 
 
@@ -35,7 +44,7 @@ for (i in 1:length(cutadapt_files)) {
 
   if (nrow(raw) > 0) {
     tmp <- str_split(raw, "\\s+")[[1]] # Split on white space and get the list content
-    tmp <- as.numeric(str_remove(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
+    tmp <- as.numeric(str_remove_all(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
     tmp <- tmp*2 # Double to get reads
     cutadapt_df$total_raw_reads[i] <- tmp
   }
@@ -44,7 +53,7 @@ for (i in 1:length(cutadapt_files)) {
 
   if (nrow(trimmed) > 0) {
     tmp <- str_split(trimmed, "\\s+")[[1]] # Split on white space and get the list content
-    tmp <- as.numeric(str_remove(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
+    tmp <- as.numeric(str_remove_all(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
     tmp <- tmp*2 # Double to get reads
     cutadapt_df$total_trimmed_reads[i] <- tmp
   }
@@ -196,12 +205,15 @@ df_nodups <- tmp_df %>%
 
 # Coverage ----------------------------------------------------------------
 
+# Add both breadth (in percent) and depth (average depth)
+# All this is without duplicates
+
 # List files
 cov_files <- list.files(path = path_5, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_5", "first_major_minor")
+tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 7))
+colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth")
 
 for (i in 1:length(cov_files)) {
   try(rm(cov))
@@ -221,19 +233,40 @@ for (i in 1:length(cov_files)) {
   # Reference length
   ref_length <- nrow(cov)
 
-  # Nr. of positions with coverage >= 5
+  # Average depth
+  tmp_df$avg_depth[i] <- mean(cov$X3)
+
+  # Nr. of positions with coverage >=1, >= 5 and > 9
   # If ref_length is zero it means that no reads were mapped. Set coverage to zero.
   # Coverage may also be zero if there are reads mapped, but never more than 5 per position
   if (ref_length > 0) {
-    pos <- nrow(
+    pos_1 <- nrow(
+      cov %>%
+        filter(X3 >= 1)
+    )
+
+    pos_5 <- nrow(
       cov %>%
         filter(X3 >= 5)
     )
+
+    pos_10 <- nrow(
+      cov %>%
+        filter(X3 > 9)
+    )
     # Coverage breadth
-    breadth <- round(pos / ref_length * 100, digits = 2)
-    tmp_df$cov_breadth_min_5[i] <- breadth
+    breadth_1 <- round(pos_1 / ref_length * 100, digits = 2)
+    tmp_df$cov_breadth_min_1[i] <- breadth_1
+
+    breadth_5 <- round(pos_5 / ref_length * 100, digits = 2)
+    tmp_df$cov_breadth_min_5[i] <- breadth_5
+
+    breadth_10 <- round(pos_10 / ref_length * 100, digits = 2)
+    tmp_df$cov_breadth_min_10[i] <- breadth_10
   } else if (ref_length == 0) {
+    tmp_df$cov_breadth_min_1[i] <- 0
     tmp_df$cov_breadth_min_5[i] <- 0
+    tmp_df$cov_breadth_min_10[i] <- 0
   }
 }
 
@@ -244,15 +277,22 @@ df_coverage <- tmp_df %>%
   # Don't need first mapping data
   filter(reference != "first_mapping") %>%
   # Create columns for major and minor coverage
+  mutate(Major_cov_breadth_min_1 = case_when(first_major_minor == "major" ~ cov_breadth_min_1)) %>%
+  mutate(Minor_cov_breadth_min_1 = case_when(first_major_minor == "minor" ~ cov_breadth_min_1)) %>%
   mutate(Major_cov_breadth_min_5 = case_when(first_major_minor == "major" ~ cov_breadth_min_5)) %>%
   mutate(Minor_cov_breadth_min_5 = case_when(first_major_minor == "minor" ~ cov_breadth_min_5)) %>%
+  mutate(Major_cov_breadth_min_10 = case_when(first_major_minor == "major" ~ cov_breadth_min_10)) %>%
+  mutate(Minor_cov_breadth_min_10 = case_when(first_major_minor == "minor" ~ cov_breadth_min_10)) %>%
+  # Create columns for major and minor average depth
+  mutate(Major_avg_depth = case_when(first_major_minor == "major" ~ avg_depth)) %>%
+  mutate(Minor_avg_depth = case_when(first_major_minor == "minor" ~ avg_depth)) %>%
   # Create columns for the major and minor references
   mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
   mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
   mutate(Major_reference = str_remove(Major_reference, "_major"),
          Minor_reference = str_remove(Minor_reference, "_minor")) %>%
   # Create one row per sample
-  select(-reference, -first_major_minor, -cov_breadth_min_5) %>%
+  select(-reference, -first_major_minor, -cov_breadth_min_1, -cov_breadth_min_5, -cov_breadth_min_10, -avg_depth) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
@@ -307,19 +347,77 @@ if (nrow(glue_report) > 0) {
     filter(Major_minor == "major")
 }
 
+# Sequencer ID ------------------------------------------------------------
+id_files <- list.files(path = path_8, pattern = "sequencerID.tsv$", full.names = TRUE)
+
+if (length(id_files > 0)) {
+    # Empty df
+    id_df <- as.data.frame(matrix(nrow = length(id_files), ncol = 2))
+    colnames(id_df) <- c("sampleName", "sequencer_id")
+}
+
+for (i in 1:length(id_files)) {
+  try(rm(id))
+
+  # Get sample name
+  id_df$sampleName[i] <- str_split(basename(id_files[i]), "\\.")[[1]][1]
+
+  # Get the sequencer id
+  id <- read_tsv(id_files[i], col_names = FALSE)
+
+  # Extract the first field if header does not start with '@SRR'
+  if (str_detect(id$X1, "^@SRR")) {
+    id_df$sequencer_id[i] <- id %>% pull(X1)
+  } else {
+    id_df$sequencer_id[i] <- id %>%
+      # Extract string up to the first ":".
+      # The "?" means a "lazy", or non-greedy, match to get the shortest string that satisfies the criteria.
+      # This is useful because there are several ":"
+      str_extract("^.*?:") %>%
+      # Remove the leading "@" and the trailing ":"
+      str_remove_all("^@|:$")
+  }
+}
+
+id_df <- as_tibble(id_df)
+
 # Join dataframes ---------------------------------------------------------
 
 final <-
   # Combine mapped reads data
   full_join(df_with_dups, df_nodups, join_by(sampleName, Major_reference, Minor_reference)) %>%
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  # Add sequencer id
+  left_join(id_df, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
     # Add glue result. Only Majority currently
     left_join(glue_report, by = c("sampleName" = "Sample"))
 }
+
+# Add percentage of total classified reads belonging to major and minor genotype. Duplicates included. As a proxy for abundance.
+final <- final %>%
+  mutate(abundance_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
+  mutate(abundance_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
+
+# Add script name and version
+final <- final %>%
+  add_column("script_name_stringency" = script_name_version)
+
+
+# Decide if a sample is "typbar" or not
+
+final <- final %>%
+  mutate(major_typbar = case_when(
+    Major_cov_breadth_min_1 >= 10 & Major_avg_depth >= 2 ~ "YES",
+    .default = "NO"
+  )) %>%
+  mutate(minor_typbar = case_when(
+    Minor_cov_breadth_min_1 >= 10 & Minor_avg_depth >= 2 ~ "YES",
+    .default = "NO"
+  ))
 
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>%
@@ -341,12 +439,15 @@ final <- final %>%
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
          Major_cov_breadth_min_5,
+         Major_cov_breadth_min_10,
+         abundance_major,
          Reads_withdup_mapped_minor,
          Reads_nodup_mapped_minor,
          Percent_reads_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
-         everything()) #%>%
-  #select(-Reference, -Major_minor)
+         Minor_cov_breadth_min_10,
+         abundance_minor,
+         everything())
 
 # Write file
 write_csv(final, file = "Genotype_mapping_summary_long.csv")
@@ -372,3 +473,69 @@ tt %>% colnames() %>% paste0(collapse = ",") %>% write_lines(file, append = TRUE
 
 # Write the data to file
 write_csv(tt, file, append = TRUE) # colnames will not be included
+
+
+# Create LW import --------------------------------------------------------
+
+lw_import <- final %>%
+    # Change "." to ","
+    #mutate(
+    #    Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
+    #    Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
+    #    Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
+    #    Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
+    #    Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
+    #    abundance_minor = str_replace(abundance_minor, "\\.", ","),
+    #    Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
+    #    Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
+    #    Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
+    #    Minor_cov_breadth_min_10 = str_replace(Minor_cov_breadth_min_10, "\\.", ",")
+  #) %>%
+  select("Sample" = sampleName,
+         "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
+         "Majority genotype:" = Major_genotype_mapping,
+         "Number of mapped reads:" = Reads_withdup_mapped_major,
+         "Percent covered:" = Major_cov_breadth_min_1,
+         "Number of mapped reads without duplicates:" = Reads_nodup_mapped_major,
+         "Average depth without duplicates:" = Major_avg_depth,
+         "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
+         "Percent covered above depth=9 without duplicates:" = Major_cov_breadth_min_10,
+         "Most abundant minority genotype:" = Minor_genotype_mapping,
+         "Percent most abundant minority genotype:" = abundance_minor,
+         "Number of mapped reads minor:" = Reads_withdup_mapped_minor,
+         "Percent covered minor:" = Minor_cov_breadth_min_5,
+         "Number of mapped reads minor without duplicates:" = Reads_nodup_mapped_minor,
+         "Average depth minor without duplicates:" = Minor_avg_depth,
+         "Percent covered above depth=5 minor without duplicates:" = Minor_cov_breadth_min_5,
+         "Percent covered above depth=9 minor without duplicates:" = Minor_cov_breadth_min_10,
+         "Script name and stringency:" = script_name_stringency,
+         "Total number of reads before trim:" = total_raw_reads,
+         "Total number of reads after trim:" = total_trimmed_reads,
+         "Majority quality:" = major_typbar,
+         "Minor quality:" = minor_typbar,
+         everything()
+         ) %>%
+  select(-total_classified_reads,
+         -Major_reference,
+         -Minor_reference,
+         -abundance_major,
+         -Percent_reads_mapped_of_trimmed_with_dups_minor,
+         -Reads_nodup_mapped_first_mapping,
+         -Minor_cov_breadth_min_1
+         ) %>%
+  # Convert "YES" to "Typbar" and "NO" to "Ikke typbar" in the "Majority quality:" and "Minor quality:" columns
+  mutate(`Majority quality:` = case_when(`Majority quality:` == "YES" ~ "Typbar",
+                                         `Majority quality:` == "NO" ~ "Ikke typbar")) %>%
+  mutate(`Minor quality:` = case_when(`Minor quality:` == "YES" ~ "Typbar",
+                                      `Minor quality:` == "NO" ~ "Ikke typbar"))
+
+# Remove column "Major_minor" if exists
+# This column is not present if GLUE is dropped
+if ("^Major_minor$" %in% colnames(lw_import)) {
+  lw_import <- lw_import %>% select(-Major_minor)
+}
+
+# Write file
+write_csv(lw_import, file = "Genotype_mapping_summary_long_LW_import.csv")
+
+
