@@ -79,13 +79,10 @@ for (x in 1:length(json_files)) {
     if (length(grep("^DEBUG", json)) > 0) {
       # Remove these lines
       json <- json[-grep("^DEBUG", json)]
-      # Write the cleaned json file back to disk
-      writeLines(json, json_files[x])
       
       # And then check if the first line is empty and remove that
       if (json[1] == "") {
         json <- json[-1]
-        writeLines(json, json_files[x])
       }
     }
 
