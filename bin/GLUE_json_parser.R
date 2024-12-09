@@ -70,9 +70,27 @@ df_final <- tibble(
 for (x in 1:length(json_files)) {
   # Remove any old objects if reading previous json file failed
   try(rm(json))
+  
+  # Need to check if there are any lines starting with "DEBUG" in the json files and remove these
+  
+  json <- readLines(json_files[x]) # Read the json file line by line
+    
+    # Check if there are any lines starting with "DEBUG"
+    if (length(grep("^DEBUG", json)) > 0) {
+      # Remove these lines
+      json <- json[-grep("^DEBUG", json)]
+      # Write the cleaned json file back to disk
+      writeLines(json, json_files[x])
+      
+      # And then check if the first line is empty and remove that
+      if (json[1] == "") {
+        json <- json[-1]
+        writeLines(json, json_files[x])
+      }
+    }
 
-  # Try to read json file. Could fail if bam file was not OK for Glue
-  try(json <- read_json(json_files[x]))
+  # Try to parse json object. Could fail if bam file was not OK for Glue
+  try(json <- parse_json(json))
 
   # Check that the json object exists
   if (exists("json")) {
