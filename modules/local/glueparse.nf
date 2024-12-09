@@ -19,7 +19,7 @@ process GLUEPARSE {
 
     script:
     """
-    GLUE_json_parser.R
+    GLUE_json_parser.R major
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
