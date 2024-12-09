@@ -1,5 +1,5 @@
 process HCVGLUE {
-    
+
     label 'process_low'
 
     // conda "YOUR-TOOL-HERE"
@@ -21,19 +21,36 @@ process HCVGLUE {
     # Copy bam files from bams/ directory so they are not present in work directory as links.
     # This is for mounting to the docker image later
     #cp bams/*.bam .
-    
+
     # Pull the latest images
-    docker pull cvrbioinformatics/gluetools-mysql:latest
-    docker pull cvrbioinformatics/gluetools:latest
+    #docker pull cvrbioinformatics/gluetools-mysql:latest
+    #docker pull cvrbioinformatics/gluetools:latest
 
     # Start the gluetools-mysql containter
     # Remove the container in case it is already running
-    #docker stop gluetools-mysql
-    #docker rm gluetools-mysql
-    #docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
+    docker stop gluetools-mysql
+    docker rm gluetools-mysql
+    docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
 
     # Install the pre-built GLUE HCV project
-    docker start gluetools-mysql
+    #docker start gluetools-mysql
+    TIMEOUT=300
+    START_TIME=\$(date +%s)
+
+    until docker exec gluetools-mysql mysql --user=root --password=root123 -e "status" &> /dev/null
+    do
+    echo "Waiting for database connection..."
+    # Wait for two seconds before checking again
+    sleep 2
+
+    # Check if the timeout has been reached
+    CURRENT_TIME=\$(date +%s)
+    ELAPSED_TIME=\$((CURRENT_TIME - START_TIME))
+    if [ \$ELAPSED_TIME -ge \$TIMEOUT ]; then
+        echo "Timeout reached. Exiting script."
+        exit 1
+    fi
+    done
     docker exec gluetools-mysql installGlueProject.sh ncbi_hcv_glue
 
     # Make a for loop over all bam files and run HCV-GLUE
@@ -49,20 +66,20 @@ process HCVGLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
          -p cmd-result-format:json \
         -EC \
-        -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam}.json || true
+        -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam%".bam"}.json || true
     done
 
-    #docker stop gluetools-mysql 
+    #docker stop gluetools-mysql
     # Remove the image
     #docker rm gluetools-mysql
-    
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
       \$(grep "projectVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
       \$(grep "engineVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
       \$(grep "extensionVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
-    END_VERSIONS   
+    END_VERSIONS
     """
 
     stub:
