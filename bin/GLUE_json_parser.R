@@ -89,6 +89,9 @@ for (x in 1:length(json_files)) {
       }
     }
 
+  # Only parse the json object if the second element contains the string "phdrReport"
+  if (grepl("phdrReport", json[2])) {
+    
   # Try to parse json object. Could fail if bam file was not OK for Glue
   try(json <- parse_json(json))
 
@@ -224,7 +227,7 @@ for (x in 1:length(json_files)) {
     }
   }
   }
-
+}
   # Then join mutations per drug category
   tmp <- as_tibble(df)
 
