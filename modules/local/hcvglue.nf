@@ -3,9 +3,9 @@ process HCVGLUE {
     label 'process_low'
 
     // conda "YOUR-TOOL-HERE"
-     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-         'docker.io/docker:24.0.7-cli-alpine3.18' }"
+    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    //     'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
+    //     'docker.io/docker:24.0.7-cli-alpine3.18' }"
 
     stageInMode = 'copy' // Can't mount symlinked files into docker containers
 
@@ -18,13 +18,17 @@ process HCVGLUE {
 
     script:
     """
-    # Copy bam files from bams/ directory so they are not present in work directory as links.
-    # This is for mounting to the docker image later
-    #cp bams/*.bam .
-
     # Remove the container in case it is already running
-    docker stop gluetools-mysql
-    docker rm gluetools-mysql
+    if docker ps -a --filter "name=gluetools-mysql" --format '{{.Names}}' | grep -q "^gluetools-mysql\$"; then
+        echo "Container 'gluetools-mysql' is running or exists."
+        # Stop the container
+        docker stop gluetools-mysql
+        # Remove the container
+        docker rm gluetools-mysql
+        echo "Container 'gluetools-mysql' has been stopped and removed."
+    else
+        echo "Container 'gluetools-mysql' is not running or does not exist."
+    fi
 
     # Pull the latest images
     docker pull cvrbioinformatics/gluetools-mysql:latest
@@ -32,7 +36,6 @@ process HCVGLUE {
 
     # Start the gluetools-mysql containter
     docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
-    docker start gluetools-mysql
 
     # Install the pre-built GLUE HCV project
     TIMEOUT=300
@@ -70,9 +73,18 @@ process HCVGLUE {
         -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam%".bam"}.json || true
     done
 
-    #docker stop gluetools-mysql
-    # Remove the image
-    #docker rm gluetools-mysql
+    # Then create html files
+    for bam in \$(ls *.bam)
+    do
+    docker run --rm \
+        --name gluetools \
+        -v \$PWD:/opt/bams \
+        -w /opt/bams \
+        --link gluetools-mysql \
+        cvrbioinformatics/gluetools:latest gluetools.sh \
+    	--console-option log-level:FINEST \
+        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml \${bam} 15.0 \${bam%".bam"}.html || true
+done
 
 
     cat <<-END_VERSIONS > versions.yml
