@@ -3,9 +3,9 @@ process HCVGLUE {
     label 'process_low'
 
     // conda "YOUR-TOOL-HERE"
-    // container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-    //     'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-    //     'docker.io/docker:24.0.7-cli-alpine3.18' }"
+     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
+         'docker.io/docker:24.0.7-cli-alpine3.18' }"
 
     stageInMode = 'copy' // Can't mount symlinked files into docker containers
 
