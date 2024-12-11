@@ -32,9 +32,9 @@ process HCVGLUE {
 
     # Start the gluetools-mysql containter
     docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
+    docker start gluetools-mysql
 
     # Install the pre-built GLUE HCV project
-    #docker start gluetools-mysql
     TIMEOUT=300
     START_TIME=\$(date +%s)
 
