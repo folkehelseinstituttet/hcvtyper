@@ -22,14 +22,15 @@ process HCVGLUE {
     # This is for mounting to the docker image later
     #cp bams/*.bam .
 
-    # Pull the latest images
-    #docker pull cvrbioinformatics/gluetools-mysql:latest
-    #docker pull cvrbioinformatics/gluetools:latest
-
-    # Start the gluetools-mysql containter
     # Remove the container in case it is already running
     docker stop gluetools-mysql
     docker rm gluetools-mysql
+
+    # Pull the latest images
+    docker pull cvrbioinformatics/gluetools-mysql:latest
+    docker pull cvrbioinformatics/gluetools:latest
+
+    # Start the gluetools-mysql containter
     docker run --detach --name gluetools-mysql cvrbioinformatics/gluetools-mysql:latest
 
     # Install the pre-built GLUE HCV project
