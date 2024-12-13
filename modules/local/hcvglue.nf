@@ -13,8 +13,9 @@ process HCVGLUE {
     path '*'
 
     output:
-    path("*.json"), optional: true, emit: GLUE_json
-    path "versions.yml"                            , emit: versions
+    path("*.json")     , optional: true, emit: GLUE_json
+    path("*.html")     , optional: true, emit: GLUE_html
+    path "versions.yml", emit: versions
 
     script:
     """
@@ -84,14 +85,14 @@ process HCVGLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
     	--console-option log-level:FINEST \
         --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml \${bam} 15.0 \${bam%".bam"}.html || true
-done
+    done
 
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-      \$(grep "projectVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
-      \$(grep "engineVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
-      \$(grep "extensionVersion" *.json | awk '{print \$2}' | uniq | tr -d '"' | tr -d "," | sed 's/:/: /g')
+        GLUE project version: \$(ls *.json | head -n 1 | xargs -I {} grep -oP '"projectVersion"\\s*:\\s*"\\K[^"]+' {})
+        GLUE engine version: \$(ls *.json | head -n 1 | xargs -I {} grep -oP '"engineVersion"\\s*:\\s*"\\K[^"]+' {})
+        GLUE extension version: \$(ls *.json | head -n 1 | xargs -I {} grep -oP '"extensionVersion"\\s*:\\s*"\\K[^"]+' {})
     END_VERSIONS
     """
 
