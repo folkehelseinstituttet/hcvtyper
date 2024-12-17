@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Added`
 
 ### `Fixed`
-HCV_GLUE process now runs with the docker profile.
+HCV_GLUE process now runs with the docker profile.  
+Write final summary file as tsv and not csv
 
 ### `Dependencies`
 
