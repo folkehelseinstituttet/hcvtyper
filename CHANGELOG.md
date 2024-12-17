@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Deprecated`
 
+## v1.0.3 - 2024.12.17
+
+### `Added`
+
+### `Fixed`
+HCV_GLUE process now runs with the docker profile.
+
+### `Dependencies`
+
+### `Deprecated`
+
 ## v1.0.2 - 2024.12.09
 
 ### `Added`
