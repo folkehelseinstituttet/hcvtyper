@@ -1,0 +1,25 @@
+id: viralseq
+name: viralseq
+description: Assemble HCV genomes and genotype
+version: dev
+website: https://github.com/folkehelseinstituttet/viralseq
+author: Jon Bråte
+logo:
+
+workflow:
+  steps:
+    - name: Run pipeline
+      script: folkehelseinstituttet/viralseq
+      revision: dev
+
+  inputs:
+    - id: input
+      description: IDs
+      type: textarea
+      value: "SRR12696236"
+      writeFile: "ids.csv"
+
+  outputs:
+    - id: outdir
+      description: Output
+      type: local_folder
