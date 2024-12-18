@@ -284,8 +284,6 @@ workflow HCV_ILLUMINA {
         SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv), // val(meta), path(idxstats), path(tsv)
         file(params.references)
     )
-
-    ALIGN_READS(input_ch)
     
     // Filter BAM files smaller than 1MB
     ch_sormadup = ch_aligned.out.map { meta, bam ->
