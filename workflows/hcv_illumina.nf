@@ -285,9 +285,21 @@ workflow HCV_ILLUMINA {
         file(params.references)
     )
 
+    ALIGN_READS(input_ch)
+    
+    // Filter BAM files smaller than 1MB
+    ch_sormadup = ch_aligned.out.map { meta, bam ->
+        def bamSize = bam.size()
+        if (bamSize >= 1024 * 1024) {  // 1MB in bytes
+            return tuple(meta, bam)
+        } else {
+            return null
+        }
+    }.filter { it != null }
+
     // Remove duplicate reads
     SAMTOOLS_SORMADUP (
-        ch_aligned,
+        ch_sormadup,
         [ [], file(params.references) ]
     )
     ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
