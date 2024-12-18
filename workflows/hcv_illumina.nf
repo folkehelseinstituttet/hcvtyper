@@ -286,7 +286,7 @@ workflow HCV_ILLUMINA {
     )
     
     // Filter BAM files smaller than 1MB
-    ch_sormadup = ch_aligned.out.map { meta, bam ->
+    ch_sormadup = ch_aligned.map { meta, bam ->
         def bamSize = bam.size()
         if (bamSize >= 1024 * 1024) {  // 1MB in bytes
             return tuple(meta, bam)
