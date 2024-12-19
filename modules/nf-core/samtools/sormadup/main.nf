@@ -16,8 +16,8 @@ process SAMTOOLS_SORMADUP {
     tuple val(meta), path("*.cram")     , emit: cram, optional: true
     tuple val(meta), path("*.csi")      , emit: csi,  optional: true
     tuple val(meta), path("*.crai")     , emit: crai, optional: true
-    tuple val(meta), path("*.metrics")  , emit: metrics
-    path "versions.yml"                 , emit: versions
+    tuple val(meta), path("*.metrics")  , emit: metrics, optional: true
+    path "versions.yml"                 , emit: versions, optional: true
 
     when:
     task.ext.when == null || task.ext.when
