@@ -112,14 +112,16 @@ if (length(minor_ref > 0)) {
 }
 
 # How many reads mapped to the minor subtype
-minor_reads <- summary %>%
-  filter(Subtype == minor_tmp) %>%
-  pull(reads)
+if (length(minor_tmp > 0)) {
+    minor_reads <- summary %>%
+      filter(Subtype == minor_tmp) %>%
+      pull(reads)
 
-df_final$minor_reads[1] <- minor_reads
+    df_final$minor_reads[1] <- minor_reads
 
-# Add minor coverage
-df_final$minor_cov[1] <- df %>% filter(X1 == minor_ref) %>% pull(percent_gt_4_int)
+    # Add minor coverage
+    df_final$minor_cov[1] <- df %>% filter(X1 == minor_ref) %>% pull(percent_gt_4_int)
+    }
 }
 
 # Write results
