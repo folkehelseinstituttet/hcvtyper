@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+Ignoring errors in the SAMTOOLS_SORMADUP module after the first mapping. When using the Tanoti mapper many bam files fails in this step for some reason.
+
 ### `Fixed`
 
 ### `Dependencies`
@@ -18,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Added`
 
 ### `Fixed`
-HCV_GLUE process now runs with the docker profile.  
+HCV_GLUE process now runs with the docker profile.
 Write final summary file as tsv and not csv
 
 ### `Dependencies`
