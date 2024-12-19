@@ -1,6 +1,7 @@
 process SAMTOOLS_SORMADUP {
     tag "$meta.id"
     label 'process_medium'
+    errorStrategy 'ignore'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
