@@ -399,12 +399,12 @@ workflow HCV_ILLUMINA {
         HCVGLUE_MAJOR (
             MAJOR_MAPPING.out.aligned
         )
-        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
+        ch_versions = ch_versions.mix(HCVGLUE_MAJOR.out.versions)
 
         HCVGLUE_MINOR (
             MINOR_MAPPING.out.aligned
         )
-        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
+        ch_versions = ch_versions.mix(HCVGLUE_MINOR.out.versions)
 
         // Collect all glue reports
         ch_glueparse = HCVGLUE_MAJOR.out.GLUE_json.collect{ it[1] }.mix(HCVGLUE_MINOR.out.GLUE_json.collect{ it[1] }.ifEmpty([]))
