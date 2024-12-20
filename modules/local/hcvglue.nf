@@ -17,8 +17,6 @@ process HCVGLUE {
     path("*.html")     , optional: true, emit: GLUE_html
     path "versions.yml", emit: versions
 
-    def prefix = task.ext.prefix ?: "${meta.id}"
-
     script:
     """
     # Remove the container in case it is already running
@@ -69,7 +67,7 @@ process HCVGLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
          -p cmd-result-format:json \
         -EC \
-        -i project hcv module phdrReportingController invoke-function reportBam ${bam} 15.0 > ${bam%".bam"}.json || true
+        -i project hcv module phdrReportingController invoke-function reportBam ${bam} 15.0 > "${bam.baseName}.json"
 
     # Then create html report
     docker run --rm \
@@ -79,7 +77,7 @@ process HCVGLUE {
         --link gluetools-mysql \
         cvrbioinformatics/gluetools:latest gluetools.sh \
     	--console-option log-level:FINEST \
-        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml ${bam} 15.0 ${bam%".bam"}.html || true
+        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml ${bam} 15.0 "${bam.baseName}.html"
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
