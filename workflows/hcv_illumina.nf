@@ -78,7 +78,8 @@ include { INSTRUMENT_ID                       } from '../modules/local/instrumen
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
-include { HCVGLUE                             } from '../modules/local/hcvglue'
+include { HCVGLUE as HCVGLUE_MAJOR            } from '../modules/local/hcvglue'
+include { HCVGLUE as HCVGLUE_MINOR            } from '../modules/local/hcvglue'
 include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
 include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
@@ -395,15 +396,20 @@ workflow HCV_ILLUMINA {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
-        // Collect the bam files from the major and minor mapping
-        ch_hcv = MAJOR_MAPPING.out.aligned.collect{ it[1] }.mix(MINOR_MAPPING.out.aligned.collect{ it[1] }.ifEmpty([]))
-        HCVGLUE (
-            ch_hcv.collect()
+        HCVGLUE_MAJOR (
+            MAJOR_MAPPING.out.aligned
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
 
+        HCVGLUE_MINOR (
+            MINOR_MAPPING.out.aligned
+        )
+        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
+
+        // Collect all glue reports
+        ch_glueparse = HCVGLUE_MAJOR.out.GLUE_json.collect{ it[1] }.mix(HCVGLUE_MINOR.out.GLUE_json.collect{ it[1] }.ifEmpty([]))
         HCV_GLUE_PARSER (
-            HCVGLUE.out.GLUE_json
+            ch_glueparse
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }

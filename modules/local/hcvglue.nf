@@ -10,12 +10,14 @@ process HCVGLUE {
     stageInMode = 'copy' // Can't mount symlinked files into docker containers
 
     input:
-    path '*'
+    tuple val(meta), path(bam)
 
     output:
     path("*.json")     , optional: true, emit: GLUE_json
     path("*.html")     , optional: true, emit: GLUE_html
     path "versions.yml", emit: versions
+
+    def prefix = task.ext.prefix ?: "${meta.id}"
 
     script:
     """
@@ -58,11 +60,7 @@ process HCVGLUE {
     done
     docker exec gluetools-mysql installGlueProject.sh ncbi_hcv_glue
 
-    # Make a for loop over all bam files and run HCV-GLUE
-    ## Adding || true to the end of the command to prevent the pipeline from failing if the bam file is not valid
-
-    for bam in \$(ls *.bam)
-    do
+    # First create json report
     docker run --rm \
        --name gluetools \
         -v \$PWD:/opt/bams \
@@ -71,12 +69,9 @@ process HCVGLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
          -p cmd-result-format:json \
         -EC \
-        -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam%".bam"}.json || true
-    done
+        -i project hcv module phdrReportingController invoke-function reportBam ${bam} 15.0 > ${bam%".bam"}.json || true
 
-    # Then create html files
-    for bam in \$(ls *.bam)
-    do
+    # Then create html report
     docker run --rm \
         --name gluetools \
         -v \$PWD:/opt/bams \
@@ -84,9 +79,7 @@ process HCVGLUE {
         --link gluetools-mysql \
         cvrbioinformatics/gluetools:latest gluetools.sh \
     	--console-option log-level:FINEST \
-        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml \${bam} 15.0 \${bam%".bam"}.html || true
-    done
-
+        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml ${bam} 15.0 ${bam%".bam"}.html || true
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
