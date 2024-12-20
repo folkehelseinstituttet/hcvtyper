@@ -1,7 +1,6 @@
 process SAMTOOLS_SORMADUP {
     tag "$meta.id"
     label 'process_medium'
-    errorStrategy 'ignore'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -17,8 +16,8 @@ process SAMTOOLS_SORMADUP {
     tuple val(meta), path("*.cram")     , emit: cram, optional: true
     tuple val(meta), path("*.csi")      , emit: csi,  optional: true
     tuple val(meta), path("*.crai")     , emit: crai, optional: true
-    tuple val(meta), path("*.metrics")  , emit: metrics, optional: true
-    path "versions.yml"                 , emit: versions, optional: true
+    tuple val(meta), path("*.metrics")  , emit: metrics
+    path "versions.yml"                 , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
