@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+### `Fixed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.0.4 - 2025.01.07
+
+### `Added`
+
 Ignoring errors in the SAMTOOLS_SORMADUP module after the first mapping. When using the Tanoti mapper many bam files fails in this step for some reason.
 
 ### `Fixed`
+SUMMARIZE module expects tsv and not csv as output.
+Reverted back to running GLUE outside of Nextflow. Some bugs in the module.
 
 ### `Dependencies`
 
