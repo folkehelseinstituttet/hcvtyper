@@ -23,7 +23,7 @@ process SUMMARIZE_HCV {
     output:
     path '*long.csv'        , emit: summary
     path '*mqc.csv'         , emit: mqc
-    path '*LW_import.csv'   , emit: lw
+    path '*LW_import.tsv'   , emit: lw
     path "versions.yml"     , emit: versions
 
     when:
