@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Deprecated`
 
+## v1.0.5
+
+### `Added`
+
+### `Fixed`
+Joining the GLUE summary file and the sequencing summary uses tsv-files and not csv
+
+### `Dependencies`
+
+### `Deprecated`
+
 ## v1.0.4 - 2025.01.07
 
 ### `Added`
