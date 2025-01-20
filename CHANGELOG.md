@@ -14,7 +14,7 @@ GLUE json parser does not fail on corrupt GLUE json files
 
 ### `Deprecated`
 
-## v1.0.5
+## v1.0.5 - 2025.01.15
 
 ### `Added`
 
