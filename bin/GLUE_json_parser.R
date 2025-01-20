@@ -115,6 +115,7 @@ for (x in 1:length(json_files)) {
 
     # One row per sample
     # Create a temporary dataframe to populate
+    try(rm(df))
     df <- as.data.frame(matrix(nrow = 1, ncol = 50))
     colnames(df) <- c("Sample",
                       "Reference",
@@ -226,6 +227,7 @@ for (x in 1:length(json_files)) {
   }
 }
   # Then join mutations per drug category
+  if (exists("df")) {
   tmp <- as_tibble(df)
 
   tmp <- tmp %>%
@@ -248,7 +250,7 @@ for (x in 1:length(json_files)) {
 
   # Merge with final data structure
   df_final <- bind_rows(df_final, df)
-
+  }
 }
 
 write_tsv(df_final, file = "GLUE_collected_report.tsv")
