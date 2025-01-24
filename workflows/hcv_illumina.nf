@@ -282,10 +282,7 @@ workflow HCV_ILLUMINA {
     //
     ch_parsefirstmapping = SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv) // val(meta), path(idxstats), path(tsv)
         .filter { meta, idxstats, tsv ->
-            def lines = idxstats.readLines() // Read the idxstats file
-            lines.size() >= 1 && // Check that the file is not empty
-            lines[0].split('\t').size() >= 3 && // Check that the first line has at least 3 columns
-            lines[0].split('\t')[2] != '0' // Require that the first reference has mapped reads
+            tsv.size() > 0 // Filter out empty tsv files
         }
 
     PARSEFIRSTMAPPING (
