@@ -280,12 +280,12 @@ workflow HCV_ILLUMINA {
     //
     // MODULE: Identify the two references with most mapped reads, duplicates included
     //
-    ch_parsefirstmapping = SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv). // val(meta), path(idxstats), path(tsv)
+    ch_parsefirstmapping = SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv) // val(meta), path(idxstats), path(tsv)
         .filter { meta, idxstats, tsv ->
-            def lines = tsv.readLines()
-            lines.size() >= 1 &&
-            lines[0].split('\t').size() >= 3 &&
-            lines[0].split('\t')[2] != '0'
+            def lines = idxstats.readLines() // Read the idxstats file
+            lines.size() >= 1 && // Check that the file is not empty
+            lines[0].split('\t').size() >= 3 && // Check that the first line has at least 3 columns
+            lines[0].split('\t')[2] != '0' // Require that the first reference has mapped reads
         }
 
     PARSEFIRSTMAPPING (
