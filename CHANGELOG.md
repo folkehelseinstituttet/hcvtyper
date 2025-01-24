@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
+Filter empty idxstats files prior to PARSEFIRSTMAPPING in the HCV workflow
 
 ### `Fixed`
 GLUE json parser does not fail on corrupt GLUE json files
