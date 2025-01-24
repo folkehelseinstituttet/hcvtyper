@@ -2,9 +2,9 @@
 
 library(tidyverse)
 
-summary_file <- list.files(path = "/summarize", pattern = "^Genotype_mapping_summary_long_LW_import.csv$", full.names = TRUE, recursive = TRUE)
+summary_file <- list.files(path = "/summarize", pattern = "^Genotype_mapping_summary_long_LW_import.tsv$", full.names = TRUE, recursive = TRUE)
 
-summary <- read_csv(summary_file)
+summary <- read_tsv(summary_file)
 
 glue_file <- list.files(path = "/hcvglue/", pattern = "^GLUE_collected_report.tsv$", full.names = TRUE, recursive = TRUE)
 
