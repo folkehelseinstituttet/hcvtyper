@@ -23,9 +23,16 @@ process HCV_GLUE {
     if docker ps -a --filter "name=gluetools-mysql" --format '{{.Names}}' | grep -q "^gluetools-mysql\$"; then
         echo "Container 'gluetools-mysql' is running or exists."
         # Stop the container
-        docker stop gluetools-mysql
+        docker stop gluetools-mysql || echo "Failed to stop container or it is already stopped."
+
+        # Wait for removal if already in progress
+        while docker ps -a --filter "name=gluetools-mysql" --format '{{.State}}' | grep -q "removing"; do
+            echo "Container 'gluetools-mysql' is being removed. Waiting..."
+            sleep 1
+        done
+
         # Remove the container
-        docker rm gluetools-mysql
+        docker rm gluetools-mysql || echo "Failed to remove container or it has already been removed."
         echo "Container 'gluetools-mysql' has been stopped and removed."
     else
         echo "Container 'gluetools-mysql' is not running or does not exist."
