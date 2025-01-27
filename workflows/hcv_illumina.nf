@@ -389,7 +389,7 @@ workflow HCV_ILLUMINA {
         HCV_GLUE (
             MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]}))
         )
-        ch_versions = ch_versions.mix(HCV_GLUE_MAJOR.out.versions)
+        ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
 
         //HCV_GLUE_MINOR (
         //    MINOR_MAPPING.out.aligned.collect{ it[1] }
@@ -427,7 +427,7 @@ workflow HCV_ILLUMINA {
         ch_blast = file("dummy_file")
     }
     if (params.agens == "HCV" && !params.skip_hcvglue) {
-        ch_glue = HCV_GLUE_PARSER_MAJOR.out.GLUE_summary
+        ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
         ch_glue = file("dummy_file")
     }
