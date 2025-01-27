@@ -388,16 +388,16 @@ workflow HCV_ILLUMINA {
     //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         HCV_GLUE_MAJOR (
-            MAJOR_MAPPING.out.aligned
+            MAJOR_MAPPING.out.aligned.collect{ it[1] }
         )
         ch_versions = ch_versions.mix(HCV_GLUE_MAJOR.out.versions)
 
         HCV_GLUE_MINOR (
-            MINOR_MAPPING.out.aligned
+            MINOR_MAPPING.out.aligned.collect{ it[1] }
         )
         ch_versions = ch_versions.mix(HCV_GLUE_MINOR.out.versions)
 
-        // Collect all glue reports
+        // Collect all glue reports and parse them
         HCV_GLUE_PARSER_MAJOR (
             HCV_GLUE_MAJOR.out.GLUE_json.collect{ it[1] },
             "major"
