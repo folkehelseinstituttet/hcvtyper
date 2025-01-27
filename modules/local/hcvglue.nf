@@ -1,4 +1,4 @@
-process HCVGLUE {
+process HCV_GLUE {
 
     label 'process_low'
 
