@@ -9,6 +9,7 @@ process GLUEPARSE {
 
     input:
     path '*'
+    val 'major_minor'
 
     output:
     path("*.tsv"), emit: GLUE_summary
@@ -19,7 +20,7 @@ process GLUEPARSE {
 
     script:
     """
-    GLUE_json_parser.R major
+    GLUE_json_parser.R $major_minor
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
