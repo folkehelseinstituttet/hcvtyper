@@ -70,16 +70,16 @@ df_final <- tibble(
 for (x in 1:length(json_files)) {
   # Remove any old objects if reading previous json file failed
   try(rm(json))
-  
+
   # Need to check if there are any lines starting with "DEBUG" in the json files and remove these
-  
+
   json <- readLines(json_files[x]) # Read the json file line by line
-    
+
     # Check if there are any lines starting with "DEBUG"
     if (length(grep("^DEBUG", json)) > 0) {
       # Remove these lines
       json <- json[-grep("^DEBUG", json)]
-      
+
       # And then check if the first line is empty and remove that
       if (json[1] == "") {
         json <- json[-1]
@@ -88,7 +88,7 @@ for (x in 1:length(json_files)) {
 
   # Only parse the json object if the second element contains the string "phdrReport"
   if (grepl("phdrReport", json[2])) {
-    
+
   # Try to parse json object. Could fail if bam file was not OK for Glue
   try(json <- parse_json(json))
 
@@ -253,4 +253,4 @@ for (x in 1:length(json_files)) {
   }
 }
 
-write_tsv(df_final, file = "GLUE_collected_report.tsv")
+write_tsv(df_final, file = paste0("GLUE_collected_report_", major_minor, ".tsv"))
