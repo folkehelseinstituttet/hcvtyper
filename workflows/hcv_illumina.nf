@@ -78,11 +78,8 @@ include { INSTRUMENT_ID                       } from '../modules/local/instrumen
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
-include { HCVGLUE as HCVGLUE_MAJOR            } from '../modules/local/hcvglue'
-include { HCVGLUE as HCVGLUE_MINOR            } from '../modules/local/hcvglue'
-include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse'
-include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
-include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
+include { GLUEPARSE as HCV_GLUE_PARSER_MAJOR  } from '../modules/local/glueparse'
+include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 include { SORT_IDXSTATS                       } from '../modules/local/idxstats_sort.nf'
 
@@ -384,39 +381,19 @@ workflow HCV_ILLUMINA {
         ch_map_minor_filtered, // val(meta), path(fasta), path(reads)
     )
 
-    //
-    // MODULE: Plot coverage from mapping
-    //
-    PLOT_COVERAGE_MAJOR (
-        MAJOR_MAPPING.out.depth
-    )
-    ch_versions = ch_versions.mix(PLOT_COVERAGE_MAJOR.out.versions)
-
-    PLOT_COVERAGE_MINOR (
-        MINOR_MAPPING.out.depth
-    )
-    ch_versions = ch_versions.mix(PLOT_COVERAGE_MINOR.out.versions)
-
-    //
-    // MODULE: Run GLUE genotyping and resistance annotation for HCV
-    //
+    // Collect all glue reports
     if (params.agens == "HCV" && !params.skip_hcvglue) {
-        HCVGLUE_MAJOR (
-            MAJOR_MAPPING.out.aligned
+        HCV_GLUE_PARSER_MAJOR (
+            MAJOR_MAPPING.out.glue_json.collect{ it[1] },
+            "major"
         )
-        ch_versions = ch_versions.mix(HCVGLUE_MAJOR.out.versions)
+        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MAJOR.out.versions)
 
-        HCVGLUE_MINOR (
-            MINOR_MAPPING.out.aligned
+        HCV_GLUE_PARSER_MINOR (
+            MINOR_MAPPING.out.glue_json.collect{ it[1] },
+            "minor"
         )
-        ch_versions = ch_versions.mix(HCVGLUE_MINOR.out.versions)
-
-        // Collect all glue reports
-        ch_glueparse = HCVGLUE_MAJOR.out.GLUE_json.collect{ it[1] }.mix(HCVGLUE_MINOR.out.GLUE_json.collect{ it[1] }.ifEmpty([]))
-        HCV_GLUE_PARSER (
-            ch_glueparse
-        )
-        ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
+        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
     }
 
     //
