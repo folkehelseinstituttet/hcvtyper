@@ -413,7 +413,7 @@ workflow HCV_ILLUMINA {
         ch_blast = file("dummy_file")
     }
     if (params.agens == "HCV" && !params.skip_hcvglue) {
-        ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
+        ch_glue = HCV_GLUE_PARSER_MAJOR.out.GLUE_summary
     } else {
         ch_glue = file("dummy_file")
     }
