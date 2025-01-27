@@ -55,8 +55,7 @@ include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/ma
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
-include { HCV_GLUE as HCV_GLUE_MAJOR            } from '../modules/local/hcvglue'
-include { HCV_GLUE as HCV_GLUE_MINOR            } from '../modules/local/hcvglue'
+include { HCV_GLUE             } from '../modules/local/hcvglue'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
@@ -387,28 +386,28 @@ workflow HCV_ILLUMINA {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
-        HCV_GLUE_MAJOR (
-            MAJOR_MAPPING.out.aligned.collect{ it[1] }
+        HCV_GLUE (
+            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]}))
         )
         ch_versions = ch_versions.mix(HCV_GLUE_MAJOR.out.versions)
 
-        HCV_GLUE_MINOR (
-            MINOR_MAPPING.out.aligned.collect{ it[1] }
-        )
-        ch_versions = ch_versions.mix(HCV_GLUE_MINOR.out.versions)
+        //HCV_GLUE_MINOR (
+        //    MINOR_MAPPING.out.aligned.collect{ it[1] }
+        //)
+        //ch_versions = ch_versions.mix(HCV_GLUE_MINOR.out.versions)
 
         // Collect all glue reports and parse them
-        HCV_GLUE_PARSER_MAJOR (
-            HCV_GLUE_MAJOR.out.GLUE_json.collect{ it[1] },
+        HCV_GLUE_PARSER (
+            HCV_GLUE.out.GLUE_json.collect{ it[1] },
             "major"
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MAJOR.out.versions)
 
-        HCV_GLUE_PARSER_MINOR (
-            HCV_GLUE_MINOR.out.GLUE_json.collect{ it[1] },
-            "minor"
-        )
-        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
+        //HCV_GLUE_PARSER_MINOR (
+        //    HCV_GLUE_MINOR.out.GLUE_json.collect{ it[1] },
+        //    "minor"
+       // )
+        //ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
     }
 
     //
