@@ -1,6 +1,5 @@
 include { BOWTIE2_BUILD     } from '../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN     } from '../../modules/nf-core/bowtie2/align/main'
-include { HCV_GLUE          } from '../../modules/local/hcvglue'
 include { PLOT_COVERAGE } from '../../modules/local/plotcoverage'
 include { TANOTI_ALIGN      } from '../../modules/local/tanoti.nf'
 include { SAMTOOLS_INDEX as INDEX_WITHDUP } from '../../modules/nf-core/samtools/index/main'
@@ -133,16 +132,6 @@ workflow TARGETED_MAPPING {
     )
     ch_versions = ch_versions.mix(IVAR_CONSENSUS.out.versions.first())
 
-        //
-    // MODULE: Run GLUE genotyping and resistance annotation for HCV
-    //
-    if (params.agens == "HCV" && !params.skip_hcvglue) {
-        HCV_GLUE (
-            SAMTOOLS_SORMADUP.out.bam
-        )
-        ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
-    }
-
     emit:
     aligned = SAMTOOLS_SORMADUP.out.bam
     versions = ch_versions
@@ -150,5 +139,5 @@ workflow TARGETED_MAPPING {
     stats_withdup = STATS_WITHDUP.out.stats
     stats_markdup = STATS_MARKDUP.out.stats
     consensus = IVAR_CONSENSUS.out.fasta
-    glue_json = HCV_GLUE.out.GLUE_json
+
 }

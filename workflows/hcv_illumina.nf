@@ -55,6 +55,8 @@ include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/ma
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
+include { HCV_GLUE as HCV_GLUE_MAJOR            } from '../modules/local/hcvglue'
+include { HCV_GLUE as HCV_GLUE_MINOR            } from '../modules/local/hcvglue'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
@@ -381,16 +383,29 @@ workflow HCV_ILLUMINA {
         ch_map_minor_filtered, // val(meta), path(fasta), path(reads)
     )
 
-    // Collect all glue reports
+    //
+    // MODULE: Run GLUE genotyping and resistance annotation for HCV
+    //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
+        HCV_GLUE_MAJOR (
+            MAJOR_MAPPING.out.aligned
+        )
+        ch_versions = ch_versions.mix(HCV_GLUE_MAJOR.out.versions)
+
+        HCV_GLUE_MINOR (
+            MINOR_MAPPING.out.aligned
+        )
+        ch_versions = ch_versions.mix(HCV_GLUE_MINOR.out.versions)
+
+        // Collect all glue reports
         HCV_GLUE_PARSER_MAJOR (
-            MAJOR_MAPPING.out.glue_json.collect{ it[1] },
+            HCV_GLUE_MAJOR.out.GLUE_json.collect{ it[1] },
             "major"
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MAJOR.out.versions)
 
         HCV_GLUE_PARSER_MINOR (
-            MINOR_MAPPING.out.glue_json.collect{ it[1] },
+            HCV_GLUE_MINOR.out.GLUE_json.collect{ it[1] },
             "minor"
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
