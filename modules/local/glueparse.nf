@@ -5,22 +5,21 @@ process GLUEPARSE {
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-        'docker.io/jonbra/tidyverse_seqinr:2.0' }"
+        'docker.io/jonbra/tidyverse_seqinr:3.0' }"
 
     input:
     path '*'
-    val 'major_minor'
 
     output:
-    path("*.tsv"), emit: GLUE_summary
-    path "versions.yml"           , emit: versions
+    path("*.tsv")      , emit: GLUE_summary
+    path "versions.yml", emit: versions
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
     """
-    GLUE_json_parser.R $major_minor
+    GLUE_json_parser.R
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
