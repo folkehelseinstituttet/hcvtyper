@@ -387,7 +387,7 @@ workflow HCV_ILLUMINA {
     //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         HCV_GLUE (
-            MAJOR_MAPPING.out.aligned.mix(MINOR_MAPPING.out.aligned).collect({it[1]}) // Collect all files. Can only have one GLUE process running
+            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect() // Collect all files. Can only have one GLUE process running
         )
         ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
 
