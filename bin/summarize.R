@@ -341,10 +341,36 @@ for (i in 1:length(blast_files)) {
 glue_file <- list.files(path = path_7, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
 glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
 
-if (nrow(glue_report) > 0) {
-  glue_report <- glue_report %>%
-    # Only keep the majority reports for the summary
-    filter(Major_minor == "major")
+# Collect also the minor GLUE report
+glue_file_minor <- list.files(path = path_7, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
+glue_report_minor <- read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character()))
+
+# Extract the GLUE genotypes and subtypes for major and minor and compare them
+if (nrow(glue_report) > 0 & nrow(glue_report_minor) > 0) {
+  major_gt <- glue_report %>%
+    select(Sample, GLUE_genotype, GLUE_subtype) %>%
+    rename(Major_genotype = GLUE_genotype,
+           Major_subtype = GLUE_subtype)
+
+  minor_gt <- glue_report_minor %>%
+    select(Sample, GLUE_genotype, GLUE_subtype) %>%
+    rename(Minor_genotype = GLUE_genotype,
+           Minor_subtype = GLUE_subtype)
+  
+  gt_check <- major_gt %>%
+    left_join(minor_gt, by = "Sample") %>% 
+    mutate(
+      identical_geno = case_when(
+        Major_genotype == Minor_genotype ~ "YES",
+        is.na(Minor_genotype) ~ NA,
+        .default = "NO"
+    ),
+      identical_subgeno = case_when(
+        Major_subtype == Minor_subtype ~ "YES",
+        is.na(Minor_subtype) ~ NA,
+        .default = "NO"
+        )
+    ) 
 }
 
 # Sequencer ID ------------------------------------------------------------
@@ -418,6 +444,16 @@ final <- final %>%
     Minor_cov_breadth_min_1 >= 10 & Minor_avg_depth >= 2 ~ "YES",
     .default = "NO"
   ))
+
+if (nrow(glue_report) > 0) {
+  final <- final %>%
+    left_join(gt_check, by = c("sampleName" = "Sample")) %>% 
+    mutate(minor_typbar = case_when(
+      identical_geno == "NO" & identical_subgeno == "NO" ~ "YES",
+      identical_geno == "YES" & identical_subgeno == "YES" ~ "NO",
+      is.na(identical_geno) ~ "UNKNOWN"
+    ))
+}
 
   # Add scaffold length info - for the moment not included
   # left_join(df_scaffolds, join_by(sampleName)) %>%
@@ -527,7 +563,8 @@ lw_import <- final %>%
   mutate(`Majority quality:` = case_when(`Majority quality:` == "YES" ~ "Typbar",
                                          `Majority quality:` == "NO" ~ "Ikke typbar")) %>%
   mutate(`Minor quality:` = case_when(`Minor quality:` == "YES" ~ "Typbar",
-                                      `Minor quality:` == "NO" ~ "Ikke typbar"))
+                                      `Minor quality:` == "NO" ~ "Ikke typbar",
+                                      .default = `Minor quality:`))
 
 # Remove column "Major_minor" if exists
 # This column is not present if GLUE is dropped
