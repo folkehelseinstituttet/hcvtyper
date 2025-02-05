@@ -79,8 +79,8 @@ include { INSTRUMENT_ID                       } from '../modules/local/instrumen
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
-include { GLUEPARSE as HCV_GLUE_PARSER_MAJOR  } from '../modules/local/glueparse'
-include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
+include { GLUEPARSE as HCV_GLUE_PARSER  } from '../modules/local/glueparse'
+//include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 include { SORT_IDXSTATS                       } from '../modules/local/idxstats_sort.nf'
 
@@ -387,27 +387,15 @@ workflow HCV_ILLUMINA {
     //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         HCV_GLUE (
-            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]}))
+            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})) // Use {it[1]} to collect only the bam file and not the meta map
         )
         ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
 
-        //HCV_GLUE_MINOR (
-        //    MINOR_MAPPING.out.aligned.collect{ it[1] }
-        //)
-        //ch_versions = ch_versions.mix(HCV_GLUE_MINOR.out.versions)
-
         // Collect all glue reports and parse them
         HCV_GLUE_PARSER (
-            HCV_GLUE.out.GLUE_json.collect{ it[1] },
-            "major"
+            HCV_GLUE.out.GLUE_json.collect()
         )
-        ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MAJOR.out.versions)
-
-        //HCV_GLUE_PARSER_MINOR (
-        //    HCV_GLUE_MINOR.out.GLUE_json.collect{ it[1] },
-        //    "minor"
-       // )
-        //ch_versions = ch_versions.mix(HCV_GLUE_PARSER_MINOR.out.versions)
+        ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }
 
     //
