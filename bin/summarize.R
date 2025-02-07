@@ -549,6 +549,7 @@ lw_import <- final %>%
          "Majority quality:" = major_typbar,
          "Minor quality:" = minor_typbar,
          sequencer_id,
+         Reference,
          GLUE_genotype,
          GLUE_subtype,
          starts_with("glecaprevir"),
