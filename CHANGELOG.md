@@ -6,9 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
+Run GLUE and create json and html files for all potential major and minor strains.
+GLUE is run as one single process on all bam files. To avoid conflicts with running docker images.
+Compare GLUE genotypes and mapping genotypes for minor strains.
+Updated tidyverse version in GLUE_PARSER.
 
 ### `Fixed`
-GLUE json parser does not fail on corrupt GLUE json files
+GLUE json parser does not fail on corrupt GLUE json files.
 
 ### `Dependencies`
 
