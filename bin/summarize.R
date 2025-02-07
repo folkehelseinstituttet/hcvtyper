@@ -346,7 +346,7 @@ glue_file_minor <- list.files(path = path_7, pattern = "GLUE_collected_report_mi
 glue_report_minor <- read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character()))
 
 # Extract the GLUE genotypes and subtypes for major and minor and compare them
-if (nrow(glue_report) > 0 & nrow(glue_report_minor) > 0) {
+
   major_gt <- glue_report %>%
     select(Sample, GLUE_genotype, GLUE_subtype) %>%
     rename(Major_genotype = GLUE_genotype,
@@ -371,7 +371,6 @@ if (nrow(glue_report) > 0 & nrow(glue_report_minor) > 0) {
         .default = "NO"
         )
     ) 
-}
 
 # Sequencer ID ------------------------------------------------------------
 id_files <- list.files(path = path_8, pattern = "sequencerID.tsv$", full.names = TRUE)
@@ -515,18 +514,18 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 
 lw_import <- final %>%
     # Change "." to ","
-    #mutate(
-    #    Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
-    #    Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
-    #    Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
-    #    Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
-    #    Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
-    #    abundance_minor = str_replace(abundance_minor, "\\.", ","),
-    #    Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
-    #    Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
-    #    Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
-    #    Minor_cov_breadth_min_10 = str_replace(Minor_cov_breadth_min_10, "\\.", ",")
-  #) %>%
+    mutate(
+        Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
+        Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
+        Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
+        Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
+        Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
+        abundance_minor = str_replace(abundance_minor, "\\.", ","),
+        Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
+        Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
+        Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
+        Minor_cov_breadth_min_10 = str_replace(Minor_cov_breadth_min_10, "\\.", ",")
+  ) %>%
   select("Sample" = sampleName,
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
@@ -549,28 +548,36 @@ lw_import <- final %>%
          "Total number of reads after trim:" = total_trimmed_reads,
          "Majority quality:" = major_typbar,
          "Minor quality:" = minor_typbar,
-         everything()
-         ) %>%
-  select(-total_classified_reads,
-         -Major_reference,
-         -Minor_reference,
-         -abundance_major,
-         -Percent_reads_mapped_of_trimmed_with_dups_minor,
-         -Reads_nodup_mapped_first_mapping,
-         -Minor_cov_breadth_min_1
+         sequencer_id,
+         GLUE_genotype,
+         GLUE_subtype,
+         starts_with("glecaprevir"),
+         starts_with("grazoprevir"),
+         starts_with("paritaprevir"),
+         starts_with("voxilaprevir"),
+         starts_with("NS34A"),
+         starts_with("daclatasvir"),
+         starts_with("elbasvir"),
+         starts_with("ledipasvir"),
+         starts_with("ombitasvir"),
+         starts_with("pibrentasvir"),
+         starts_with("velpatasvir"),
+         starts_with("NS5A"),
+         starts_with("dasabuvir"),
+         starts_with("sofosbuvir"),
+         starts_with("NS5B"),
+         `HCV project version`,
+         `GLUE engine version`,
+         starts_with("PHE")
          ) %>%
   # Convert "YES" to "Typbar" and "NO" to "Ikke typbar" in the "Majority quality:" and "Minor quality:" columns
   mutate(`Majority quality:` = case_when(`Majority quality:` == "YES" ~ "Typbar",
                                          `Majority quality:` == "NO" ~ "Ikke typbar")) %>%
   mutate(`Minor quality:` = case_when(`Minor quality:` == "YES" ~ "Typbar",
                                       `Minor quality:` == "NO" ~ "Ikke typbar",
-                                      .default = `Minor quality:`))
-
-# Remove column "Major_minor" if exists
-# This column is not present if GLUE is dropped
-if ("^Major_minor$" %in% colnames(lw_import)) {
-  lw_import <- lw_import %>% select(-Major_minor)
-}
+                                      `Minor quality:` == "UNKNOWN" ~ "Ikke typbar",
+                                      .default = `Minor quality:`)) %>% 
+  distinct()
 
 # Write file
 write_tsv(lw_import, file = "Genotype_mapping_summary_long_LW_import.tsv")
