@@ -3,16 +3,12 @@
 library(tidyverse)
 library(jsonlite)
 
-args = commandArgs(trailingOnly=TRUE)
-if (length(args) < 1) {
-  stop("Usage: GLUE_json_parser.R <major/minor>", call.=FALSE)
-}
-
-major_minor     <- args[1]
-
-json_files <- list.files(pattern = paste0(major_minor, ".nodup.json$"),
-                         full.names = TRUE)
-
+# Define json parser function
+parse_json_files <- function(major_minor) {
+  
+  json_files <- list.files(pattern = paste0(major_minor, ".nodup.json$"),
+                           full.names = TRUE)
+  
 # Create final data file
 df_final <- tibble(
   "Sample" = character(),
@@ -67,19 +63,21 @@ df_final <- tibble(
   "PHE drug resistance extension version"  = character()
 )
 
+# Only run if the length of json_files is greater than 0
+if (length(json_files) > 0) {
 for (x in 1:length(json_files)) {
   # Remove any old objects if reading previous json file failed
   try(rm(json))
-  
+
   # Need to check if there are any lines starting with "DEBUG" in the json files and remove these
-  
+
   json <- readLines(json_files[x]) # Read the json file line by line
-    
+
     # Check if there are any lines starting with "DEBUG"
     if (length(grep("^DEBUG", json)) > 0) {
       # Remove these lines
       json <- json[-grep("^DEBUG", json)]
-      
+
       # And then check if the first line is empty and remove that
       if (json[1] == "") {
         json <- json[-1]
@@ -88,7 +86,7 @@ for (x in 1:length(json_files)) {
 
   # Only parse the json object if the second element contains the string "phdrReport"
   if (grepl("phdrReport", json[2])) {
-    
+
   # Try to parse json object. Could fail if bam file was not OK for Glue
   try(json <- parse_json(json))
 
@@ -115,9 +113,9 @@ for (x in 1:length(json_files)) {
 
     # One row per sample
     # Create a temporary dataframe to populate
-    try(rm(df))
-    df <- as.data.frame(matrix(nrow = 1, ncol = 50))
-    colnames(df) <- c("Sample",
+    try(rm(df_tmp))
+    df_tmp <- as.data.frame(matrix(nrow = 1, ncol = 50))
+    colnames(df_tmp) <- c("Sample",
                       "Reference",
                       "Major_minor",
                       "GLUE_genotype",
@@ -168,14 +166,14 @@ for (x in 1:length(json_files)) {
                       "GLUE engine version",
                       "PHE drug resistance extension version")
 
-    df$Sample <- sample
-    df$Reference <- reference
-    df$Major_minor <- major_minor
-    df$GLUE_genotype <- genotype
-    df$GLUE_subtype <- subtype
-    df$`HCV project version` <- projectVersion
-    df$`GLUE engine version` <- engineVersion
-    df$`PHE drug resistance extension version` <- extensionVersion
+    df_tmp$Sample <- sample
+    df_tmp$Reference <- reference
+    df_tmp$Major_minor <- major_minor
+    df_tmp$GLUE_genotype <- genotype
+    df_tmp$GLUE_subtype <- subtype
+    df_tmp$`HCV project version` <- projectVersion
+    df_tmp$`GLUE engine version` <- engineVersion
+    df_tmp$`PHE drug resistance extension version` <- extensionVersion
 
     # Dette er underlisten for Drug Scores. Lengden av denne angir hvor mange drugs som er funnet.
     # Under drugScores så er det en ny liste for hver drug category
@@ -186,10 +184,10 @@ for (x in 1:length(json_files)) {
                   # Hvis det er sufficient coverage (denne evaluerer til TRUE):
                   if (json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["sufficientCoverage"]]) {
                     if (json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drugScoreDisplayShort"]] == "No resistance") {
-                      df[[json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]]]]  <- "No resistance"
+                      df_tmp[[json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]]]]  <- "No resistance"
                     } else {
                       # Skrive inn resistance informasjonen for druget
-                      df[[json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]]]]  <- json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drugScoreDisplayShort"]]
+                      df_tmp[[json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]]]]  <- json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drugScoreDisplayShort"]]
 
                       # De tre kategoriene er lister. Hvis lengden er > 0 betyr det at det er en mutasjon i den
                       mut <- vector(mode = "character") # Create empty vector to hold mutations
@@ -214,11 +212,11 @@ for (x in 1:length(json_files)) {
                       }
                       mut <- paste(mut, collapse = ";")
                       mut_short <- paste(mut_short, collapse = ";")
-                      df[[paste0(json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]], "_mut")]] <- mut
-                      df[[paste0(json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]], "_mut_short")]] <- mut_short
+                      df_tmp[[paste0(json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]], "_mut")]] <- mut
+                      df_tmp[[paste0(json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]], "_mut_short")]] <- mut_short
                     }
                   } else {
-                    df[[json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]]]] <- "Insufficient coverage"
+                    df_tmp[[json[["phdrReport"]][["samReferenceResult"]][["drugScores"]][[i]][["drugAssessments"]][[k]][["drug"]][["id"]]]] <- "Insufficient coverage"
                 }
               }
             }
@@ -227,8 +225,9 @@ for (x in 1:length(json_files)) {
   }
 }
   # Then join mutations per drug category
-  if (exists("df")) {
-  tmp <- as_tibble(df)
+  # if not NA in df_tmp$Sample
+  if (exists("df_tmp")) {
+  tmp <- as_tibble(df_tmp)
 
   tmp <- tmp %>%
     unite("NS34A", c(glecaprevir_mut, grazoprevir_mut, paritaprevir_mut, voxilaprevir_mut), sep = ";", na.rm = TRUE) %>%
@@ -239,18 +238,28 @@ for (x in 1:length(json_files)) {
     unite("NS5B_short", c(dasabuvir_mut_short, sofosbuvir_mut_short), sep = ";", na.rm = TRUE)
 
   # Gjøre om innholdet i cellene til en vector, deretter fjerne dupliater i vektoren
-  try(df$NS34A <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS34A, ";")), ","))), "\\+"))), collapse = ";"))
-  try(df$NS5A <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5A, ";")), ","))), "\\+"))), collapse = ";"))
-  try(df$NS5B <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5B, ";")), ","))), "\\+"))), collapse = ";"))
-  try(df$NS34A_short <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS34A_short, ";")), ","))), "\\+"))), collapse = ";"))
-  try(df$NS5A_short <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5A_short, ";")), ","))), "\\+"))), collapse = ";"))
-  try(df$NS5B_short <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5B_short, ";")), ","))), "\\+"))), collapse = ";"))
+  try(df_tmp$NS34A <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS34A, ";")), ","))), "\\+"))), collapse = ";"))
+  try(df_tmp$NS5A <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5A, ";")), ","))), "\\+"))), collapse = ";"))
+  try(df_tmp$NS5B <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5B, ";")), ","))), "\\+"))), collapse = ";"))
+  try(df_tmp$NS34A_short <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS34A_short, ";")), ","))), "\\+"))), collapse = ";"))
+  try(df_tmp$NS5A_short <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5A_short, ";")), ","))), "\\+"))), collapse = ";"))
+  try(df_tmp$NS5B_short <- paste(unique(unlist(strsplit(gsub(" ", "", unlist(strsplit(unlist(strsplit(tmp$NS5B_short, ";")), ","))), "\\+"))), collapse = ";"))
 
-  df <- as_tibble(df)
+  df_tmp <- as_tibble(df_tmp)
 
   # Merge with final data structure
-  df_final <- bind_rows(df_final, df)
+  df_final <- bind_rows(df_final, df_tmp)
   }
 }
+}
 
-write_tsv(df_final, file = "GLUE_collected_report.tsv")
+return(df_final)
+}
+
+df_major <- parse_json_files("major")
+write_tsv(df_major, file = paste0("GLUE_collected_report_major.tsv"))
+
+df_minor <- parse_json_files("minor")
+write_tsv(df_minor, file = paste0("GLUE_collected_report_minor.tsv"))
+
+

@@ -39,3 +39,4 @@ module_order:
         - "*.trimmed_*.zip"
   - kraken:
       name: "Kraken2"
+      top_n: 10

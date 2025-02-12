@@ -1,4 +1,4 @@
-process PLOTCOVERAGE {
+process PLOT_COVERAGE {
     tag "$meta.id"
     label 'process_single'
 

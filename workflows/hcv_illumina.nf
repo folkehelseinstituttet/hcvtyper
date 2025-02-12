@@ -55,6 +55,7 @@ include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/ma
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
+include { HCV_GLUE             } from '../modules/local/hcvglue'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
@@ -78,11 +79,8 @@ include { INSTRUMENT_ID                       } from '../modules/local/instrumen
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
-include { HCVGLUE as HCVGLUE_MAJOR            } from '../modules/local/hcvglue'
-include { HCVGLUE as HCVGLUE_MINOR            } from '../modules/local/hcvglue'
-include { GLUEPARSE as HCV_GLUE_PARSER        } from '../modules/local/glueparse'
-include { PLOTCOVERAGE as PLOT_COVERAGE_MAJOR } from '../modules/local/plotcoverage'
-include { PLOTCOVERAGE as PLOT_COVERAGE_MINOR } from '../modules/local/plotcoverage'
+include { GLUEPARSE as HCV_GLUE_PARSER  } from '../modules/local/glueparse'
+//include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 include { SORT_IDXSTATS                       } from '../modules/local/idxstats_sort.nf'
 
@@ -282,10 +280,7 @@ workflow HCV_ILLUMINA {
     //
     ch_parsefirstmapping = SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv) // val(meta), path(idxstats), path(tsv)
         .filter { meta, idxstats, tsv ->
-            def lines = idxstats.readLines() // Read the idxstats file
-            lines.size() >= 1 && // Check that the file is not empty
-            lines[0].split('\t').size() >= 3 && // Check that the first line has at least 3 columns
-            lines[0].split('\t')[2] != '0' // Require that the first reference has mapped reads
+            tsv.size() > 0 // Filter out empty tsv files
         }
 
     PARSEFIRSTMAPPING (
@@ -388,36 +383,17 @@ workflow HCV_ILLUMINA {
     )
 
     //
-    // MODULE: Plot coverage from mapping
-    //
-    PLOT_COVERAGE_MAJOR (
-        MAJOR_MAPPING.out.depth
-    )
-    ch_versions = ch_versions.mix(PLOT_COVERAGE_MAJOR.out.versions)
-
-    PLOT_COVERAGE_MINOR (
-        MINOR_MAPPING.out.depth
-    )
-    ch_versions = ch_versions.mix(PLOT_COVERAGE_MINOR.out.versions)
-
-    //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (params.agens == "HCV" && !params.skip_hcvglue) {
-        HCVGLUE_MAJOR (
-            MAJOR_MAPPING.out.aligned
+        HCV_GLUE (
+            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect() // Collect all files. Can only have one GLUE process running
         )
-        ch_versions = ch_versions.mix(HCVGLUE_MAJOR.out.versions)
+        ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
 
-        HCVGLUE_MINOR (
-            MINOR_MAPPING.out.aligned
-        )
-        ch_versions = ch_versions.mix(HCVGLUE_MINOR.out.versions)
-
-        // Collect all glue reports
-        ch_glueparse = HCVGLUE_MAJOR.out.GLUE_json.collect{ it[1] }.mix(HCVGLUE_MINOR.out.GLUE_json.collect{ it[1] }.ifEmpty([]))
+        // Collect all glue reports and parse them
         HCV_GLUE_PARSER (
-            ch_glueparse
+            HCV_GLUE.out.GLUE_json.collect()
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }

@@ -1,4 +1,4 @@
-process HCVGLUE {
+process HCV_GLUE {
 
     label 'process_low'
 
@@ -10,7 +10,7 @@ process HCVGLUE {
     stageInMode = 'copy' // Can't mount symlinked files into docker containers
 
     input:
-    tuple val(meta), path(bam)
+    path '*'
 
     output:
     path("*.json")     , optional: true, emit: GLUE_json
@@ -23,9 +23,16 @@ process HCVGLUE {
     if docker ps -a --filter "name=gluetools-mysql" --format '{{.Names}}' | grep -q "^gluetools-mysql\$"; then
         echo "Container 'gluetools-mysql' is running or exists."
         # Stop the container
-        docker stop gluetools-mysql
+        docker stop gluetools-mysql || echo "Failed to stop container or it is already stopped."
+
+        # Wait for removal if already in progress
+        while docker ps -a --filter "name=gluetools-mysql" --format '{{.State}}' | grep -q "removing"; do
+            echo "Container 'gluetools-mysql' is being removed. Waiting..."
+            sleep 1
+        done
+
         # Remove the container
-        docker rm gluetools-mysql
+        docker rm gluetools-mysql || echo "Failed to remove container or it has already been removed."
         echo "Container 'gluetools-mysql' has been stopped and removed."
     else
         echo "Container 'gluetools-mysql' is not running or does not exist."
@@ -58,6 +65,11 @@ process HCVGLUE {
     done
     docker exec gluetools-mysql installGlueProject.sh ncbi_hcv_glue
 
+    # Make a for loop over all bam files and run HCV-GLUE
+    ## Adding || true to the end of the command to prevent the pipeline from failing if the bam file is not valid
+    for bam in \$(ls *.bam)
+    do
+
     # First create json report
     docker run --rm \
        --name gluetools \
@@ -67,9 +79,12 @@ process HCVGLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
          -p cmd-result-format:json \
         -EC \
-        -i project hcv module phdrReportingController invoke-function reportBam ${bam} 15.0 > "${bam.baseName}.json"
+        -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam%".bam"}.json || true
+    done
 
     # Then create html report
+    for bam in \$(ls *.bam)
+    do
     docker run --rm \
         --name gluetools \
         -v \$PWD:/opt/bams \
@@ -77,7 +92,8 @@ process HCVGLUE {
         --link gluetools-mysql \
         cvrbioinformatics/gluetools:latest gluetools.sh \
     	--console-option log-level:FINEST \
-        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml ${bam} 15.0 "${bam.baseName}.html"
+        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml \${bam} 15.0 \${bam%".bam"}.html || true
+    done
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
