@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
+
+### `Fixed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.0.6 - 2025.02.12
+
+### `Added`
 Filter empty idxstats files prior to PARSEFIRSTMAPPING in the HCV workflow
 Run GLUE and create json and html files for all potential major and minor strains.
 GLUE is run as one single process on all bam files. To avoid conflicts with running docker images.
