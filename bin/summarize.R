@@ -451,7 +451,8 @@ final <- final %>%
     .default = "NO"
   ))
 
-if (nrow(glue_report) > 0) {
+# If minor genotype is the sama as major, then not typbar. But only possible if there are minor glue reports available
+if (nrow(glue_report) > 0 & exists("gt_check")) {
   final <- final %>%
     left_join(gt_check, by = c("sampleName" = "Sample")) %>% 
     mutate(minor_typbar = case_when(
