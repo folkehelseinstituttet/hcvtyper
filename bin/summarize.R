@@ -347,16 +347,22 @@ glue_report_minor <- read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = c
 
 # Extract the GLUE genotypes and subtypes for major and minor and compare them
 
+if (nrow(glue_report) > 0) {
   major_gt <- glue_report %>%
     select(Sample, GLUE_genotype, GLUE_subtype) %>%
     rename(Major_genotype = GLUE_genotype,
            Major_subtype = GLUE_subtype)
+}
 
+if (nrow(glue_report_minor) > 0) {
   minor_gt <- glue_report_minor %>%
     select(Sample, GLUE_genotype, GLUE_subtype) %>%
     rename(Minor_genotype = GLUE_genotype,
            Minor_subtype = GLUE_subtype)
-  
+}
+
+# Check if the same genotype has been called for major and minor. If Yes, then minor is not typbar
+if (exists("major_gt") & exists("minor_gt")) {
   gt_check <- major_gt %>%
     left_join(minor_gt, by = "Sample") %>% 
     mutate(
@@ -371,6 +377,7 @@ glue_report_minor <- read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = c
         .default = "NO"
         )
     ) 
+}
 
 # Sequencer ID ------------------------------------------------------------
 id_files <- list.files(path = path_8, pattern = "sequencerID.tsv$", full.names = TRUE)
@@ -459,6 +466,60 @@ if (nrow(glue_report) > 0) {
   # mutate(test = case_when(Majority_reference == reference ~ "OK",
   #                         Minority_reference == reference ~ "OK")) %>%
   # filter(test == "OK") %>%
+
+# If the GLUE report is missing, and GLUE columns with NAs
+if (!"GLUE_genotype" %in% colnames(final)) {
+  final <- final %>%
+    add_column("Reference" = NA_character_,
+               "GLUE_genotype" = NA_character_,
+               "GLUE_subtype" = NA_character_,
+               "glecaprevir" = NA_character_,
+               "glecaprevir_mut" = NA_character_,
+               "glecaprevir_mut_short" = NA_character_,
+               "grazoprevir" = NA_character_,
+               "grazoprevir_mut" = NA_character_,
+               "grazoprevir_mut_short" = NA_character_,
+               "paritaprevir" = NA_character_,
+               "paritaprevir_mut" = NA_character_,
+               "paritaprevir_mut_short" = NA_character_,
+               "voxilaprevir" = NA_character_,
+               "voxilaprevir_mut" = NA_character_,
+               "voxilaprevir_mut_short" = NA_character_,
+               "NS34A" = NA_character_,
+               "NS34A_short" = NA_character_,
+               "daclasvir" = NA_character_,
+               "daclasvir_mut" = NA_character_,
+               "daclasvir_mut_short" = NA_character_,
+               "elbasvir" = NA_character_,
+               "elbasvir_mut" = NA_character_,
+               "elbasvir_mut_short" = NA_character_,
+               "ledipasvir" = NA_character_,
+               "ledipasvir_mut" = NA_character_,
+               "ledipasvir_mut_short" = NA_character_,
+               "ombitasvir" = NA_character_,
+               "ombitasvir_mut" = NA_character_,
+               "ombitasvir_mut_short" = NA_character_,
+               "pibrentasvir" = NA_character_,
+               "pibrentasvir_mut" = NA_character_,
+               "pibrentasvir_mut_short" = NA_character_,
+               "velpatasvir" = NA_character_,
+               "velpatasvir_mut" = NA_character_,
+               "velpatasvir_mut_short" = NA_character_,
+               "NS5A" = NA_character_,
+               "NS5A_short" = NA_character_,
+               "dasabuvir" = NA_character_,
+               "dasabuvir_mut" = NA_character_,
+               "dasabuvir_mut_short" = NA_character_,
+               "sofosbuvir" = NA_character_,
+               "sofosbuvir_mut" = NA_character_,
+               "sofosbuvir_mut_short" = NA_character_,
+               "NS5B" = NA_character_,
+               "NS5B_short" = NA_character_,
+               "HCV project version" = NA_character_,
+               "GLUE engine version" = NA_character_,
+               "PHE drug resistance extension version" = NA_character_,
+               )
+}
 
 # Reorder columns
 final <- final %>%
