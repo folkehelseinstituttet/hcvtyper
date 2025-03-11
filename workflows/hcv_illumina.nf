@@ -80,7 +80,6 @@ include { BLASTPARSE                          } from '../modules/local/blastpars
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
 include { GLUEPARSE as HCV_GLUE_PARSER  } from '../modules/local/glueparse'
-//include { GLUEPARSE as HCV_GLUE_PARSER_MINOR  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 include { SORT_IDXSTATS                       } from '../modules/local/idxstats_sort.nf'
 
@@ -89,8 +88,6 @@ include { SORT_IDXSTATS                       } from '../modules/local/idxstats_
     RUN MAIN WORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-
-// TODO: Make subworkflows for all refs, major and minor
 
 // Info required for completion email and summary
 def multiqc_report = []
