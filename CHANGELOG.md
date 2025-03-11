@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
-### `Fixed`
+### `Fixed`  
+The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
 
 ### `Dependencies`
 
