@@ -35,10 +35,12 @@ ch_multiqc_custom_methods_description = params.multiqc_methods_description ? fil
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK                       } from '../subworkflows/local/input_check'
-include { BAM_MARKDUPLICATES_SAMTOOLS       } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
-include { TARGETED_MAPPING as MAJOR_MAPPING } from '../subworkflows/local/targeted_mapping'
-include { TARGETED_MAPPING as MINOR_MAPPING } from '../subworkflows/local/targeted_mapping'
+include { INPUT_CHECK                                    } from '../subworkflows/local/input_check'
+include { BAM_MARKDUPLICATES_SAMTOOLS                    } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
+include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows/local/get_mapping_stats'
+include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
+include { TARGETED_MAPPING as MAJOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
+include { TARGETED_MAPPING as MINOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -55,21 +57,15 @@ include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/ma
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
-include { HCV_GLUE             } from '../modules/local/hcvglue'
+include { HCV_GLUE                           } from '../modules/local/hcvglue'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
 include { SPADES                             } from '../modules/nf-core/spades/main'
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
-include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_WITHDUP } from '../modules/nf-core/samtools/index/main'
-include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_MARKDUP } from '../modules/nf-core/samtools/index/main'
-include { SAMTOOLS_IDXSTATS as SAMTOOLS_IDXSTATS_WITHDUP } from '../modules/nf-core/samtools/idxstats/main'
-include { SAMTOOLS_IDXSTATS as SAMTOOLS_IDXSTATS_MARKDUP } from '../modules/nf-core/samtools/idxstats/main'
-include { SAMTOOLS_DEPTH as SAMTOOLS_DEPTH_WITHDUP } from '../modules/nf-core/samtools/depth/main'
-include { SAMTOOLS_DEPTH as SAMTOOLS_DEPTH_MARKDUP } from '../modules/nf-core/samtools/depth/main'
-include { SAMTOOLS_STATS                     } from '../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_SORMADUP                  } from '../modules/nf-core/samtools/sormadup/main'
+include { VERIFYBAMID_VERIFYBAMID2           } from '../modules/nf-core/verifybamid/verifybamid2/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -81,7 +77,6 @@ include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf
 include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
 include { GLUEPARSE as HCV_GLUE_PARSER  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
-include { SORT_IDXSTATS                       } from '../modules/local/idxstats_sort.nf'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,6 +197,9 @@ workflow HCV_ILLUMINA {
             )
             ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
+            // Collect all contigs from all samples. The intention is to align them all against each other and create a distance matrix and a tree.
+            ch_contigs = SPADES.out.contigs.collect({it[1]})
+
             //
             // MODULE: Blast assembled scaffolds against viral references.
             //
@@ -251,31 +249,35 @@ workflow HCV_ILLUMINA {
         ch_aligned = TANOTI_ALIGN.out.aligned
     }
 
-    SAMTOOLS_INDEX_WITHDUP (
-        ch_aligned
+    //
+    // SUBWORKFLOW: Get mapping statistics with duplicates included
+    //
+    GET_MAPPING_STATS_WITHDUP (
+        ch_aligned, // Channel: [ val(meta), [ bam ] ]
+        Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_INDEX_WITHDUP.out.versions.first())
+    versions = GET_MAPPING_STATS_WITHDUP.out.versions
 
-    SAMTOOLS_IDXSTATS_WITHDUP (
-        ch_aligned.join(SAMTOOLS_INDEX_WITHDUP.out.bai) // val(meta), path(bam), path(bai)
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_WITHDUP.out.versions.first())
-
-    SORT_IDXSTATS (
-        SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats
-    )
-    ch_versions = ch_versions.mix(SORT_IDXSTATS.out.versions)
-
-    SAMTOOLS_DEPTH_WITHDUP (
+    // Remove duplicate reads
+    SAMTOOLS_SORMADUP (
         ch_aligned,
-        [ [], []] // Passing empty channels instead of an interval file
+        [ [], file(params.references) ]
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH_WITHDUP.out.versions.first())
+    ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
+
+    //
+    // SUBWORKFLOW: Get mapping statistics with duplicates removed
+    //
+    GET_MAPPING_STATS_MARKDUP (
+        SAMTOOLS_SORMADUP.out.bam,
+        Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
+    )
+    versions = GET_MAPPING_STATS_MARKDUP.out.versions
 
     //
     // MODULE: Identify the two references with most mapped reads, duplicates included
     //
-    ch_parsefirstmapping = SAMTOOLS_IDXSTATS_WITHDUP.out.idxstats.join(SAMTOOLS_DEPTH_WITHDUP.out.tsv) // val(meta), path(idxstats), path(tsv)
+    ch_parsefirstmapping = GET_MAPPING_STATS_WITHDUP.out.idxstats.join(GET_MAPPING_STATS_WITHDUP.out.tsv) // val(meta), path(idxstats), path(tsv)
         .filter { meta, idxstats, tsv ->
             tsv.size() > 0 // Filter out empty tsv files
         }
@@ -285,35 +287,6 @@ workflow HCV_ILLUMINA {
         ch_parsefirstmapping,
         file(params.references)
     )
-
-    // Remove duplicate reads
-    SAMTOOLS_SORMADUP (
-        ch_aligned,
-        [ [], file(params.references) ]
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
-
-    SAMTOOLS_INDEX_MARKDUP (
-        SAMTOOLS_SORMADUP.out.bam
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_INDEX_MARKDUP.out.versions.first())
-
-    SAMTOOLS_IDXSTATS_MARKDUP (
-        SAMTOOLS_SORMADUP.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai) // val(meta), path(bam), path(bai)
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_IDXSTATS_MARKDUP.out.versions.first())
-
-    SAMTOOLS_DEPTH_MARKDUP (
-        SAMTOOLS_SORMADUP.out.bam,
-        [ [], []] // Passing empty channels instead of an interval file
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_DEPTH_MARKDUP.out.versions.first())
-
-    SAMTOOLS_STATS (
-        SAMTOOLS_SORMADUP.out.bam.join(SAMTOOLS_INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
-        Channel.value(file(params.references)).map { [ [:], it ] } // Add empty meta map before the reference file path
-    )
-    ch_versions = ch_versions.mix(SAMTOOLS_STATS.out.versions.first())
 
     //
     // SUBWORKFLOW: Map reads against the majority reference
