@@ -5,7 +5,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### `Added`
+### `Added`  
+Moved various samtools processes on the first mapping to a local subworkflow.  
 
 ### `Fixed`  
 The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
