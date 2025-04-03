@@ -82,5 +82,5 @@ p <- ggplot(noise_data, aes(x = pos, y = noise)) +
   theme_minimal()
 
 # Save the plot as a PNG file
-output_filename <- paste0("variation_plot_", selected_ref, "_major.png")
-ggsave(output_filename, plot = p, width = 10, height = 5, dpi = 300)
+output_filename <- paste0("variation_plot_", ref_name, "_major.png")
+ggsave(output_filename, plot = p, width = 10, height = 5, dpi = 300, bg = "white")
