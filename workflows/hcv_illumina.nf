@@ -389,7 +389,8 @@ workflow HCV_ILLUMINA {
     } else {
         ch_glue = file("dummy_file")
     }
-
+    ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
+    
     SUMMARIZE (
         params.tanoti_stringency_1,
         params.tanoti_stringency_2,
@@ -400,7 +401,8 @@ workflow HCV_ILLUMINA {
         ch_depth.collect(),
         ch_blast,
         ch_glue,
-        ch_sequence_id.collect()
+        ch_sequence_id.collect(),
+        ch_variation.collect(),
     )
 
     //

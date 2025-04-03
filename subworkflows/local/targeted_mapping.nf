@@ -136,5 +136,6 @@ workflow TARGETED_MAPPING {
     stats_withdup = STATS_WITHDUP.out.stats
     stats_markdup = STATS_MARKDUP.out.stats
     consensus = IVAR_CONSENSUS.out.fasta
+    variation = PLOT_BAM_VARIATION.out.png
 
 }

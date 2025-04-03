@@ -6,7 +6,7 @@ process SUMMARIZE_HCV {
     conda "YOUR-TOOL-HERE"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/YOUR-TOOL-HERE':
-        'docker.io/jonbra/tidyverse_seqinr:2.0' }"
+        'community.wave.seqera.io/library/r-gridextra_r-png_r-seqinr_r-tidyverse:3536dd50a17de0ab' }"
 
     input:
     val stringency_1
@@ -19,11 +19,13 @@ process SUMMARIZE_HCV {
     path 'blast/'
     path 'glue/'
     path 'id/'
+    path 'variation/'
 
     output:
     path '*long.csv'        , emit: summary
     path '*mqc.csv'         , emit: mqc
     path '*LW_import.tsv'   , emit: lw
+    path '*png'             , emit: png
     path "versions.yml"     , emit: versions
 
     when:

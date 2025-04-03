@@ -19,6 +19,7 @@ path_5 <- "depth/"
 path_6 <- "blast/"
 path_7 <- "glue/"
 path_8 <- "id/"
+path_9 <- "variation/"
 
 
 
@@ -412,6 +413,61 @@ for (i in 1:length(id_files)) {
 }
 
 id_df <- as_tibble(id_df)
+
+# Variation ---------------------------------------------------------------
+# Read both the major and minor variation plots
+variation_plot_files <- list.files(path = path_9, pattern = ".*variation_plot.*\\.png$", full.names = TRUE)
+
+# Create R-code that will gather all the variation plots, then plot them as a grid with four columns and as many rows as needed. 
+# Make separate grids for files containing the string "major" and "minor"
+if (length(variation_plot_files) > 0) {
+  # Create a grid of plots for major and minor
+  major_plots <- variation_plot_files[grepl("major", variation_plot_files)]
+  minor_plots <- variation_plot_files[grepl("minor", variation_plot_files)]
+
+  # Create a grid of plots for major
+  if (length(major_plots) > 0) {
+    # Read images and convert to grobs
+    image_list <- lapply(major_plots, function(file) {
+      img <- png::readPNG(file)
+      grid::rasterGrob(img, interpolate = TRUE)
+    })
+
+    # Create a list of ggplot objects containing the images
+    plot_list <- lapply(image_list, function(g) {
+      ggplot() + 
+      annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+      theme_void()
+    })
+
+    # Arrange the plots in a grid with 4 columns
+    grid_arrange_major <- gridExtra::grid.arrange(grobs = plot_list, ncol = 4)
+
+    # Save the arranged grid to a PNG file with a white background
+    ggsave(filename = "Variation_plot_major.png", plot = grid_arrange_major, width = 12, height = 8, dpi = 300, bg = "white")
+  }
+
+  # Create a grid of plots for minor
+  if (length(minor_plots) > 0) {    # Read images and convert to grobs
+    image_list <- lapply(minor_plots, function(file) {
+      img <- png::readPNG(file)
+      grid::rasterGrob(img, interpolate = TRUE)
+    })
+
+    # Create a list of ggplot objects containing the images
+    plot_list <- lapply(image_list, function(g) {
+      ggplot() + 
+      annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
+      theme_void()
+    })
+
+    # Arrange the plots in a grid with 4 columns
+    grid_arrange_minor <- gridExtra::grid.arrange(grobs = plot_list, ncol = 4)
+
+    # Save the arranged grid to a PNG file with a white background
+    ggsave(filename = "Variation_plot_minor.png", plot = grid_arrange_minor, width = 12, height = 8, dpi = 300, bg = "white")
+  }
+}
 
 # Join dataframes ---------------------------------------------------------
 
