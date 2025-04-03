@@ -22,7 +22,7 @@ process PLOT_BAM_VARIATION {
     def prefix = task.ext.prefix ?: "${meta.id}"
 
     """
-    plot_bam_variation.R "${bam}"
+    plot_bam_variation.R "${bam}" "${prefix}"
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -22,7 +22,7 @@ process PLOT_COVERAGE {
     def prefix = task.ext.prefix ?: "${meta.id}"
 
     """
-    bam_coverage.R "${depth}"
+    bam_coverage.R "${depth}" "${prefix}"
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
