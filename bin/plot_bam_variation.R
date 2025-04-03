@@ -1,17 +1,28 @@
 #!/usr/bin/env Rscript
 
 args = commandArgs(trailingOnly=TRUE)
-if (length(args) < 1) {
-  stop("Usage: plot_bam_variation.R <bam file>", call.=FALSE)
+if (length(args) < 2) {
+  stop("Usage: plot_bam_variation.R <bam file> <prefix>", call.=FALSE)
 }
 
 library(Rsamtools)
 library(tidyverse)
 
+# Define the bam file
+bam_file <- args[1]
+prefix <- args[2]
+
+# Read the sample name from the input file. Use this as a control that the right bam file is inputted
+sampleName <- unlist(str_split(basename(bam_file), pattern = "\\."))[1]
+
+# Check that prefix and sampleName are identical. If not, stop the script and print an error message
+if (prefix != sampleName) {
+  stop("Error: Prefix and sample name do not match. Please check the input files.", call.=FALSE)
+}
+
+
 # Set noise threshold for highlighting (modify as needed)
 noise_threshold <- 0.15  
-
-bam_file <- args[1]
 
 # Open the BAM file
 bam <- BamFile(bam_file)
@@ -82,5 +93,5 @@ p <- ggplot(noise_data, aes(x = pos, y = noise)) +
   theme_minimal()
 
 # Save the plot as a PNG file
-output_filename <- paste0("variation_plot_", ref_name, "_major.png")
+output_filename <- paste0(sampleName,".variation_plot_", ref_name, "_major.png")
 ggsave(output_filename, plot = p, width = 10, height = 5, dpi = 300, bg = "white")
