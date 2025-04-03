@@ -9,6 +9,7 @@ include { SAMTOOLS_DEPTH    } from '../../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../modules/nf-core/samtools/stats/main'
 include { IVAR_CONSENSUS } from '../../modules/nf-core/ivar/consensus/main'
+include { PLOT_BAM_VARIATION } from '../../modules/local/bam_variation'
 
 include { SAMTOOLS_SORMADUP } from '../../modules/nf-core/samtools/sormadup/main'
 
@@ -24,24 +25,12 @@ workflow TARGETED_MAPPING {
             align: [ meta, fasta, reads ]
         }
 
-    // Extract the val(meta), path(fasta)
-    ch_build = ch_major_mapping
-        .map { meta, fasta, reads ->
-        return [meta, fasta]
-    }
-
-    // Extract only the fasta path
-    ch_fasta = ch_major_mapping
-        .map { meta, fasta, reads ->
-        return [fasta]
-    }
-
     // Extract val(meta), path(reads). Add the reference name to the meta map
-    ch_align = ch_major_mapping
-        .map { meta, fasta, reads ->
-            new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
-        return [new_meta, reads]
-    }
+//    ch_align = ch_major_mapping
+//        .map { meta, fasta, reads ->
+//            new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
+//        return [new_meta, reads]
+//    }
 
     if (params.mapper == "bowtie2") {
         BOWTIE2_BUILD (
@@ -63,8 +52,8 @@ workflow TARGETED_MAPPING {
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
-            ch_align,
-            ch_build,
+            ch_input.align,
+            ch_input.build,
             true, // Sort bam file
             params.tanoti_stringency_2
         )
@@ -79,7 +68,7 @@ workflow TARGETED_MAPPING {
 
     STATS_WITHDUP (
         ch_aligned.join(INDEX_WITHDUP.out.bai), // val(meta), path(bam), path(bai)
-        ch_build // val(meta), path(fasta)
+        ch_input.build // val(meta), path(fasta)
 
     )
     // Remove duplicate reads
@@ -110,7 +99,7 @@ workflow TARGETED_MAPPING {
 
     STATS_MARKDUP (
         SAMTOOLS_SORMADUP.out.bam.join(INDEX_MARKDUP.out.bai), // val(meta), path(bam), path(bai)
-        ch_build // val(meta), path(fasta)
+        ch_input.build // val(meta), path(fasta)
     )
     ch_versions = ch_versions.mix(STATS_MARKDUP.out.versions.first())
 
@@ -121,6 +110,14 @@ workflow TARGETED_MAPPING {
         SAMTOOLS_DEPTH.out.tsv
     )
     ch_versions = ch_versions.mix(PLOT_COVERAGE.out.versions)
+
+    //
+    // MODULE: Plot variation in mapping file
+    //
+    PLOT_BAM_VARIATION (
+        SAMTOOLS_SORMADUP.out.bam
+    )
+    ch_versions = ch_versions.mix(PLOT_BAM_VARIATION.out.versions)
 
     //
     // MODULE: Create consensus sequence
