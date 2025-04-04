@@ -87,9 +87,10 @@ p <- ggplot(noise_data, aes(x = pos, y = noise)) +
   geom_segment(aes(xend = pos, yend = 0), color = "black") +  # Black bars for variation
   geom_point(data = zero_coverage, aes(x = pos, y = 0), color = "blue", size = 2) +  # Blue dots for zero coverage
   geom_point(data = high_noise, aes(x = pos, y = noise), color = "red", size = 2) +  # Red dots for high noise
-  labs(title = paste("Variation per Position in", ref_name),
+  labs(title = paste0(sampleName, ". Variation per Position in ", ref_name, ". Threshold ", noise_threshold),
        x = "Position",
        y = "Noise") +
+  ylim(0, 1.0) +  # Hardcode the y-axis limit to 1.0
   theme_minimal()
 
 # Save the plot as a PNG file
