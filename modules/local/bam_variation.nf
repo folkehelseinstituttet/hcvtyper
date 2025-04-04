@@ -12,6 +12,7 @@ process PLOT_BAM_VARIATION {
 
     output:
     path("*.png")      , emit: png, optional: true
+    path("*.tsv")      , emit: tsv, optional: true
     path "versions.yml", emit: versions
 
     when:
