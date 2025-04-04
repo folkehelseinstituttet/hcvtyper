@@ -5,7 +5,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### `Added`
+### `Added`  
+Plotting variation per site in the bam files from the targeted mapping.  
+Cleaned up various publish dirs.
 
 ### `Fixed`  
 The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
