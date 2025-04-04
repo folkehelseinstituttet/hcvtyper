@@ -24,6 +24,9 @@ if (prefix != sampleName) {
 # Set noise threshold for highlighting (modify as needed)
 noise_threshold <- 0.15  
 
+# Set minimum coverage for considering a position
+min_coverage <- 10
+
 # Open the BAM file
 bam <- BamFile(bam_file)
 
@@ -79,6 +82,13 @@ noise_data <- complete_pileup %>%
 # Identify positions with zero coverage
 zero_coverage <- noise_data %>% filter(total_count == 0)
 
+# Identify positions with total count of 9 or less
+low_coverage <- noise_data %>% filter(total_count > 0 & total_count < min_coverage)
+
+# Set noise to zero for low coverage positions
+noise_data <- noise_data %>%
+  mutate(noise = ifelse(total_count > 0 & total_count <= 9, 0, noise))
+
 # Identify positions with noise above the threshold
 high_noise <- noise_data %>% filter(noise > noise_threshold)
 
@@ -86,8 +96,9 @@ high_noise <- noise_data %>% filter(noise > noise_threshold)
 p <- ggplot(noise_data, aes(x = pos, y = noise)) +
   geom_segment(aes(xend = pos, yend = 0), color = "black") +  # Black bars for variation
   geom_point(data = zero_coverage, aes(x = pos, y = 0), color = "blue", size = 2) +  # Blue dots for zero coverage
+  geom_point(data = low_coverage, aes(x = pos, y = 0), color = "grey", size = 2) +  # Grey dots for low coverage
   geom_point(data = high_noise, aes(x = pos, y = noise), color = "red", size = 2) +  # Red dots for high noise
-  labs(title = paste0(sampleName, ". Variation per Position in ", ref_name, ". Threshold ", noise_threshold),
+  labs(title = paste0(sampleName, ". Ref. ", ref_name, ". Noise threshold ", noise_threshold, ". Min. coverage ", min_coverage),
        x = "Position",
        y = "Noise") +
   ylim(0, 1.0) +  # Hardcode the y-axis limit to 1.0
