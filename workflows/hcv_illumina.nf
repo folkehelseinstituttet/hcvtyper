@@ -65,7 +65,7 @@ include { SPADES                             } from '../modules/nf-core/spades/m
 include { BLAST_BLASTN                       } from '../modules/nf-core/blast/blastn/main'
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
 include { SAMTOOLS_SORMADUP                  } from '../modules/nf-core/samtools/sormadup/main'
-include { VERIFYBAMID_VERIFYBAMID2           } from '../modules/nf-core/verifybamid/verifybamid2/main'
+include { PICARD_COLLECTINSERTSIZEMETRICS    } from '../modules/nf-core/picard/collectinsertsizemetrics/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 
 //
@@ -264,6 +264,14 @@ workflow HCV_ILLUMINA {
         [ [], file(params.references) ]
     )
     ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
+
+    //
+    // MODULE: Collect insert size metrics with duplicates removed
+    //
+    PICARD_COLLECTINSERTSIZEMETRICS (
+        SAMTOOLS_SORMADUP.out.bam
+    )
+    ch_versions = ch_versions.mix(PICARD_COLLECTINSERTSIZEMETRICS.out.versions.first())
 
     //
     // SUBWORKFLOW: Get mapping statistics with duplicates removed
