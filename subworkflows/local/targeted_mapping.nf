@@ -10,7 +10,6 @@ include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../modules/nf-core/samtools
 include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../modules/nf-core/samtools/stats/main'
 include { IVAR_CONSENSUS } from '../../modules/nf-core/ivar/consensus/main'
 include { PLOT_BAM_VARIATION } from '../../modules/local/bam_variation'
-
 include { SAMTOOLS_SORMADUP } from '../../modules/nf-core/samtools/sormadup/main'
 
 workflow TARGETED_MAPPING {
@@ -24,13 +23,6 @@ workflow TARGETED_MAPPING {
             fasta: [ fasta ]
             align: [ meta, fasta, reads ]
         }
-
-    // Extract val(meta), path(reads). Add the reference name to the meta map
-//    ch_align = ch_major_mapping
-//        .map { meta, fasta, reads ->
-//            new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
-//        return [new_meta, reads]
-//    }
 
     if (params.mapper == "bowtie2") {
         BOWTIE2_BUILD (
