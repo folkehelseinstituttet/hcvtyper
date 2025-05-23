@@ -11,9 +11,9 @@ process PICARD_COLLECTINSERTSIZEMETRICS {
     tuple val(meta), path(bam)
 
     output:
-    tuple val(meta), path("*.txt"), emit: metrics
-    tuple val(meta), path("*.pdf"), emit: histogram
-    path "versions.yml"           , emit: versions
+    tuple val(meta), path("*.txt"), emit: metrics, optional: true
+    tuple val(meta), path("*.pdf"), emit: histogram, optional: true
+    path "versions.yml"           , emit: versions, optional: true
 
     when:
     task.ext.when == null || task.ext.when
