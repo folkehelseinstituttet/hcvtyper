@@ -28,23 +28,40 @@ if (agens == "HCV") {
 }
 
 
-R1 <- sort(fastq[grep("R1", fastq)])
-R2 <- sort(fastq[grep("R2", fastq)])
+# Extract sample ID = first string before first underscore
+extract_sample_id <- function(x) str_extract(basename(x), "^[^_]+")
 
-df <- as_tibble(cbind(R1, R2))
+# Split R1 and R2
+R1 <- fastq[str_detect(fastq, "_R1")]
+R2 <- fastq[str_detect(fastq, "_R2")]
+
+# Create tibbles with sample ID
+df_R1 <- tibble(
+  sample = map_chr(R1, extract_sample_id),
+  fastq_1 = R1
+)
+
+df_R2 <- tibble(
+  sample = map_chr(R2, extract_sample_id),
+  fastq_2 = R2
+)
+
+# Join R1 and R2 on sample ID. This ensures R1 and R2 are correctly paired
+df <- left_join(df_R1, df_R2, by = "sample")
+
+# Check for missing pairs
+if (any(is.na(df$fastq_1)) || any(is.na(df$fastq_2))) {
+  stop("Some samples are missing R1 or R2 files", call. = FALSE)
+}
 
 # Check that the R1 and R2 files are correctly paired
 tmp <- df %>%
-  mutate(tmpR1 = gsub("_.*", "", basename(R1)),
-         tmpR2 = gsub("_.*", "", basename(R2))) %>%
+  mutate(tmpR1 = gsub("_.*", "", basename(fastq_1)),
+         tmpR2 = gsub("_.*", "", basename(fastq_2))) %>%
   select(tmpR1, tmpR2)
 
 if (identical(tmp$tmpR1, tmp$tmpR2)) {
-  df <- df %>%
-    mutate(sample_id = gsub("_.*", "", basename(R1))) %>%
-    select("sample" = sample_id,
-           "fastq_1" = R1,
-           "fastq_2" = R2)
+  print("All files are correctly paired")
 } else {
   print("R1 and R2 files not correctly paired")
 }
