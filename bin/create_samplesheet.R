@@ -48,7 +48,6 @@ df_R2 <- tibble(
 
 # Join R1 and R2 on sample ID. This ensures R1 and R2 are correctly paired
 df <- left_join(df_R1, df_R2, by = "sample")
-write_csv(df, "tmp.csv")
 
 # Check for missing pairs
 if (any(is.na(df$fastq_1)) || any(is.na(df$fastq_2))) {
