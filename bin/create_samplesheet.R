@@ -56,8 +56,8 @@ if (any(is.na(df$fastq_1)) || any(is.na(df$fastq_2))) {
 
 # Check that the R1 and R2 files are correctly paired
 tmp <- df %>%
-  mutate(tmpR1 = gsub("_.*", "", basename(fastq_1)),
-         tmpR2 = gsub("_.*", "", basename(fastq_2))) %>%
+  mutate(tmpR1 = map_chr(fastq_1, ~ gsub("_.*", "", basename(.))),
+         tmpR2 = map_chr(fastq_2, ~ gsub("_.*", "", basename(.)))) %>%
   select(tmpR1, tmpR2)
 
 if (identical(tmp$tmpR1, tmp$tmpR2)) {
