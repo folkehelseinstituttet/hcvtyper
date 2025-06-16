@@ -19,6 +19,7 @@ process BLASTPARSE {
     tuple val(meta), path("*major.fa")      , emit: major_fasta
     tuple val(meta), path("*minor.fa")      , emit: minor_fasta, optional: true
     tuple val(meta), path("*blastparse.csv"), emit: csv
+    tuple val(meta), path("*_top_hits_longer499.csv"), emit: long_hits
     tuple val(meta), path("*.png")          , emit: png
     path "versions.yml"                     , emit: versions
 
