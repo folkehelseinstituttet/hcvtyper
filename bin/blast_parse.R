@@ -1,266 +1,191 @@
 #!/usr/bin/env Rscript
+#
+# blast_parse.R  —  tidy BLAST‑tab output, basic QC plots,
+#                   per‑subtype scaffold FASTAs (≥500 bp),
+#                   and an “alignment” bar‑plot of top hits.
+#
+# Usage: blast_parse.R <prefix> <blast_out> <scaffolds> <references> <agens>
+#        * <references> and <agens> are kept for CLI compatibility
+#          but no longer used by this script.
+# ---------------------------------------------------------------------------
 
-library(tidyverse)
-library(seqinr)
+suppressPackageStartupMessages({
+  library(tidyverse)   # readr, dplyr, tidyr, ggplot2, purrr
+  library(seqinr)      # FASTA I/O
+})
 
-args = commandArgs(trailingOnly=TRUE)
+## ── 1. Command‑line args ----------------------------------------------------
+args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 5) {
-  stop("Usage: blast_parse.R <prefix> <blast_out> <scaffolds> <references> <agens>", call.=FALSE)
+  stop(
+    "Usage: blast_parse.R <prefix> <blast_out> <scaffolds> <references> <agens>",
+    call. = FALSE
+  )
 }
-
 prefix     <- args[1]
 blast_out  <- args[2]
 scaffolds  <- args[3]
 references <- args[4]
-agens      <- args[5]
+# agens      <- args[5]   # not used
 
-# Read the reference fasta file
-fasta <- read.fasta(file = references)
-
-# Read Spades scaffolds
-scaffolds_fa <- read.fasta(file = scaffolds)
-
-# Read the output from blasting scaffolds against the references
-scaf <- read_tsv(blast_out, col_names = FALSE) %>%
-  # Rename columns
-  rename("qseqid" = "X1",
-    "sseqid" = "X2",
-    "pident" = "X3",
-    "length" = "X4",
-    "mismatch" = "X5",
-    "gapopen" = "X6",
-    "qstart" = "X7",
-    "qend" = "X8",
-    "sstart" = "X9",
-    "send" = "X10",
-    "evalue" = "X11",
-    "bitscore" = "X12")
-
-# Plot evalues, bitscore and hit length
-scaf %>%
-  arrange(desc(bitscore)) %>%
-  head(n = 30) %>%
-  ggplot(aes(x = reorder(sseqid, -bitscore), y = bitscore)) +
-  geom_point() +
-  ylab("Bitscore") +
-  xlab("Reference") +
-  ggtitle(paste0(prefix, " Blastn, top 30 highest bitscores")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-ggsave(paste0(prefix, ".bitscore_plot.png"),
-       plot = last_plot(),
-       device = "png",
-       dpi = 300,
-       bg = "white")
-
-scaf %>%
-  arrange(desc(length)) %>%
-  head(n = 30) %>%
-  ggplot(aes(x = reorder(sseqid, -length), y = length)) +
-  geom_point() +
-  ylab("Hit length") +
-  xlab("Reference") +
-  ggtitle(paste0(prefix, " Blastn, top 30 longest hits")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-ggsave(paste0(prefix, ".hitlength_plot.png"),
-       plot = last_plot(),
-       device = "png",
-       dpi = 300,
-       bg = "white")
-
-# Separate the subtypes from the subject header
-# Add a column for the subtype
-scaf <- scaf %>%
-  separate(sseqid, into = c("subtype", NA), remove = FALSE)
-
-# Write out the reformatted blast result
-write_csv(scaf, file = paste0(prefix, "_blast_out.csv"))
-
-# Which subytpes are present?
-subtypes <- scaf %>%
-  distinct(subtype)
-
-write_tsv(subtypes, paste0(prefix, ".subtypes.tsv"))
-
-# What is the most common reference sequence (sseqid) per subtype?
-# Need to choose when two or more subtypes are equally frequent. Choose the one hit by the longest scaffold
-ref_info <- scaf %>%
-  # Get scaffold length info
-  separate(qseqid, c(NA, NA, NA, "sc_length", NA, NA), sep = "_", remove = FALSE) %>%
-  mutate(sc_length = as.numeric(sc_length)) %>%
-  # Select the row with the longest scaffold lengths for each genotype/blast hit
-  group_by(subtype) %>%
-  slice_max(order_by = sc_length, n = 1)
-
-# Write out a fasta file for the reference file of each subtype
-for (i in 1:nrow(ref_info)) {
-  #write_tsv(subtypes[i, 1], file = paste0(prefix, ".", subtypes$sseqid[i], ".txt"), col_names = FALSE)
-  write.fasta(sequences = fasta[[ref_info$sseqid[i]]], names = ref_info$sseqid[i], file.out = paste0(prefix, ".", ref_info$sseqid[i], "_ref.fa"))
-}
-
-# Split scaffolds per subtype
-# First extract the scaffold names that matches the different subtypes from the blast output
-split <- scaf %>%
-  group_split(subtype)
-
-# Write one fasta per subtype
-for (i in 1:length(split)){
-  # Store the scaffold names and corresponding subtype
-  tmp <- split[[i]] %>% select(qseqid, subtype) %>%
-    # If the same scaffold has multiple blast hits to the same reference
-    # it will cover multiple lines
-    distinct()
-  # Subset the scaffolds
-  subtype_fa <- scaffolds_fa[tmp$qseqid]
-  # Write to file
-  write.fasta(sequences = subtype_fa, names = names(subtype_fa), file.out = paste0(prefix, ".", tmp$subtype[1], "_scaffolds.fa"))
-}
-
-# Identify major and minor reference
-
-# Simply take the best blast hit as determined by Blastn - the top hit - as the majority reference
-major_name <- scaf %>%
-  head(n=1) %>%
-  pull(sseqid)
-
-# write the fasta file
-write.fasta(sequences = fasta[major_name], names = major_name, file.out = paste0(prefix, ".", major_name, "_major.fa"))
-
-# For the minor, take the second best blast hit that belongs to a different genotype, if there are any
-major_geno <- str_sub(major_name, 1, 1)
-minor_name <- scaf %>%
-  filter(str_detect(subtype, paste0("^", major_geno), negate = T)) %>% # Genotype cannot begin with the major_geno
-  head(n=1) %>%
-  pull(sseqid)
-
-# if minor_name is character(0) then it is empty, i.e., there are no major genotype present
-if (!identical(minor_name, character(0))) {
-  # write the fasta file
-  write.fasta(sequences = fasta[minor_name], names = minor_name, file.out = paste0(prefix, ".", minor_name, "_minor.fa"))
-}
-
-# Create a csv file with info on major and minor references and blast hit length
-df <- matrix(nrow = 1, ncol = 5)
-colnames(df) <- c("sample", "major_ref", "major_length", "minor_ref", "minor_length")
-df <- as.data.frame(df)
-df$sample <- prefix
-df$major_ref <- major_name
-if (!identical(minor_name, character(0))) {
-  df$minor_ref <- minor_name
-}
-
-major_length <- scaf %>%
-  filter(sseqid == major_name) %>%
-  arrange(desc(length)) %>%
-  head(n=1) %>%
-  pull(length)
-df$major_length <- major_length
-
-if (!identical(minor_name, character(0))) {
-  minor_length <- scaf %>%
-    filter(sseqid == minor_name) %>%
-    arrange(desc(length)) %>%
-    head(n=1) %>%
-    pull(length)
-  df$minor_length <- minor_length
-}
-
-write_csv(df, file = paste0(prefix, ".blastparse.csv"))
-
-# ──────────────────────────────────────────────────────────────────────────────
-#  NEW SECTION ─ Top blast hit per contig (>499 bp) + alignment‑style plot
-# ──────────────────────────────────────────────────────────────────────────────
-#  1.  Pull contig length and coverage out of the scaffold name
-#      Expected scaffold header pattern:
-#         NODE_<id>_length_<len>_cov_<cov>[...]
-# ------------------------------------------------------------------------------
-
-scaf <- scaf %>%                                  # <<‑ existing BLAST tibble
-  mutate(
-    sc_length = as.numeric(                       # contig length (bp)
-      str_extract(qseqid, "(?<=_length_)[0-9]+")
-    ),
-    coverage  = as.numeric(                       # contig coverage
-      str_extract(qseqid, "(?<=_cov_)[0-9.]+")
-    )
-  )
-
-# ------------------------------------------------------------------------------
-#  2.  Keep only contigs longer than 499 bp
-# ------------------------------------------------------------------------------
-
-scaf_long <- scaf %>% filter(sc_length > 499)
-
-# ------------------------------------------------------------------------------
-#  3.  For each contig, grab the single best BLAST hit
-#      • Primary key = lowest e‑value
-#      • Tie‑breaker = highest bitscore
-# ------------------------------------------------------------------------------
-
-top_hits <- scaf_long %>%
-  arrange(evalue, desc(bitscore)) %>%
-  group_by(qseqid) %>%
-  slice(1) %>%                            # best hit
-  ungroup()
-
-# ------------------------------------------------------------------------------
-#  4.  Add genotype / subtype fields and tidy the coordinates
-# ------------------------------------------------------------------------------
-
-top_hits <- top_hits %>%
-  separate(sseqid, into = c("subtype", NA), remove = FALSE) %>%  # e.g. 3a_D1776
-  mutate(
-    genotype   = str_sub(subtype, 1, 1),                         # "3"
-    hit_length = length,                                         # BLAST hit length
-    ref_start  = pmin(sstart, send),                             # always left‑to‑right
-    ref_end    = pmax(sstart, send)
-  ) %>%
-  select(qseqid, sc_length, coverage, genotype, subtype,
-         sseqid, hit_length, ref_start, ref_end)
-
-# ------------------------------------------------------------------------------
-#  5.  Write summary table
-# ------------------------------------------------------------------------------
-
-write_csv(top_hits,
-          file = paste0(prefix, "_top_hits_longer499.csv"))
-
-# ------------------------------------------------------------------------------
-#  6.  Alignment‑style bar plot
-#      • X‑axis = position on reference
-#      • One horizontal bar per contig covering ref_start‑ref_end
-#      • Colour = subtype
-# ------------------------------------------------------------------------------
-
-align_plot <- ggplot(top_hits) +
-  geom_segment(
-    aes(x = ref_start, xend = ref_end,
-        y = reorder(qseqid, sc_length), yend = reorder(qseqid, sc_length),
-        colour = subtype),
-    size = 2
-  ) +
-  labs(
-    x       = "Position on reference (bp)",
-    y       = "Contig (ordered by length)",
-    colour  = "Subtype",
-    title   = paste0(prefix,
-                     " – BLAST hit positions on references\n(contigs > 499 bp, best hit only)")
-  ) +
-  theme_minimal()
-
-ggsave(
-  filename = paste0(prefix, ".contig_alignment_plot.png"),
-  plot     = align_plot,
-  width    = 10,
-  height   = max(4, nrow(top_hits) / 10),   # auto‑stretch height for many contigs
-  dpi      = 300,
-  bg       = "white"
+ref_fa     <- read.fasta(             # DNA FASTA with HCV references
+  file    = references,
+  seqtype = "DNA"
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  END NEW SECTION
-# ──────────────────────────────────────────────────────────────────────────────
+## ── 2. Input files ----------------------------------------------------------
+# Scaffolds FASTA (for sequence export)
+scaffolds_fa <- read.fasta(file = scaffolds, seqtype = "DNA")
+
+# BLAST outfmt 6 table
+scaf <- read_tsv(
+  blast_out,
+  col_names = FALSE,
+  show_col_types = FALSE
+) %>%
+  rename(qseqid  = X1,  sseqid  = X2,  pident   = X3,  length   = X4,
+         mismatch = X5, gapopen = X6,  qstart   = X7,  qend     = X8,
+         sstart   = X9, send    = X10, evalue   = X11, bitscore = X12) %>%
+  # pull subtype from reference header (e.g. 3a_D1776 → subtype = "3a")
+  separate(sseqid, into = c("subtype", NA), remove = FALSE) %>%
+  # extract scaffold length & coverage from header: NODE_?_length_<len>_cov_<cov>
+  mutate(
+    sc_length = as.numeric(str_extract(qseqid, "(?<=_length_)[0-9]+")),
+    coverage  = as.numeric(str_extract(qseqid, "(?<=_cov_)[0-9.]+"))
+  )
+
+# Write reformatted BLAST output
+write_csv(scaf, paste0(prefix, "_blast_out.csv"))
+
+## ── 3. Quick QC plots -------------------------------------------------------
+# 3a. Top‑30 bitscores
+scaf %>%
+  arrange(desc(bitscore)) %>% slice_head(n = 30) %>%
+  ggplot(aes(x = reorder(sseqid, -bitscore), y = bitscore)) +
+  geom_point() +
+  labs(
+    title = paste0(prefix, " – top 30 BLAST bitscores"),
+    x = "Reference",
+    y = "Bitscore"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+ggsave(
+  paste0(prefix, ".bitscore_plot.png"),
+  dpi = 300, width = 9, height = 4, bg = "white"
+)
+
+# 3b. Top‑30 hit lengths
+scaf %>%
+  arrange(desc(length)) %>% slice_head(n = 30) %>%
+  ggplot(aes(x = reorder(sseqid, -length), y = length)) +
+  geom_point() +
+  labs(
+    title = paste0(prefix, " – top 30 BLAST hit lengths"),
+    x = "Reference",
+    y = "Hit length (bp)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+ggsave(
+  paste0(prefix, ".hitlength_plot.png"),
+  dpi = 300, width = 9, height = 4, bg = "white"
+)
+
+## ── 4. Top BLAST hit per scaffold (all lengths) ----------------------------
+scaf_top <- scaf %>%
+  arrange(evalue, desc(bitscore)) %>%      # best hit = lowest e‑value, highest bitscore
+  group_by(qseqid) %>% slice(1) %>% ungroup()
+
+write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
+
+## ── 5. Alignment‑style bar plot (ALL scaffolds) ----------------------------
+plot_dat <- scaf_top %>%
+  mutate(
+    idx       = row_number(),                # vertical order
+    aln_start = pmin(sstart, send),
+    aln_end   = pmax(sstart, send)
+  )
+
+align_plot <- ggplot(
+  plot_dat,
+  aes(xmin = aln_start, xmax = aln_end,
+      y = idx, ymin = idx - .45, ymax = idx + .45,
+      fill = subtype)
+) +
+  geom_rect() +
+  labs(
+    title = paste0(prefix, " – alignment of top BLAST hits"),
+    x     = "Position on reference (bp)",
+    y     = "Scaffold",
+    fill  = "Subtype"
+  ) +
+  theme_minimal() +
+  theme(axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank())
+
+ggsave(
+  paste0(prefix, ".alignment_plot.png"),
+  align_plot,
+  width = 10,
+  height = max(4, nrow(plot_dat) / 12),
+  dpi = 300,
+  bg = "white"
+)
+
+## ── 6. Scaffold FASTAs ≥500 bp, grouped by subtype -------------------------
+scaf_top_long <- scaf_top %>% filter(sc_length >= 500)
+
+# Write one FASTA per subtype
+scaf_top_long %>%
+  group_by(subtype) %>%
+  group_walk(~{
+    subtype_name <- .y$subtype
+    seqs <- scaffolds_fa[.x$qseqid]
+    write.fasta(
+      sequences = seqs,
+      names     = names(seqs),
+      file.out  = paste0(prefix, ".", subtype_name, "_scaffolds.fa")
+    )
+  })
+
+# --- 7. Major / minor reference summary + FASTA export ---------------------
+
+# a) pick closest major and (optionally) minor reference names
+major_name <- scaf_top$sseqid[1]                 # best overall hit
+major_geno <- str_sub(major_name, 1, 1)
+
+minor_vec  <- scaf_top %>%
+  filter(!str_starts(subtype, major_geno)) %>%   # must be different genotype
+  slice_head(n = 1) %>%
+  pull(sseqid)
+minor_name <- if (length(minor_vec) == 0) NA_character_ else minor_vec
+
+# b) FASTA export -----------------------------------------------------------
+# Helper that writes the sequence only if it exists
+write_ref_fasta <- function(ref_name, tag) {
+  if (!is.na(ref_name) && ref_name %in% names(ref_fa)) {
+    write.fasta(
+      sequences = ref_fa[ref_name],
+      names     = ref_name,
+      file.out  = paste0(prefix, ".", ref_name, "_", tag, ".fa")
+    )
+  }
+}
+
+write_ref_fasta(major_name, "major")
+write_ref_fasta(minor_name, "minor")
+
+# c) summary CSV
+summary_tbl <- tibble(
+  sample       = prefix,
+  major_ref    = major_name,
+  major_length = scaf %>% filter(sseqid == major_name) %>%
+                   slice_max(length, n = 1) %>% pull(length),
+  minor_ref    = minor_name,
+  minor_length = if (is.na(minor_name)) NA_integer_ else
+                   scaf %>% filter(sseqid == minor_name) %>%
+                     slice_max(length, n = 1) %>% pull(length)
+)
+write_csv(summary_tbl, paste0(prefix, ".blastparse.csv"))
 
