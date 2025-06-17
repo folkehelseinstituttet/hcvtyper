@@ -129,6 +129,7 @@ p_align <- scaf_ordered %>%
 ggsave(paste0(prefix, ".alignment_plot.png"),
        plot = p_align,
        width = 10,
+       bg = "white",
        height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of scaffolds
        dpi = 300)
 
