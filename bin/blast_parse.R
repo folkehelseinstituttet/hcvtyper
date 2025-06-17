@@ -103,16 +103,20 @@ write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 # Create scaffold factor levels sorted by subtype, then by sstart
 scaf_ordered <- scaf_top %>%
   arrange(subtype, sstart, qseqid) %>%
-  mutate(scaffold_id = factor(qseqid, levels = unique(qseqid)))
+  mutate(y_pos = row_number())  # numeric y position
 
 # Plot: alignment-like overview of scaffold BLAST hits
 p_align <- scaf_ordered %>%
   ggplot(aes(xmin = pmin(sstart, send),
              xmax = pmax(sstart, send),
-             y = scaffold_id,
+             ymin = y_pos - 0.4,
+             ymax = y_pos + 0.4,
              fill = subtype)) +
-  geom_rect(aes(ymin = as.numeric(scaffold_id) - 0.4,
-                ymax = as.numeric(scaffold_id) + 0.4)) +
+  geom_rect() +
+  scale_y_continuous(
+    breaks = scaf_ordered$y_pos,
+    labels = scaf_ordered$qseqid
+  ) +
   scale_fill_viridis_d(option = "D") +
   theme_minimal() +
   labs(
