@@ -100,38 +100,33 @@ scaf_top <- scaf %>%
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
 ## ── 5. Alignment‑style bar plot (ALL scaffolds) ----------------------------
-plot_dat <- scaf_top %>%
-  mutate(
-    idx       = row_number(),                # vertical order
-    aln_start = pmin(sstart, send),
-    aln_end   = pmax(sstart, send)
+# Create scaffold factor levels sorted by subtype, then by sstart
+scaf_ordered <- scaf_top %>%
+  arrange(subtype, sstart, qseqid) %>%
+  mutate(scaffold_id = factor(qseqid, levels = unique(qseqid)))
+
+# Plot: alignment-like overview of scaffold BLAST hits
+p_align <- scaf_ordered %>%
+  ggplot(aes(xmin = pmin(sstart, send),
+             xmax = pmax(sstart, send),
+             y = scaffold_id,
+             fill = subtype)) +
+  geom_rect(aes(ymin = as.numeric(scaffold_id) - 0.4,
+                ymax = as.numeric(scaffold_id) + 0.4)) +
+  scale_fill_viridis_d(option = "D") +
+  theme_minimal() +
+  labs(
+    title = paste0(prefix, ": Blast hit regions (sorted by subtype)"),
+    x = "Reference position",
+    y = "Scaffold",
+    fill = "Subtype"
   )
 
-align_plot <- ggplot(
-  plot_dat,
-  aes(xmin = aln_start, xmax = aln_end,
-      y = idx, ymin = idx - .45, ymax = idx + .45,
-      fill = subtype)
-) +
-  geom_rect() +
-  labs(
-    title = paste0(prefix, " – alignment of top BLAST hits"),
-    x     = "Position on reference (bp)",
-    y     = "Scaffold",
-    fill  = "Subtype"
-  ) +
-  theme_minimal() +
-  theme(axis.text.y  = element_blank(),
-        axis.ticks.y = element_blank())
-
-ggsave(
-  paste0(prefix, ".alignment_plot.png"),
-  align_plot,
-  width = 10,
-  height = max(4, nrow(plot_dat) / 12),
-  dpi = 300,
-  bg = "white"
-)
+ggsave(paste0(prefix, ".alignment_plot.png"),
+       plot = p_align,
+       width = 10,
+       height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of scaffolds
+       dpi = 300)
 
 ## ── 6. Scaffold FASTAs ≥500 bp, grouped by subtype -------------------------
 scaf_top_long <- scaf_top %>% filter(sc_length >= 500)
