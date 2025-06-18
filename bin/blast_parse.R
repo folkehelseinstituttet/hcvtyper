@@ -181,11 +181,11 @@ summary_tbl <- tibble(
   sample       = prefix,
   major_ref    = major_name,
   major_length = scaf %>% filter(sseqid == major_name) %>%
-                   slice_max(length, n = 1) %>% pull(length),
+                   slice_max(sc_length, n = 1) %>% pull(sc_length),
   minor_ref    = minor_name,
   minor_length = if (is.na(minor_name)) NA_integer_ else
                    scaf %>% filter(sseqid == minor_name) %>%
-                     slice_max(length, n = 1) %>% pull(length)
+                     slice_max(sc_length, n = 1) %>% pull(sc_length)
 )
 write_csv(summary_tbl, paste0(prefix, ".blastparse.csv"))
 
