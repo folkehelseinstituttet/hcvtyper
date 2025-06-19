@@ -38,5 +38,12 @@ module_order:
       path_filters:
         - "*.trimmed_*.zip"
   - kraken:
-      name: "Kraken2"
+      name: "Kraken2 all database"
       top_n: 10
+      path_filters:
+        - "*entireDB*.txt"
+  - kraken:
+      name: "Kraken2 focused"
+      top_n: 10
+      path_filters:
+        - "*focused*.txt"
