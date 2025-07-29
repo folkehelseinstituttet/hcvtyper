@@ -1,0 +1,157 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+# # TODO nf-core: Add a description of the module and list keywords
+name: "blastparse"
+description: Extract various metrics from the Blast search of the denovo assembled contigs against all HCV references
+keywords:
+  - blast
+  - R
+tools:
+  - "blastparse":
+      description: "Uses R and the tidyverse and seqinr packages to extract various metrics from the Blastn output (outformat 6) of the blast search of the denovo assembled contigs against all HCV references"
+      homepage: ""
+      documentation: ""
+      tool_dev_url: ""
+      doi: ""
+      licence: null
+      identifier: null
+
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1' ]`
+    - blast_out:
+        type: file
+        description: Tabular text file from Blastn with -outfmt 6
+        pattern: "*.{txt}"
+    - scaffolds:
+        type: file
+        description: The assembled scaffolds from Spades (scaffolds.fa)
+        pattern: "*{scaffolds.fa.gz}"
+  - - references:
+        type: file
+        description: |
+          Fasta file with HCV reference sequences.
+          Fasta headers must start with the genotype/subtype information and end with the NCBI accession separated by a single underscore.
+          E.g.: 1a_ABXXXX
+        ontologies:
+          - edam: "http://edamontology.org/format_1929" # FASTA
+
+output:
+  scaffolds:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*scaffolds.fa":
+          type: file
+          description: |
+            Fasta sequence of the denovo assembled scaffolds that give the best blast hit for each HCV subtype.
+            The files are named with the Sample id and the closest subtype hit from the blast output.
+            E.g.: Test_2.3a.scaffolds.fa
+          pattern: "*.{scaffolds.fa}"
+          ontologies:
+            - edam: "http://edamontology.org/format_1929" # FASTA
+  blast_res:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*blast_out.csv":
+          type: file
+          description: |
+            Modified version of the raw tabular blast output with the following headers:
+            qseqid: Name of the scaffold that produced the hit (query).
+            sseqid: Name of the hit HCV reference (subject).
+            subtype: The HCV subtype information extracted from the hit name (i.e., the part before the underscore of the fasta header).
+            pident: Percent identical nucleotides.
+            length: Length of the blast alignment.
+            mismatch: Number of mismatches.
+            gapopen: Number of gap openings.
+            qstart: Start of alignment in query.
+            qend: End of alignment in query.
+            sstart: Start of alignment in subject.
+            send: End of alignment in subject.
+            evalue: the Blast E value.
+            bitscore: the Blast bitscore.
+            sc_length: The length of the query (hit scaffold) extracted from the fasta header of the query.
+            kmer_cov: The scaffold coverage reported by Spades. Extracted from the fasta header of the query.
+          pattern: "*.{blast_out.csv}"
+  major_fasta:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*major.fa":
+          type: file
+          description: |
+            The sequence in fasta format of the HCV reference presumed to represent
+            the major subtype based on the blast result.
+          pattern: "*.{major.fa}"
+          ontologies:
+            - edam: "http://edamontology.org/format_1929" # FASTA
+  minor_fasta:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*minor.fa":
+          type: file
+          description: |
+            The sequence in fasta format of the HCV reference presumed to represent
+            the minor subtype based on the blast result. If only a single scaffold
+            was assembled, the minor reference will not be produced.
+          pattern: "*.{minor.fa}"
+          ontologies:
+            - edam: "http://edamontology.org/format_1929" # FASTA
+  csv:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*blastparse.csv":
+          type: file
+          description: |
+            A summary of the parsing of the blast output in csv format with the following headers:
+            sample: The sample id.
+            major_ref: The fasta header of the presumed major reference sequence.
+            major_length: The length of the major reference sequence.
+            minor_ref: The fasta header of the presumed minor reference sequence. NA if not present.
+            minor_length: The length of the presumed minor reference sequence. NA of not present.
+          pattern: "*.{blastparse.csv}"
+  png:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*.png":
+          type: file
+          description: |
+            Alignment plot: Graphical representation of the blast hits.
+            Each row on the y-axis represents one scaffold (query)
+            and the x-axis represent the start and stop of the alignment on the subject sequence.
+            The different scaffolds are colored according to the HCV subtype extracted from the subject header.
+            Note that it is assumed that all subject sequences are oriented in the 5'->3' direction.
+            Bitscore plot: The bitscores of the top 30 hit sequences. Ordered from highest to lowest bitscore.
+            Hitlength plot: The lengths of the top 30 Blast hit alignments. Ordered from longest to shortest.
+          pattern: "*.{blastparse.csv}"
+
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+        ontologies:
+          - edam: "http://edamontology.org/format_3750" # YAML
+
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"
