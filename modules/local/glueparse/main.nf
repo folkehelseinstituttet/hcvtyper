@@ -32,7 +32,7 @@ process GLUEPARSE {
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
         tidyverse: \$(Rscript -e "library(tidyverse); cat(as.character(packageVersion('tidyverse')))")
-        seqinr: \$(Rscript -e "library(seqinr); cat(as.character(packageVersion('seqinr')))")
+        jsonlite: \$(Rscript -e "library(jsonlite); cat(as.character(packageVersion('jsonlite')))")
     END_VERSIONS
     """
 
