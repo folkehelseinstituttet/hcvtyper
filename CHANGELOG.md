@@ -5,13 +5,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### `Added`  
-Plotting variation per site in the bam files from the targeted mapping.  
-Cleaned up various publish dirs.  
-Changed name of pipeline to hcv_illumina. 
+### `Added`
+Plotting variation per site in the bam files from the targeted mapping.
+Cleaned up various publish dirs.
+Changed name of pipeline to hcv_illumina.
 Visual representation of the denovo blast output
+Removed deprecated workflows for HBV and ROV.
+Do not need to specify the "agens" or "platform" paratmeters.
+Rewrote local modules using the nf-core module create tool.
+Use seqera containers to create conda, docker and singulatrity environments.
 
-### `Fixed`  
+### `Fixed`
 The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
 
 ### `Dependencies`
