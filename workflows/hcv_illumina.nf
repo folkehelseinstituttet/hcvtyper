@@ -57,7 +57,6 @@ include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/ma
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
-include { HCV_GLUE                           } from '../modules/local/hcvglue'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
@@ -76,6 +75,7 @@ include { BLASTPARSE                         } from '../modules/local/blastparse
 include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
+include { HCV_GLUE                           } from '../modules/local/hcvglue'
 include { SUMMARIZE_HCV as SUMMARIZE         } from '../modules/local/summarize_hcv'
 
 /*
