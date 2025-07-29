@@ -75,7 +75,7 @@ include { INSTRUMENTID                       } from '../modules/local/instrument
 include { BLASTPARSE                         } from '../modules/local/blastparse/main'
 include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
-include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse'
+include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { SUMMARIZE_HCV as SUMMARIZE         } from '../modules/local/summarize_hcv'
 
 /*

@@ -1,0 +1,101 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "glueparse"
+description: Parse the output of the HCV GLUE analysis
+keywords:
+  - R
+  - HCV GLUE
+  - Drug resistance
+tools:
+  - "glueparse":
+      description: |
+        Parse the output of the HCV GLUE analysis: https://github.com/giffordlabcvr/HCV-GLUE
+        Reads the GLUE output in json format. There can be a single or multiple json files as input.
+        The GLUE information will be summarised in a tsv file with one sample per line.
+        The input json file names needs to begin with the sample id, then the name of the reference sequence,
+        and then the string major or minor. Each separated by a dot.
+      homepage: ""
+      documentation: ""
+      tool_dev_url: ""
+      doi: ""
+      licence: null
+      identifier: null
+
+input:
+    - '*':
+        type: file
+        description: HCV GLUE json file. Can be one or several files.
+        pattern: "*.{json}"
+        ontologies:
+          - edam: "http://edamontology.org/format_3464" # JSON
+
+output:
+  GLUE_summary:
+      - "*.tsv":
+          type: file
+          description: |
+            TSV file with the following headers:
+              Sample: sample id
+              Reference: name of the HCV reference sequence used in the mapping
+              Major_minor: whether the reference used represent a major or minor strain
+              GLUE_genotype: HCV genotype predicted by HCV GLUE
+              GLUE_subtype: HCV subtype predicted by HCV GLUE
+              glecaprevir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              glecaprevir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              glecaprevir_mut_short: Same as above, but with only the mutated residue listed.
+              grazoprevir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              grazoprevir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              grazoprevir_mut_short: Same as above, but with only the mutated residue listed.
+              paritaprevir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              paritaprevir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              paritaprevir_mut_short: Same as above, but with only the mutated residue listed.
+              voxilaprevir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              voxilaprevir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              voxilaprevir_mut_short: Same as above, but with only the mutated residue listed.
+              NS34A: All the resistance mutations for that gene target combined. Listed with both the reference and the mutated residue.
+              NS34A_short: All the resistance mutations for that gene target combined. Only the mutated residue listed.
+              daclatasvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              daclatasvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              daclatasvir_mut_short: Same as above, but with only the mutated residue listed.
+              elbasvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              elbasvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              elbasvir_mut_short: Same as above, but with only the mutated residue listed.
+              ledipasvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              ledipasvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              ledipasvir_mut_short: Same as above, but with only the mutated residue listed.
+              ombitasvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              ombitasvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              ombitasvir_mut_short: Same as above, but with only the mutated residue listed.
+              pibrentasvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              pibrentasvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              pibrentasvir_mut_short: Same as above, but with only the mutated residue listed.
+              velpatasvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              velpatasvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              velpatasvir_mut_short: Same as above, but with only the mutated residue listed.
+              NS5A: All the resistance mutations for that gene target combined. Listed with both the reference and the mutated residue.
+              NS5A_short: All the resistance mutations for that gene target combined. Only the mutated residue listed.
+              dasabuvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              dasabuvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              dasabuvir_mut_short: Same as above, but with only the mutated residue listed.
+              sofosbuvir: Either Resistance, Probable resistance, Possible resitance, or Insufficient coverage. NA if HCV GLUE was not run for a sample.
+              sofosbuvir_mut: List of the different resistance mutations for that drug as predicted by HCV GLUE. Listed with both the reference and the mutated residue.
+              sofosbuvir_mut_short: Same as above, but with only the mutated residue listed.
+              NS5B: All the resistance mutations for that gene target combined. Listed with both the reference and the mutated residue.
+              NS5B_short: All the resistance mutations for that gene target combined. Only the mutated residue listed.
+              HCV project version: HCV project version.
+              GLUE engine version: GLUE engine version.
+              PHE drug resistance extension version: PHE drug resistance extension version.
+            There will be a separate tsv file produced for the major and minor strains in each sample.
+          pattern: "*.{tsv}"
+
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+        ontologies:
+          - edam: "http://edamontology.org/format_3750" # YAML
+
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"
