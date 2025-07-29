@@ -71,10 +71,10 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 //
 // Local modules
 //
-include { INSTRUMENT_ID                       } from '../modules/local/instrument_id'
+include { INSTRUMENTID                       } from '../modules/local/instrumentid/main'
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
-include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping/main.nf'
+include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 
@@ -105,9 +105,10 @@ workflow HCV_ILLUMINA {
     //
     // MODULE: Identify the instrument ID
     //
-    INSTRUMENT_ID (
+    INSTRUMENTID (
         INPUT_CHECK.out.reads
     )
+    ch_versions = ch_versions.mix(INSTRUMENTID.out.versions.first())
 
     //
     // MODULE: Run Bowtie2_build to create a reference index
@@ -381,7 +382,7 @@ workflow HCV_ILLUMINA {
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarixty. Don't need the meta
-    ch_sequence_id      = INSTRUMENT_ID.out.id.collect({it[1]})
+    ch_sequence_id      = INSTRUMENTID.out.id.collect({it[1]})
     ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
