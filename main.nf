@@ -9,29 +9,6 @@
 
 nextflow.enable.dsl = 2
 
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    GENOME PARAMETER VALUES
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-def primer_set         = ''
-def primer_set_version = 0
-if (params.platform == 'nanopore') {
-    primer_set          = params.primer_set
-    primer_set_version  = params.primer_set_version
-    params.artic_scheme = WorkflowMain.getGenomeAttribute(params, 'scheme', log, primer_set, primer_set_version)
-}
-
-params.fasta         = WorkflowMain.getGenomeAttribute(params, 'fasta'     , log, primer_set, primer_set_version)
-params.gff           = WorkflowMain.getGenomeAttribute(params, 'gff'       , log, primer_set, primer_set_version)
-params.bowtie2_index = WorkflowMain.getGenomeAttribute(params, 'bowtie2'   , log, primer_set, primer_set_version)
-params.primer_bed    = WorkflowMain.getGenomeAttribute(params, 'primer_bed', log, primer_set, primer_set_version)
-
-params.nextclade_dataset           = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset'          , log, primer_set, primer_set_version)
-params.nextclade_dataset_name      = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset_name'     , log, primer_set, primer_set_version)
-params.nextclade_dataset_reference = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset_reference', log, primer_set, primer_set_version)
-params.nextclade_dataset_tag       = WorkflowMain.getGenomeAttribute(params, 'nextclade_dataset_tag'      , log, primer_set, primer_set_version)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,51 +40,18 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-if (params.platform == 'illumina' & params.agens == 'HCV') {
-    include { HCV_ILLUMINA } from './workflows/hcv_illumina'
-} else if (params.platform == 'illumina' & params.agens == 'ROV') {
-    include { ROV_ILLUMINA } from './workflows/rov_illumina'
-} else if (params.platform == 'nanopore' & params.agens == 'HBV') {
-    include { HBV_NANOPORE } from './workflows/hbv_nanopore'
-}
+include { HCV_ILLUMINA } from './workflows/hcv_illumina'
 
 //
-// WORKFLOW: Run main folkehelseinstituttet/viralseq analysis pipeline
+// WORKFLOW: Run main folkehelseinstituttet/hcv_illumina analysis pipeline
 //
-workflow VIRALSEQ {
+workflow {
 
     //
     // WORKFLOW: HCV genome assembly and analysis from Illumina capture data
     //
-    if (params.platform == 'illumina' & params.agens == 'HCV') {
-        HCV_ILLUMINA ()
+    HCV_ILLUMINA ()
 
-    //
-    // WORKFLOW: ROV genome assembly and analysis from Illumina data
-    //
-    } else if (params.platform == 'illumina' & params.agens == 'ROV') {
-        ROV_ILLUMINA ()
-
-    //
-    // WORKFLOW: HBV genome assembly and analysis from Gunther PCR and Nanopore data
-    //
-    } else if (params.platform == 'nanopore' & params.agens == 'HBV') {
-        HBV_NANOPORE ()
-    }
-}
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN ALL WORKFLOWS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-//
-// WORKFLOW: Execute a single named workflow for the pipeline
-// See: https://github.com/nf-core/rnaseq/issues/619
-//
-workflow {
-    VIRALSEQ ()
 }
 
 /*
