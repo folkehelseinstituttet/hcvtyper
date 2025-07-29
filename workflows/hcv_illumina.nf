@@ -74,7 +74,7 @@ include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/d
 include { INSTRUMENT_ID                       } from '../modules/local/instrument_id'
 include { BLASTPARSE                          } from '../modules/local/blastparse.nf'
 include { TANOTI_ALIGN                        } from '../modules/local/tanoti.nf'
-include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping.nf'
+include { PARSEFIRSTMAPPING                   } from '../modules/local/parsefirstmapping/main.nf'
 include { GLUEPARSE as HCV_GLUE_PARSER  } from '../modules/local/glueparse'
 include { SUMMARIZE_HCV as SUMMARIZE          } from '../modules/local/summarize_hcv'
 
@@ -398,7 +398,7 @@ workflow HCV_ILLUMINA {
         ch_glue = file("dummy_file")
     }
     ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
-    
+
     SUMMARIZE (
         params.tanoti_stringency_1,
         params.tanoti_stringency_2,

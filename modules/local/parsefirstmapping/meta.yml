@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+# # TODO nf-core: Add a description of the module and list keywords
+name: "parsefirstmapping"
+description: Extracts various metrics such as major and minor strain from the first mapping to all HCV references
+keywords:
+  - mapping
+  - R
+tools:
+  - "parsefirstmapping":
+      description: "Extracts various metrics such as major and minor strain from the first mapping to all HCV references"
+      homepage: ""
+      documentation: ""
+      tool_dev_url: ""
+      doi: ""
+      licence: null
+      identifier: null
+
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1' ]`
+    - idxstats:
+        type: file
+        description: Tex tfile produced by Samtools idxstats
+        pattern: "*.{idxstats}"
+    - depth:
+        type: file
+        description: TSV file produced by Samtools depth
+        pattern: "*.{tsv}"
+
+output:
+  csv:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*.csv":
+          type: file
+          description: |
+            CSV file with the followign columns:
+            sample: sample id,
+            total_mapped_reads: total mapped reads from the mapping against all references,
+            major_ref: name of the major reference sequence,
+            major_reads: number of reads mapped to the major reference,
+            major_cov: the mapping coverage of the major reference. This is percent of reference positions with coverage greater than 4 reads,
+            minor_ref: name of the candidate minor reference sequence,
+            minor_reads: number of reads mapped to the minor reference,
+            minor_cov: same as major_cov but for the minor reference.
+
+          pattern: "*.{csv}"
+  major_fasta:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*major.fa":
+          type: file
+          description: Fasta file of the major reference sequence in the "major_ref" column in the csv file
+
+  minor_fasta:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*minor.fa":
+          type: file
+          description: Fasta file of the minr reference sequence in the "minor_ref" column in the csv file
+
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+        ontologies:
+          - edam: "http://edamontology.org/format_3750" # YAML
+
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"
