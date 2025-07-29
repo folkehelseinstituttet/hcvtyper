@@ -76,7 +76,7 @@ include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { HCV_GLUE                           } from '../modules/local/hcvglue'
-include { SUMMARIZE_HCV as SUMMARIZE         } from '../modules/local/summarize_hcv'
+include { SUMMARIZE                          } from '../modules/local/summarize/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -413,6 +413,7 @@ workflow HCV_ILLUMINA {
         ch_sequence_id.collect(),
         ch_variation.collect(),
     )
+    ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 
     //
     // MODULE: Dump software versions

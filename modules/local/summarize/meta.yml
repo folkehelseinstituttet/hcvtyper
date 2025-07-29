@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "summarize"
+description: Produce summary files for the entire run
+keywords:
+  - summarize
+  - R
+tools:
+  - "summarize":
+      description: "Produce various summary files and plots that captures the overall results of the pipeline"
+      homepage: ""
+      documentation: ""
+      tool_dev_url: ""
+      doi: ""
+      licence: null
+      identifier: null
+
+input:
+  - stringency_1:
+      type: value
+      description: If the Tanoti mapper is chosen. The mapping stringency for the mapping against all HCV references
+      pattern: "*.{bam,cram,sam}"
+      ontologies:
+        - edam: http://edamontology.org/format_2572 # BAM
+        - edam: http://edamontology.org/format_2573 # CRAM
+        - edam: http://edamontology.org/format_3462 # SAM
+output:
+  bam:
+    - "*.bam":
+        type: file
+        description: Sorted BAM/CRAM/SAM file
+        pattern: "*.{bam,cram,sam}"
+        ontologies:
+          - edam: http://edamontology.org/format_2572 # BAM
+          - edam: http://edamontology.org/format_2573 # CRAM
+          - edam: http://edamontology.org/format_3462 # SAM
+  versions:
+    - versions.yml:
+        type: file
+        description: File containing software versions
+        pattern: versions.yml
+        ontologies:
+          - edam: http://edamontology.org/format_3750 # YAML
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"
