@@ -48,10 +48,10 @@ scaf <- read_tsv(
          sstart   = X9, send    = X10, evalue   = X11, bitscore = X12) %>%
   # pull subtype from reference header (e.g. 3a_D1776 → subtype = "3a")
   separate(sseqid, into = c("subtype", NA), remove = FALSE) %>%
-  # extract scaffold length & coverage from header: NODE_?_length_<len>_cov_<cov>
+  # extract scaffold length & kmer coverage from header: NODE_?_length_<len>_cov_<cov>
   mutate(
     sc_length = as.numeric(str_extract(qseqid, "(?<=_length_)[0-9]+")),
-    coverage  = as.numeric(str_extract(qseqid, "(?<=_cov_)[0-9.]+"))
+    kmer_cov  = as.numeric(str_extract(qseqid, "(?<=_cov_)[0-9.]+"))
   )
 
 # Write reformatted BLAST output
