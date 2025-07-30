@@ -6,10 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
-Plotting variation per site in the bam files from the targeted mapping.
-Cleaned up various publish dirs.
 Changed name of pipeline to hcv_illumina.
-Visual representation of the denovo blast output
+Changed profile name for the minimal test from "test_illumina" to "test".
+Plotting variation per site in the bam files from the targeted mapping.
+The Kraken2 database PlusPFP-8 by Ben Langmead will be downloaded automatically if it is not overridden.
+Cleaned up various publish dirs.
+Visual representation of the denovo blast output.
 Removed deprecated workflows for HBV and ROV.
 Do not need to specify the "agens" or "platform" paratmeters.
 Rewrote local modules using the nf-core module create tool.

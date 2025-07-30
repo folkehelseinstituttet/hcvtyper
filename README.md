@@ -11,19 +11,48 @@ maps Illumina reads to a reference genome and creates a consensus sequence.
 ## Requirements
 The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
-## Usage
+## Test the pipeline
 To run a minimal test:
 ```
 nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test
 ```
-This is only to see if you can get the pipeline up and running and will not run the entire pipeline such as HCV-GLUE. The results will be in a directory called `minimal_test`.  
+This is only to see if you can get the pipeline up and running and will not run the entire pipeline such as HCV-GLUE. The results will be in a directory called `minimal_test`.
 
-To run a full test on a real dataset type:  
+To run a full test on a real dataset type:
 ```
 nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test_full
 ```
-This will download a HCV Illumina dataset from SRA and run the entire pipeline. The results will be in a directory called `full_test`.   
+This will download a HCV Illumina dataset from SRA and run the entire pipeline. The results will be in a directory called `full_test`.
 
+## Required parameters
+### Samplesheet input
+You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown below. The sample names can contain numbers and underscores (_), but not spaces, dots (.) or other symbols. The fastq_1 and fastq_2 columns must contain the full path to the gzipped paired fastq files corresponding to the same sample.
+
+```
+sample,fastq_1,fastq_2
+Sample_1,/path/to/sample1_fastq_R1.fastq.gz,/path/to/sample1_fastq_R2.fastq.gz
+Sample_2,/path/to/sample2_fastq_R1.fastq.gz,/path/to/sample2_fastq_R2.fastq.gz
+```
+
+The samplesheet is input to the pipeline using the `--input` parameter, e.g.:
+`--input assets/samplesheet_illumina.csv`
+
+An (example samplesheet)[assets/samplesheet_illumina.csv] has been provided with the pipeline in the assets directory.
+
+### Output directory
+The output directory is specified using the `--outdir` parameter, e.g.:
+`--outdir results`
+
+### Profiles
+The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`
+
+> [!IMPORTANT]
+> HCV-GLUE is only available with the Docker profile. We recommend that you always run the pipeline with Docker.
+
+## Optional parameters
+
+
+## Usage
 
 ## Citations
 
