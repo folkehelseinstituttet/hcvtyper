@@ -1,3 +1,0 @@
-sample,fastq_1,fastq_2
-ROV1,data/reads/ROV1_R1.fastq.gz,data/reads/ROV1_R2.fastq.gz
-ROV2,data/reads/ROV2_R1.fastq.gz,data/reads/ROV2_R2.fastq.gz
