@@ -2,8 +2,7 @@
 work/
 .DS_Store
 *.pyc
-minimal_test/
 ROV*
 .Rproj.user
-data/fastq_pass/
 minimal_test/
+full_test/
