@@ -37,7 +37,7 @@ Sample_2,/path/to/sample2_fastq_R1.fastq.gz,/path/to/sample2_fastq_R2.fastq.gz
 The samplesheet is input to the pipeline using the `--input` parameter, e.g.:
 `--input assets/samplesheet_illumina.csv`
 
-An (example samplesheet)[assets/samplesheet_illumina.csv] has been provided with the pipeline in the assets directory.
+An [example samplesheet](assets/samplesheet_illumina.csv) has been provided with the pipeline in the assets directory.
 
 ### Output directory
 The output directory is specified using the `--outdir` parameter, e.g.:
