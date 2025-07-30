@@ -14,8 +14,15 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 ## Usage
 To run a minimal test:
 ```
-nextflow run folkehelseinstituttet/hcv_illumina -r v1.0 -profile docker,test_illumina
+nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test
 ```
+This is only to see if you can get the pipeline up and running and will not run the entire pipeline such as HCV-GLUE. The results will be in a directory called `minimal_test`.  
+
+To run a full test on a real dataset type:  
+```
+nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test_full
+```
+This will download a HCV Illumina dataset from SRA and run the entire pipeline. The results will be in a directory called `full_test`.   
 
 
 ## Citations
