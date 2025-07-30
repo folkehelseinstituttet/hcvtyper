@@ -66,6 +66,7 @@ include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/
 include { SAMTOOLS_SORMADUP                  } from '../modules/nf-core/samtools/sormadup/main'
 include { PICARD_COLLECTINSERTSIZEMETRICS    } from '../modules/nf-core/picard/collectinsertsizemetrics/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
+include { UNTAR as UNTAR_KRAKEN2_DB          } from '../modules/nf-core/untar/main'
 
 //
 // Local modules
@@ -92,21 +93,52 @@ workflow HCV_ILLUMINA {
     ch_versions = Channel.empty()
 
     //
-    // SUBWORKFLOW: Read in samplesheet, validate and stage input files
+    // Prepare and stage input read files
     //
-    INPUT_CHECK (
-        file(params.input)
-    )
-    ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
-    // TODO: OPTIONAL, you can use nf-validation plugin to create an input channel from the samplesheet with Channel.fromSamplesheet("input")
-    // See the documentation https://nextflow-io.github.io/nf-validation/samplesheets/fromSamplesheet/
-    // ! There is currently no tooling to help you write a sample sheet schema
+    if (params.config_profile_name == 'Full test profile') {
+        //
+        // If test_full profile get fastq data from SRA
+        //
+        reads = Channel.fromSRA(params.sra_accession)
+            // Transform the reads channel to comply with the required structure
+            .map { accession, files ->
+                // Only keep files ending with _1.fastq.gz or _2.fastq.gz
+                def filtered = files.findAll { it.name.endsWith('_1.fastq.gz') || it.name.endsWith('_2.fastq.gz') }
+                def meta = [ id: accession, single_end: false ]
+                [ meta, filtered ]
+            }
+    } else {
+        //
+        // SUBWORKFLOW: Read in samplesheet, validate and stage input files
+        //
+        INPUT_CHECK (
+            file(params.input)
+        )
+        reads = INPUT_CHECK.out.reads
+        ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
+    }
+
+    //
+    // Prepare Kraken2 database for all domaines of life
+    //
+    ch_kraken_all_db = Channel.empty()
+    if (params.kraken_all_db) {
+        if (params.kraken_all_db.endsWith('.tar.gz')) {
+            UNTAR_KRAKEN2_DB (
+                [ [:], params.kraken_all_db ] // Add empty meta map
+            )
+            ch_kraken_all_db = UNTAR_KRAKEN2_DB.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
+            ch_versions = ch_versions.mix(UNTAR_KRAKEN2_DB.out.versions.first())
+        } else {
+            ch_kraken_all_db = Channel.value(file(params.kraken_all_db))
+        }
+    }
 
     //
     // MODULE: Identify the instrument ID
     //
     INSTRUMENTID (
-        INPUT_CHECK.out.reads
+        reads
     )
     ch_versions = ch_versions.mix(INSTRUMENTID.out.versions.first())
 
@@ -131,15 +163,15 @@ workflow HCV_ILLUMINA {
     // MODULE: Run FastQC
     //
     FASTQC_RAW (
-        INPUT_CHECK.out.reads
+        reads
     )
-    ch_versions = ch_versions.mix(FASTQC_RAW.out.versions.first())
+    ch_versions = ch_versions.mix(FASTQC_RAW.out.versions)
 
     //
     // MODULE: Trim reads with Cutadapt
     //
     CUTADAPT(
-        INPUT_CHECK.out.reads
+        reads
     )
     ch_versions = ch_versions.mix(CUTADAPT.out.versions)
 
@@ -160,14 +192,14 @@ workflow HCV_ILLUMINA {
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { n > 1 } // Filter out empty fastq files
-        .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for BBMAP_BBNORM
+        .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for KRAKEN2_KRAKEN2
 
     //
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2 (
         ch_kraken,
-        Channel.value(file(params.kraken_all_db)),
+        ch_kraken_all_db,
         false,
         false
     )
