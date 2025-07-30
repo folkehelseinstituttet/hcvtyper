@@ -1,7 +1,0 @@
-name: tabix_bgzip
-channels:
-  - conda-forge
-  - bioconda
-  - defaults
-dependencies:
-  - bioconda::tabix=1.11
