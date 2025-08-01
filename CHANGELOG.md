@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the names of the parameters `minAgensRead` and `minAgensCov` to `minRead` and `minCov`.
 - Renamed summary directory to `summary`.
 - Labware-formatted summary file will only be published when `--labware` is set to `true`.
+- Analyzing Spades contigs instead of scaffolds. For low coverage samples, sometimes scaffolds are not produced.
 
 ### `Fixed`
-The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
+- The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
+- Fixed bug in the making of consensus sequence in cases of co-infection. The filenames would not separate between the two strains and only a single consensus would be written.
 
 ### `Dependencies`
 
