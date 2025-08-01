@@ -26,7 +26,7 @@ process SUMMARIZE {
     path 'variation/'
 
     output:
-    path '*long.csv'        , emit: summary
+    path 'Summary.csv'        , emit: summary
     path '*mqc.csv'         , emit: mqc
     path '*LW_import.tsv'   , emit: lw
     path '*png'             , emit: png

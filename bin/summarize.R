@@ -365,7 +365,7 @@ if (nrow(glue_report_minor) > 0) {
 # Check if the same genotype has been called for major and minor. If Yes, then minor is not typbar
 if (exists("major_gt") & exists("minor_gt")) {
   gt_check <- major_gt %>%
-    left_join(minor_gt, by = "Sample") %>% 
+    left_join(minor_gt, by = "Sample") %>%
     mutate(
       identical_geno = case_when(
         Major_genotype == Minor_genotype ~ "YES",
@@ -377,7 +377,7 @@ if (exists("major_gt") & exists("minor_gt")) {
         is.na(Minor_subtype) ~ NA,
         .default = "NO"
         )
-    ) 
+    )
 }
 
 # Sequencer ID ------------------------------------------------------------
@@ -418,7 +418,7 @@ id_df <- as_tibble(id_df)
 # Read both the major and minor variation plots
 variation_plot_files <- list.files(path = path_9, pattern = ".*variation_plot.*\\.png$", full.names = TRUE)
 
-# Create R-code that will gather all the variation plots, then plot them as a grid with four columns and as many rows as needed. 
+# Create R-code that will gather all the variation plots, then plot them as a grid with four columns and as many rows as needed.
 # Make separate grids for files containing the string "major" and "minor"
 if (length(variation_plot_files) > 0) {
   # Create a grid of plots for major and minor
@@ -435,7 +435,7 @@ if (length(variation_plot_files) > 0) {
 
     # Create a list of ggplot objects containing the images
     plot_list <- lapply(image_list, function(g) {
-      ggplot() + 
+      ggplot() +
       annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
       theme_void()
     })
@@ -456,7 +456,7 @@ if (length(variation_plot_files) > 0) {
 
     # Create a list of ggplot objects containing the images
     plot_list <- lapply(image_list, function(g) {
-      ggplot() + 
+      ggplot() +
       annotation_custom(g, xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf) +
       theme_void()
     })
@@ -510,7 +510,7 @@ final <- final %>%
 # If minor genotype is the sama as major, then not typbar. But only possible if there are minor glue reports available
 if (nrow(glue_report) > 0 & exists("gt_check")) {
   final <- final %>%
-    left_join(gt_check, by = c("sampleName" = "Sample")) %>% 
+    left_join(gt_check, by = c("sampleName" = "Sample")) %>%
     mutate(minor_typbar = case_when(
       identical_geno == "NO" & identical_subgeno == "NO" ~ "YES",
       identical_geno == "YES" & identical_subgeno == "YES" ~ "NO",
@@ -603,7 +603,7 @@ final <- final %>%
          everything())
 
 # Write file
-write_csv(final, file = "Genotype_mapping_summary_long.csv")
+write_csv(final, file = "Summary.csv")
 
 # Write file for MultiQC
 # Add MultiQC info lines
@@ -695,7 +695,7 @@ lw_import <- final %>%
   mutate(`Minor quality:` = case_when(`Minor quality:` == "YES" ~ "Typbar",
                                       `Minor quality:` == "NO" ~ "Ikke typbar",
                                       `Minor quality:` == "UNKNOWN" ~ "Ikke typbar",
-                                      .default = `Minor quality:`)) %>% 
+                                      .default = `Minor quality:`)) %>%
   distinct()
 
 # Write file
