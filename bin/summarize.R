@@ -300,7 +300,7 @@ df_coverage <- tmp_df %>%
   slice(1)
 
 
-# Length of scaffolds -----------------------------------------------------
+# Length of contigs -------------------------------------------------------
 
 # Print the length of the longest scaffold matching the given reference
 blast_files <- list.files(path = path_6, pattern = "txt$", full.names = TRUE)
@@ -308,13 +308,13 @@ blast_files <- list.files(path = path_6, pattern = "txt$", full.names = TRUE)
 if (length(blast_files > 0)) {
 
 # Empty df
-df_scaffolds <- tribble(
+df_contigs <- tribble(
   ~"scaffold_length", ~"reference", ~"sampleName",
   )
 
 for (i in 1:length(blast_files)) {
 
-  # Read the length of scaffolds
+  # Read the length of contigs
   blast_out <- read_tsv(blast_files[i], col_names = FALSE) %>%
     # Separate the genotype from the subject header
     separate(X2, into = c("genotype", NA), remove = FALSE) %>%
@@ -325,15 +325,15 @@ for (i in 1:length(blast_files)) {
     group_by(genotype) %>%
     slice_max(order_by = scaffold_length, n = 1) %>%
     ungroup() %>%
-    # Sometimes the same scaffolds has two or more hits
+    # Sometimes the same contigs has two or more hits
     distinct(X1, .keep_all = TRUE) %>%
     select(scaffold_length,
            "reference" = X2) %>%
     # Legg til en kolonne med Sample Name
     add_column("sampleName" = str_split(basename(blast_files[i]), "\\.")[[1]][1])
 
-  # Add to df_scaffolds
-  df_scaffolds <- bind_rows(df_scaffolds, blast_out)
+  # Add to df_contigs
+  df_contigs <- bind_rows(df_contigs, blast_out)
 
 }
 }
@@ -519,7 +519,7 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
 }
 
   # Add scaffold length info - for the moment not included
-  # left_join(df_scaffolds, join_by(sampleName)) %>%
+  # left_join(df_contigs, join_by(sampleName)) %>%
   # mutate(test = case_when(Majority_reference == reference ~ "OK",
   #                         Minority_reference == reference ~ "OK")) %>%
   # filter(test == "OK") %>%

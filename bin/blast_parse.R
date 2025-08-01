@@ -4,7 +4,7 @@
 #                   per‑subtype scaffold FASTAs (≥500 bp),
 #                   and an “alignment” bar‑plot of top hits.
 #
-# Usage: blast_parse.R <prefix> <blast_out> <scaffolds> <references> <agens>
+# Usage: blast_parse.R <prefix> <blast_out> <contigs> <references> <agens>
 #        * <references> and <agens> are kept for CLI compatibility
 #          but no longer used by this script.
 # ---------------------------------------------------------------------------
@@ -18,13 +18,13 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 5) {
   stop(
-    "Usage: blast_parse.R <prefix> <blast_out> <scaffolds> <references> <agens>",
+    "Usage: blast_parse.R <prefix> <blast_out> <contigs> <references> <agens>",
     call. = FALSE
   )
 }
 prefix     <- args[1]
 blast_out  <- args[2]
-scaffolds  <- args[3]
+contigs  <- args[3]
 references <- args[4]
 # agens      <- args[5]   # not used
 
@@ -34,8 +34,8 @@ ref_fa     <- read.fasta(             # DNA FASTA with HCV references
 )
 
 ## ── 2. Input files ----------------------------------------------------------
-# Scaffolds FASTA (for sequence export)
-scaffolds_fa <- read.fasta(file = scaffolds, seqtype = "DNA")
+# Contigs FASTA (for sequence export)
+contigs_fa <- read.fasta(file = contigs, seqtype = "DNA")
 
 # BLAST outfmt 6 table
 scaf <- read_tsv(
@@ -99,7 +99,7 @@ scaf_top <- scaf %>%
 
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
-## ── 5. Alignment‑style bar plot (ALL scaffolds) ----------------------------
+## ── 5. Alignment‑style bar plot (ALL contigs) ----------------------------
 # Create scaffold factor levels sorted by subtype, then by sstart
 scaf_ordered <- scaf_top %>%
   arrange(subtype, sstart, qseqid) %>%
@@ -130,7 +130,7 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
        plot = p_align,
        width = 10,
        bg = "white",
-       height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of scaffolds
+       height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of contigs
        dpi = 300)
 
 ## ── 6. Scaffold FASTAs ≥500 bp, grouped by subtype -------------------------
@@ -141,11 +141,11 @@ scaf_top_long %>%
   group_by(subtype) %>%
   group_walk(~{
     subtype_name <- .y$subtype
-    seqs <- scaffolds_fa[.x$qseqid]
+    seqs <- contigs_fa[.x$qseqid]
     write.fasta(
       sequences = seqs,
       names     = names(seqs),
-      file.out  = paste0(prefix, ".", subtype_name, "_scaffolds.fa")
+      file.out  = paste0(prefix, ".", subtype_name, "_contigs.fa")
     )
   })
 

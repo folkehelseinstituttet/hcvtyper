@@ -234,10 +234,10 @@ workflow HCV_ILLUMINA {
             ch_contigs = SPADES.out.contigs.collect({it[1]})
 
             //
-            // MODULE: Blast assembled scaffolds against viral references.
+            // MODULE: Blast assembled contigs against viral references.
             //
             BLAST_BLASTN (
-                SPADES.out.scaffolds,
+                SPADES.out.contigs,
                 BLAST_MAKEBLASTDB.out.db
             )
             ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
@@ -245,11 +245,11 @@ workflow HCV_ILLUMINA {
             //
             // MODULE: Parse blast output
             //
-            // Create input channel that holds val(meta), path(blast_out), path(scaffolds)
+            // Create input channel that holds val(meta), path(blast_out), path(contigs)
             // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
             // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
             // See Issue on this
-            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.scaffolds)
+            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs)
             BLASTPARSE (
                 ch_blastparse,
                 file(params.references),

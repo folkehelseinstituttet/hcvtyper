@@ -12,12 +12,12 @@ process BLASTPARSE {
         'community.wave.seqera.io/library/r-seqinr_r-tidyverse:5358395134867368' }"
 
     input:
-    tuple val(meta), path(blast_out), path(scaffolds)
+    tuple val(meta), path(blast_out), path(contigs)
     path(references)
     val(agens)
 
     output:
-    tuple val(meta), path("*scaffolds.fa")  , emit: scaffolds
+    tuple val(meta), path("*contigs.fa")    , emit: contigs
     tuple val(meta), path('*blast_out.csv') , emit: blast_res
     tuple val(meta), path("*major.fa")      , emit: major_fasta
     tuple val(meta), path("*minor.fa")      , emit: minor_fasta, optional: true
@@ -37,7 +37,7 @@ process BLASTPARSE {
     blast_parse.R \\
         $prefix \\
         $blast_out \\
-        $scaffolds \\
+        $contigs \\
         $references \\
         $agens \\
         $args

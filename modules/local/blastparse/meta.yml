@@ -25,10 +25,10 @@ input:
         type: file
         description: Tabular text file from Blastn with -outfmt 6
         pattern: "*.{txt}"
-    - scaffolds:
+    - contigs:
         type: file
-        description: The assembled scaffolds from Spades (scaffolds.fa)
-        pattern: "*{scaffolds.fa.gz}"
+        description: The assembled contigs from Spades (contigs.fa)
+        pattern: "*{contigs.fa.gz}"
   - - references:
         type: file
         description: |
@@ -39,19 +39,19 @@ input:
           - edam: "http://edamontology.org/format_1929" # FASTA
 
 output:
-  scaffolds:
+  contigs:
     - - meta:
           type: map
           description: |
             Groovy Map containing sample information
             e.g. `[ id:'sample1' ]`
-      - "*scaffolds.fa":
+      - "*contigs.fa":
           type: file
           description: |
-            Fasta sequence of the denovo assembled scaffolds that give the best blast hit for each HCV subtype.
+            Fasta sequence of the denovo assembled contigs that give the best blast hit for each HCV subtype.
             The files are named with the Sample id and the closest subtype hit from the blast output.
-            E.g.: Test_2.3a.scaffolds.fa
-          pattern: "*.{scaffolds.fa}"
+            E.g.: Test_2.3a.contigs.fa
+          pattern: "*.{contigs.fa}"
           ontologies:
             - edam: "http://edamontology.org/format_1929" # FASTA
   blast_res:
@@ -137,7 +137,7 @@ output:
             Alignment plot: Graphical representation of the blast hits.
             Each row on the y-axis represents one scaffold (query)
             and the x-axis represent the start and stop of the alignment on the subject sequence.
-            The different scaffolds are colored according to the HCV subtype extracted from the subject header.
+            The different contigs are colored according to the HCV subtype extracted from the subject header.
             Note that it is assumed that all subject sequences are oriented in the 5'->3' direction.
             Bitscore plot: The bitscores of the top 30 hit sequences. Ordered from highest to lowest bitscore.
             Hitlength plot: The lengths of the top 30 Blast hit alignments. Ordered from longest to shortest.
