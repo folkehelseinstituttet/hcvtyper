@@ -366,7 +366,7 @@ workflow HCV_ILLUMINA {
         .filter { entry ->
             def mappedReads = entry[0]['total_mapped_reads'].toInteger()
             def minorCov = entry[0]['minor_cov'].toInteger()
-            mappedReads > params.minAgensRead && minorCov > params.minAgensCov
+            mappedReads > params.minRead && minorCov > params.minCov
         }
     } else if (params.strategy == "denovo") {
         ch_join = BLASTPARSE.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
