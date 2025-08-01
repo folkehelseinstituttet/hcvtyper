@@ -600,7 +600,8 @@ final <- final %>%
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
          abundance_minor,
-         everything())
+         everything()) %>%
+  distinct() # Remove any duplicated rows from the different joins
 
 # Write file
 write_csv(final, file = "Summary.csv")
