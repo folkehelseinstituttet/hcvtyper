@@ -6,16 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
-Changed name of pipeline to hcv_illumina.
-Changed profile name for the minimal test from "test_illumina" to "test".
-Plotting variation per site in the bam files from the targeted mapping.
-The Kraken2 database PlusPFP-8 by Ben Langmead will be downloaded automatically if it is not overridden.
-Cleaned up various publish dirs.
-Visual representation of the denovo blast output.
-Removed deprecated workflows for HBV and ROV.
-Do not need to specify the "agens" or "platform" paratmeters.
-Rewrote local modules using the nf-core module create tool.
-Use seqera containers to create conda, docker and singulatrity environments.
+- Changed name of pipeline to `hcv_illumina`.
+- Changed profile name for the minimal test from `test_illumina` to `test`.
+- Added plotting of variation per site in the bam files from the targeted mapping.
+- The Kraken2 database PlusPFP-8 by Ben Langmead will be downloaded automatically if not overridden.
+- Cleaned up various publish directories.
+- Added visual representation of the denovo BLAST output.
+- Removed deprecated workflows for HBV and ROV.
+- No need to specify the `agens` or `platform` parameters.
+- Rewrote local modules using the nf-core module create tool.
+- Use Seqera containers to create conda, docker, and singularity environments.
+- Changed the names of the parameters `minAgensRead` and `minAgensCov` to `minRead` and `minCov`.
+- Renamed summary directory to `summary`.
+- Labware-formatted summary file will only be published when `--labware` is set to `true`.
 
 ### `Fixed`
 The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
