@@ -228,7 +228,8 @@ workflow HCV_ILLUMINA {
         return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { n > 1 } // Filter out empty fastq files
-        .map { meta, fastq, [], [] } // Recreate the channel structure correct for SPADES
+        .map { meta, fastq -> [meta, fastq, [], []] } // Recreate the channel structure correct for SPADES
+
     if (!params.skip_assembly) {
             SPADES (
                 ch_reads,
