@@ -188,7 +188,7 @@ workflow HCV_ILLUMINA {
     // In some cases there are empty fastq files after trimming. Remove these before Kraken2
     ch_kraken = CUTADAPT.out.reads
         .map { meta, fastq ->
-            n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+            def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { n > 1 } // Filter out empty fastq files
@@ -224,11 +224,11 @@ workflow HCV_ILLUMINA {
     // Filter in case of no classified reads emitted by KRAKEN2_FOCUSED
     ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq
         .map { meta, fastq ->
-        n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
-        return [meta, fastq, n] // Add the count as the last element in the tuple
+            def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+            return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { n > 1 } // Filter out empty fastq files
-        .map { meta, fastq -> [meta, fastq, [], []] } // Recreate the channel structure correct for SPADES
+        .map { meta, fastq, n -> [ meta, fastq, [], [] ] } // Recreate the channel structure correct for SPADES
 
     if (!params.skip_assembly) {
             SPADES (
