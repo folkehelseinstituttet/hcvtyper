@@ -191,7 +191,7 @@ workflow HCV_ILLUMINA {
             def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
-        .filter { n > 1 } // Filter out empty fastq files
+        .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
         .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for KRAKEN2_KRAKEN2
 
     //
@@ -227,7 +227,7 @@ workflow HCV_ILLUMINA {
             def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
-        .filter { n > 1 } // Filter out empty fastq files
+        .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
         .map { meta, fastq, n -> [ meta, fastq, [], [] ] } // Recreate the channel structure correct for SPADES
 
     if (!params.skip_assembly) {
