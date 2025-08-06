@@ -221,7 +221,14 @@ workflow HCV_ILLUMINA {
 
     // Create input read channel for SPADES.
     // A tuple with meta, paired Illumina reads, and empty elements for pacbio and nanopore reads
-    ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq.map { meta, fastq -> [ meta, fastq, [], [] ] }
+    // Filter in case of no classified reads emitted by KRAKEN2_FOCUSED
+    ch_reads = KRAKEN2_FOCUSED.out.classified_reads_fastq
+        .map { meta, fastq ->
+        n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+        return [meta, fastq, n] // Add the count as the last element in the tuple
+        }
+        .filter { n > 1 } // Filter out empty fastq files
+        .map { meta, fastq, [], [] } // Recreate the channel structure correct for SPADES
     if (!params.skip_assembly) {
             SPADES (
                 ch_reads,
