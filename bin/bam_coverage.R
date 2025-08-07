@@ -21,7 +21,7 @@ if (prefix != sampleName) {
 
 # If there are no mapped reads df is empty
 if (nrow(df) > 0) {
-  df <- df %>% 
+  df <- df %>%
     # Rename columns
     rename("Reference" = X1,
            "Position" = X2,
@@ -30,17 +30,52 @@ if (nrow(df) > 0) {
 # Get the mapped reference
 reference <- df %>% distinct(Reference) %>% pull(Reference)
 
-plot <- df %>% 
-    ggplot() +
-    aes(x = Position, y = Coverage) + 
-    geom_line() +
-    geom_hline(yintercept = 10, color = "darkgreen", linetype = "dotted") +
-    annotate("text", x=900, y=-150, label="Coverage cutoff = 10") +
-    ggtitle(paste0(sampleName, ".", major_minor, ".", reference))
+# Define the coverage cutoff
+coverage_cutoff <- 10
+
+# Add column for highlighting
+df <- df %>%
+  mutate(below_cutoff = ifelse(Coverage < coverage_cutoff, Coverage, NA_real_))
+
+# Start base plot
+plot <- ggplot(df, aes(x = Position)) +
+  # Add ribbon only if some values are below cutoff
+  {if (any(df$Coverage < coverage_cutoff, na.rm = TRUE))
+    geom_ribbon(aes(ymin = 0, ymax = below_cutoff), fill = "red", alpha = 0.2)
+  } +
+
+  # Main coverage line
+  geom_line(aes(y = Coverage), color = "steelblue", linewidth = 0.6) +
+
+  # Horizontal line at cutoff
+  geom_hline(yintercept = coverage_cutoff, color = "darkgreen", linetype = "dotted") +
+
+  # Label cutoff line
+  annotate("text", x = max(df$Position, na.rm = TRUE) * 0.01,
+         y = -max(df$Coverage, na.rm = TRUE) * 0.02,  # 2% below the baseline
+         label = paste("Coverage cutoff =", coverage_cutoff),
+         hjust = 0, color = "darkgreen", size = 3.5) +
+
+  # Labels
+  labs(
+    x = "Genome Position",
+    y = "Read Coverage",
+    title = paste0(sampleName, ".", major_minor, ".", reference)
+  ) +
+
+  # Theme tweaks
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text = element_text(color = "black"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
 
 # Save the plot
-ggsave(plot = plot, 
-       file = paste0(sampleName, ".", major_minor, ".", reference, ".png"), 
-         device = "png", 
-         dpi = 300)
+ggsave(plot = plot,
+       file = paste0(sampleName, ".", major_minor, ".", reference, ".png"),
+         device = "png",
+         dpi = 300,
+         bg = "white")
 }
