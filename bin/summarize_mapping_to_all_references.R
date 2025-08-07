@@ -63,9 +63,11 @@ summary <- df %>%
 
 ## Major
 # Find major reference to use
-major_tmp <- summary$Subtype[1]
+major_subtype <- summary$Subtype[1]
+major_genotype <- summary$Genotype[1]
+
 major_ref <- df %>%
-  filter(Subtype == major_tmp) %>%
+  filter(Subtype == major_subtype) %>%
   # Choose the reference with most mapped reads
   arrange(desc(X3)) %>%
   head(n = 1) %>%
@@ -75,7 +77,7 @@ df_final$major_ref[1] <- major_ref
 
 # How many read pairs mapped to the major subtype
 major_reads <- summary %>%
-  filter(Subtype == major_tmp) %>%
+  filter(Subtype == major_subtype) %>%
   pull(reads)
 
 df_final$major_reads[1] <- major_reads
@@ -86,42 +88,50 @@ df_final$major_cov[1] <- df %>% filter(X1 == major_ref) %>% pull(percent_gt_4_in
 ## Minor
 # Only execute if two or more references have reads mapped
 # And require that the reference with second most reads belong to a different genotype than the major
-major_genotype <- head(summary$Genotype, n = 1)
+# Except for 1a and 1b, and treat 2k1b as a special case
+  
+# Define logic for valid co-infections
+is_valid_minor <- function(minor_row) {
+    minor_subtype <- minor_row$Subtype
+    minor_genotype <- minor_row$Genotype
 
-if (major_genotype == "1" | major_genotype == "2k1b") { # If major genotype is 1 or 2k1b, discard gt 1 and 2k1b as potential minor
+    # Rule: allow 1a and 1b co-infection
+    if ((major_subtype %in% c("1a", "1b")) & (minor_subtype %in% c("1a", "1b")) & (major_subtype != minor_subtype)) {
+      return(TRUE)
+    }
+
+    # Rule: block 2k1b co-infections with any genotype 1 or 2 (and itself)
+    if ((major_genotype == "2k1b" & minor_genotype %in% c("1", "2", "2k1b")) |
+        (minor_genotype == "2k1b" & major_genotype %in% c("1", "2", "2k1b"))) {
+      return(FALSE)
+    }
+
+    # Rule: allow only different genotypes
+    return(major_genotype != minor_genotype)
+  }
+
+# Apply rule to find best valid minor
   tmp <- df %>%
-    # Remove major Genotype
-    filter(Genotype != major_genotype) %>%
-    filter(Genotype != "2k1b") %>%
-    # Choose the reference with the higest coverage
+    filter(X1 != major_ref) %>%
+    rowwise() %>%
+    filter(is_valid_minor(cur_data())) %>%
+    ungroup() %>%
     arrange(desc(percent_gt_4)) %>%
-    head(n = 1)
-} else { # If the major gt is not 1 or 2k1b, then allow for these genotypes to be present among potential minor
-  tmp <- df %>%
-    # Remove major Genotype
-    filter(Genotype != major_genotype) %>%
-    # Choose the reference with the highest coverage
-    arrange(desc(percent_gt_4)) %>%
-    head(n = 1)
-}
-minor_tmp <- tmp %>% pull(Subtype)
-minor_ref <- tmp %>% pull(X1)
+    slice(1)
 
-if (length(minor_ref > 0)) {
-  df_final$minor_ref[1] <- minor_ref
-}
+  minor_ref <- tmp %>% pull(X1)
+  minor_subtype <- tmp %>% pull(Subtype)
 
-# How many reads mapped to the minor subtype
-if (length(minor_tmp > 0)) {
+  if (length(minor_ref) > 0) {
+    df_final$minor_ref[1] <- minor_ref
+
     minor_reads <- summary %>%
-      filter(Subtype == minor_tmp) %>%
+      filter(Subtype == minor_subtype) %>%
       pull(reads)
 
     df_final$minor_reads[1] <- minor_reads
-
-    # Add minor coverage
     df_final$minor_cov[1] <- df %>% filter(X1 == minor_ref) %>% pull(percent_gt_4_int)
-    }
+  }
 }
 
 # Write results
