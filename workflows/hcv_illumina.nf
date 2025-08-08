@@ -236,8 +236,17 @@ workflow HCV_ILLUMINA {
             //
             // MODULE: Blast assembled contigs against viral references.
             //
+            // NOTE:
+            // In some cases there is an empty contig file produced by Spades. Filter out these
+            ch_blastn = SPADES.out.contigs
+                .map { meta, contigs ->
+                n = contigs.countFasta() // Count fasta records
+                return [meta, contigs, n] // Add the count as the last element in the tuple
+            }
+            .filter { n > 0 } // Filter out empty fasta files
+            .map { meta, contigs, n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
             BLAST_BLASTN (
-                SPADES.out.contigs,
+                ch_blastn,
                 BLAST_MAKEBLASTDB.out.db
             )
             ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
@@ -245,11 +254,7 @@ workflow HCV_ILLUMINA {
             //
             // MODULE: Parse blast output
             //
-            // Create input channel that holds val(meta), path(blast_out), path(contigs)
-            // TODO: Decide the major genotype present (I guess the best blast hit, maybe with a few criteria) and the potential minor.
-            // Then create an output channel with this info that can be put into MAJOR_MAPPING and MINOR_MAPPING.
-            // See Issue on this
-            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs)
+            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs) // Create input channel that holds val(meta), path(blast_out), path(contigs)
             BLASTPARSE (
                 ch_blastparse,
                 file(params.references),
@@ -384,7 +389,7 @@ workflow HCV_ILLUMINA {
         // This will result in a channel with values that meet the read nr and coverage criteria
         ch_map_minor_filtered = ch_map_minor
         .filter { entry ->
-            def minorLength = entry[0]['minor_length'].toInteger()
+            def minorLength = entry[0]['minor_contig_length'].toInteger()
             minorLength > params.minDenovoLength
         }
     }
