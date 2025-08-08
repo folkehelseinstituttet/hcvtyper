@@ -3,13 +3,45 @@
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 
+## Table of Contents
+- [About HCV Illumina](#about-hcv-illumina)
+- [Requirements](#requirements)
+- [Test the pipeline](#test-the-pipeline)
+- [Required parameters](#required-parameters)
+  - [Samplesheet input](#samplesheet-input)
+  - [Output directory](#output-directory)
+  - [Profiles](#profiles)
+- [Optional parameters](#optional-parameters)
+- [Usage](#usage)
+- [Citations](#citations)
+  
 ## About HCV Illumina
 
 **folkehelseinstituttet/hcv_illumina** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
 maps Illumina reads to a reference genome and creates a consensus sequence.
 
 ## Requirements
-The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
+The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).  
+
+> [!IMPORTANT]
+> HCV-GLUE is currently only available with the Docker profile. We recommend that you always run the pipeline with Docker.
+
+## Run the pipeline  
+The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:   
+```
+nextflow run folkehelseinstituttet/hcv_illumina -r v1.0.6 \
+    --input samplesheet.csv \
+    --outdir <OUTDIR> \
+    -profile docker
+```
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, v1.0.6 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.  
+
+If you want to download a local copy of the pipeline you can run:
+```
+nextflow pull folkehelseinstituttet/hcv_illumina -r v1.0.6
+```
+Again, `-r` is optional.  
+
 
 ## Test the pipeline
 To run a minimal test:
@@ -46,10 +78,8 @@ The output directory is specified using the `--outdir` parameter, e.g.:
 ### Profiles
 The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`
 
-> [!IMPORTANT]
-> HCV-GLUE is only available with the Docker profile. We recommend that you always run the pipeline with Docker.
-
 ## Optional parameters
+## Customizing the pipeline
 
 
 ## Usage
