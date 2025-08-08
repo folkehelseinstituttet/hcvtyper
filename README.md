@@ -6,41 +6,47 @@
 ## Table of Contents
 - [About HCV Illumina](#about-hcv-illumina)
 - [Requirements](#requirements)
+- [Run the pipeline](#run-the-pipeline)
 - [Test the pipeline](#test-the-pipeline)
 - [Required parameters](#required-parameters)
   - [Samplesheet input](#samplesheet-input)
   - [Output directory](#output-directory)
   - [Profiles](#profiles)
+  - [Provide parameters in a file](#provide-parameters-in-a-file)
 - [Optional parameters](#optional-parameters)
-- [Usage](#usage)
+  - [Kraken2 databases](#kraken2-databases)
+  - [HCV reference sequences](#hcv-reference-sequences)
+  - [Criteria for identifying co-infections](#criteria-for-identifying-co-infections)
+- [Customizing the pipeline](#customizing-the-pipeline)
+- [Output files](#output-files)
 - [Citations](#citations)
-  
+
 ## About HCV Illumina
 
 **folkehelseinstituttet/hcv_illumina** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
 maps Illumina reads to a reference genome and creates a consensus sequence.
 
 ## Requirements
-The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).  
+The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
 > [!IMPORTANT]
 > HCV-GLUE is currently only available with the Docker profile. We recommend that you always run the pipeline with Docker.
 
-## Run the pipeline  
-The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:   
+## Run the pipeline
+The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 ```
 nextflow run folkehelseinstituttet/hcv_illumina -r v1.0.6 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
-Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, v1.0.6 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.  
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, v1.0.6 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
 
 If you want to download a local copy of the pipeline you can run:
 ```
 nextflow pull folkehelseinstituttet/hcv_illumina -r v1.0.6
 ```
-Again, `-r` is optional.  
+Again, `-r` is optional.
 
 
 ## Test the pipeline
@@ -76,13 +82,45 @@ The output directory is specified using the `--outdir` parameter, e.g.:
 `--outdir results`
 
 ### Profiles
-The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`
+The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`.
+
+### Provide parameters in a file
+The different parameters can be provided in a file using the argument `-params-file path/to/params-file.yml`. The file can be either YAML-formatted:
+
+```yml
+input: 'samplesheet.csv'
+outdir: 'results'
+```
+
+or JSON-formatted:
+```json
+{
+  "input": "samplesheet.csv",
+  "outdir": "results"
+}
+```
 
 ## Optional parameters
+### Kraken2 databases
+The pipeline uses [Kraken2](https://github.com/DerrickWood/kraken2) for two purposes. One is to classify the reads against a general database to get a broad overview of the taxonomic diversity within the sample (e.g., are there a lot of human reads?). The second is to classify the reads against a specific HCV-database and then use only the classified reads for the rest of the pipeline. This is done to reduce the computational load and time needed to run mapping and _de novo_ assembly.
+
+By default, the pipeline will download and use the [PlusPFP-8 database](https://benlangmead.github.io/aws-indexes/k2) compiled by Ben Langmead for the broad classification. This requires the download and upacking of a fairly large file (>5 GB) and we recommend that you download and unpack this yourself and specify the path to the database using the `--kraken_all_db` parameter.
+
+For the HCV-specific classification, the pipeline will use a very small and provided database which consists of around 200 different HCV strains. You can specify a custom HCV-datavase using the `--kraken_focused` paramter.
+
+### HCV reference sequences
+The database comes with a provided set of about 200 HCV reference sequences downloaded from NCBI. See the file [data/blast_db/HCVgenosubtypes_8.5.19_clean.fa](data/blast_db/HCVgenosubtypes_8.5.19_clean.fa). The fasta headers have been modified to begin with the genotype and subtype information (e.g., `1a`, `3b`, etc.) followed by an underscore and the NCBI accession number (e.g, `1a_AF009606`).  You can for example add or remove HCV strains by modifying this file. Remember to format the fasta headers accordingly. This file will then be used in the mapping and analysis of the de novo assembled contigs to identify genotype and subtype. You need to provide the path to this file like this: `--references /path/to/HCV-sequences.fasta`.
+
+### Criteria for identifying co-infections
+The pipeline will first map all HCV-classified reads against all HCV reference sequences. Then it will identify the reference sequence with the most mapped reads and use the genotype and subtype information from this reference sequence to call major genotype and subtype. To identify a potential co-infection (minor strain), the pipeline will identify the reference that belongs to a different genotype than the major strain (expect for genotypes 1a and 1b which are considered different enough so that we can distinguish them in a co-infection) and has the highest coverage (i.e., percent of the genome covered by 5 or more reads). By default we have set a threshold of minimum 500 reads and 30% genome coverage in order to consider a strain as a minor strain at all. This can be overridden using the parameters `--minRead` and `--minCov`.
+
+Note that there is a recombinant strain between gsubtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
+
+
 ## Customizing the pipeline
+Changing the arguments given to the various sub-tools can be done in several ways, perhaps the easiest is to create a custom config file. Described in more detail [here](https://nf-co.re/docs/usage/configuration#custom-configuration-files).
 
-
-## Usage
+## Output files
 
 ## Citations
 
