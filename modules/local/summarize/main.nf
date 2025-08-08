@@ -1,6 +1,6 @@
 process SUMMARIZE {
 
-    label 'process_single'
+    label 'process_medium'
     errorStrategy 'terminate'
 
     // Environment with R tidyverse and seqinr packages from the conda-forge channel. Created using seqera containers.
