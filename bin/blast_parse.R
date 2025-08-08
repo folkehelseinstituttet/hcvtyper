@@ -123,7 +123,7 @@ p_align <- scaf_ordered %>%
   labs(
     title = paste0(prefix, ": Blast hit regions (sorted by subtype)"),
     x = "Reference position",
-    y = "Scaffold",
+    y = "Contig",
     fill = "Subtype"
   )
 
@@ -134,7 +134,7 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
        height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of contigs
        dpi = 300)
 
-## ── 6. Scaffold FASTAs ≥500 bp, grouped by subtype -------------------------
+## ── 6. Contig FASTAs ≥500 bp, grouped by subtype -------------------------
 scaf_top_long <- scaf_top %>% filter(sc_length >= 500)
 
 # Write one FASTA per subtype
@@ -186,14 +186,14 @@ summary_tbl <- tibble(
   sample       = prefix,
   major_ref    = major_name,
   major_contig_length = scaf %>% filter(sseqid == major_name) %>%
-                   slice_max(sc_length, n = 1) %>% 
+                   slice_max(sc_length, n = 1) %>%
                    # If the major contig have multiple blast hits against the same reference, the length will be duplicated
                    select(qseqid, sc_length) %>% distinct() %>% pull(sc_length),
   minor_ref    = minor_name,
   minor_contig_length = if (is.na(minor_name)) NA_integer_ else
                    scaf %>% filter(sseqid == minor_name)  %>%
                     filter(qseqid != major_contig) %>%  # Exclude the major contig if it is also a minor hit
-                    slice_max(sc_length, n = 1) %>%  
+                    slice_max(sc_length, n = 1) %>%
                     # If the minor contig have multiple blast hits against the same reference, the length will be duplicated
                     select(qseqid, sc_length) %>% distinct() %>% pull(sc_length)
 )
