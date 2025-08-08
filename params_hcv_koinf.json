@@ -1,8 +1,0 @@
-{
-    "input": "HCV_koinf.csv",
-    "spades_mode": "rnaviral",
-    "platform": "illumina",
-    "agens": "HCV",
-    "outdir": "HCV_gap_test",
-    "kraken_all_db": "/media/jonr/SATA6TB1/Kraken_db/"
-}
