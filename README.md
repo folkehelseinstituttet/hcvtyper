@@ -15,8 +15,8 @@
   - [Provide parameters in a file](#provide-parameters-in-a-file)
 - [Optional parameters](#optional-parameters)
   - [Kraken2 databases](#kraken2-databases)
-  - [HCV reference sequences](#hcv-reference-sequences)
-  - [Criteria for identifying co-infections](#criteria-for-identifying-co-infections)
+    - [HCV reference sequences](#hcv-reference-sequences)
+    - [Co-infections (major and minor strains)](#co-infections-major-and-minor-strains)
 - [Customizing the pipeline](#customizing-the-pipeline)
 - [Output files](#output-files)
 - [Citations](#citations)
@@ -111,7 +111,7 @@ For the HCV-specific classification, the pipeline will use a very small and prov
 ### HCV reference sequences
 The database comes with a provided set of about 200 HCV reference sequences downloaded from NCBI. See the file [data/blast_db/HCVgenosubtypes_8.5.19_clean.fa](data/blast_db/HCVgenosubtypes_8.5.19_clean.fa). The fasta headers have been modified to begin with the genotype and subtype information (e.g., `1a`, `3b`, etc.) followed by an underscore and the NCBI accession number (e.g, `1a_AF009606`).  You can for example add or remove HCV strains by modifying this file. Remember to format the fasta headers accordingly. This file will then be used in the mapping and analysis of the de novo assembled contigs to identify genotype and subtype. You need to provide the path to this file like this: `--references /path/to/HCV-sequences.fasta`.
 
-### Criteria for identifying co-infections
+### Co-infections (major and minor strains)
 The pipeline will first map all HCV-classified reads against all HCV reference sequences. Then it will identify the reference sequence with the most mapped reads and use the genotype and subtype information from this reference sequence to call major genotype and subtype. To identify a potential co-infection (minor strain), the pipeline will identify the reference that belongs to a different genotype than the major strain (expect for genotypes 1a and 1b which are considered different enough so that we can distinguish them in a co-infection) and has the highest coverage (i.e., percent of the genome covered by 5 or more reads). By default we have set a threshold of minimum 500 reads and 30% genome coverage in order to consider a strain as a minor strain at all. This can be overridden using the parameters `--minRead` and `--minCov`.
 
 Note that there is a recombinant strain between gsubtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
