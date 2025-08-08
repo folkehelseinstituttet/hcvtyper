@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Labware-formatted summary file will only be published when `--labware` is set to `true`.
 - Analyzing Spades contigs instead of scaffolds. For low coverage samples, sometimes scaffolds are not produced.
 - Publish blast plots in the `QC` directory.
+- Allow for co-infection of 1a and 1b subtypes. Otherwise, co-infections must belong to subtypes to be identified.
 
 ### `Fixed`
 - The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
