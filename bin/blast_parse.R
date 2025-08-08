@@ -24,7 +24,7 @@ if (length(args) < 5) {
 }
 prefix     <- args[1]
 blast_out  <- args[2]
-contigs  <- args[3]
+contigs    <- args[3]
 references <- args[4]
 # agens      <- args[5]   # not used
 
@@ -64,7 +64,7 @@ scaf %>%
   ggplot(aes(x = reorder(sseqid, -bitscore), y = bitscore)) +
   geom_point() +
   labs(
-    title = paste0(prefix, " – top 30 BLAST bitscores"),
+    title = paste0(prefix, " - top 30 BLAST bitscores"),
     x = "Reference",
     y = "Bitscore"
   ) +
@@ -81,7 +81,7 @@ scaf %>%
   ggplot(aes(x = reorder(sseqid, -length), y = length)) +
   geom_point() +
   labs(
-    title = paste0(prefix, " – top 30 BLAST hit lengths"),
+    title = paste0(prefix, " - top 30 BLAST hit lengths"),
     x = "Reference",
     y = "Hit length (bp)"
   ) +
@@ -95,13 +95,14 @@ ggsave(
 ## ── 4. Top BLAST hit per scaffold (all lengths) ----------------------------
 scaf_top <- scaf %>%
   arrange(evalue, desc(bitscore)) %>%      # best hit = lowest e‑value, highest bitscore
-  group_by(qseqid) %>% slice(1) %>% ungroup()
+  group_by(qseqid) %>% slice(1) %>% ungroup() # take first hit per scaffold
 
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
-## ── 5. Alignment‑style bar plot (ALL contigs) ----------------------------
+## ── 5. Alignment‑style bar plot (100 top hit contigs) ----------------------------
 # Create scaffold factor levels sorted by subtype, then by sstart
 scaf_ordered <- scaf_top %>%
+  slice_head(n = 100) %>% # Only use the 100 top hits
   arrange(subtype, sstart, qseqid) %>%
   mutate(y_pos = row_number())  # numeric y position
 
@@ -154,6 +155,10 @@ scaf_top_long %>%
 # a) pick closest major and (optionally) minor reference names
 major_name <- scaf_top$sseqid[1]                 # best overall hit
 major_geno <- str_sub(major_name, 1, 1)
+major_contig <- scaf_top %>%
+  slice_max(sc_length, n = 1) %>%               # longest contig for this reference
+  select(qseqid, sc_length) %>% distinct() %>% # Remove duplicates if several hits against the same reference
+  pull(qseqid)
 
 minor_vec  <- scaf_top %>%
   filter(!str_starts(subtype, major_geno)) %>%   # must be different genotype
@@ -180,12 +185,17 @@ write_ref_fasta(minor_name, "minor")
 summary_tbl <- tibble(
   sample       = prefix,
   major_ref    = major_name,
-  major_length = scaf %>% filter(sseqid == major_name) %>%
-                   slice_max(sc_length, n = 1) %>% pull(sc_length),
+  major_contig_length = scaf %>% filter(sseqid == major_name) %>%
+                   slice_max(sc_length, n = 1) %>% 
+                   # If the major contig have multiple blast hits against the same reference, the length will be duplicated
+                   select(qseqid, sc_length) %>% distinct() %>% pull(sc_length),
   minor_ref    = minor_name,
-  minor_length = if (is.na(minor_name)) NA_integer_ else
-                   scaf %>% filter(sseqid == minor_name) %>%
-                     slice_max(sc_length, n = 1) %>% pull(sc_length)
+  minor_contig_length = if (is.na(minor_name)) NA_integer_ else
+                   scaf %>% filter(sseqid == minor_name)  %>%
+                    filter(qseqid != major_contig) %>%  # Exclude the major contig if it is also a minor hit
+                    slice_max(sc_length, n = 1) %>%  
+                    # If the minor contig have multiple blast hits against the same reference, the length will be duplicated
+                    select(qseqid, sc_length) %>% distinct() %>% pull(sc_length)
 )
 write_csv(summary_tbl, paste0(prefix, ".blastparse.csv"))
 
