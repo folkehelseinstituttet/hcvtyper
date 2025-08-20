@@ -93,30 +93,13 @@ workflow HCV_ILLUMINA {
     ch_versions = Channel.empty()
 
     //
-    // Prepare and stage input read files
+    // SUBWORKFLOW: Read in samplesheet, validate and stage input files
     //
-    if (params.config_profile_name == 'Full test profile') {
-        //
-        // If test_full profile get fastq data from SRA
-        //
-        reads = Channel.fromSRA(params.sra_accession)
-            // Transform the reads channel to comply with the required structure
-            .map { accession, files ->
-                // Only keep files ending with _1.fastq.gz or _2.fastq.gz
-                def filtered = files.findAll { it.name.endsWith('_1.fastq.gz') || it.name.endsWith('_2.fastq.gz') }
-                def meta = [ id: accession, single_end: false ]
-                [ meta, filtered ]
-            }
-    } else {
-        //
-        // SUBWORKFLOW: Read in samplesheet, validate and stage input files
-        //
-        INPUT_CHECK (
-            file(params.input)
-        )
-        reads = INPUT_CHECK.out.reads
-        ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
-    }
+    INPUT_CHECK (
+        file(params.input)
+    )
+    reads = INPUT_CHECK.out.reads
+    ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 
     //
     // Prepare Kraken2 database for all domaines of life
