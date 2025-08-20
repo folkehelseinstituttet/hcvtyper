@@ -17,6 +17,7 @@
   - [Kraken2 databases](#kraken2-databases)
   - [HCV reference sequences](#hcv-reference-sequences)
   - [Co-infections (major and minor strains)](#co-infections-major-and-minor-strains)
+- [Starting and stopping the pipeline](#starting-and-stopping-the-pipeline)
 - [Customizing the pipeline](#customizing-the-pipeline)
 - [Output files](#output-files)
 - [Citations](#citations)
@@ -121,6 +122,8 @@ The pipeline will first map all HCV-classified reads against all HCV reference s
 
 Note that there is a recombinant strain between gsubtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
 
+## Starting and stopping the pipeline
+If the pipeline crashes, or stopped deliberately, it can be restarted from the last completed step by running the same command but with the `-resume` option. Read more about resuming a Nextflow pipeline [here](https://www.nextflow.io/docs/latest/cache-and-resume.html).
 
 ## Customizing the pipeline
 Changing the arguments given to the various sub-tools can be done in several ways, perhaps the easiest is to create a custom config file. Described in more detail [here](https://nf-co.re/docs/usage/configuration#custom-configuration-files).
