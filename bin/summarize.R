@@ -487,8 +487,8 @@ if (nrow(glue_report) > 0) {
 
 # Add percentage of total classified reads belonging to major and minor genotype. Duplicates included. As a proxy for abundance.
 final <- final %>%
-  mutate(abundance_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
-  mutate(abundance_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
+  mutate(percent_mapped_reads_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
+  mutate(percent_mapped_reads_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
 
 # Add script name and version
 final <- final %>%
@@ -593,13 +593,13 @@ final <- final %>%
          Percent_reads_mapped_of_trimmed_with_dups_major,
          Major_cov_breadth_min_5,
          Major_cov_breadth_min_10,
-         abundance_major,
+         percent_mapped_reads_major,
          Reads_withdup_mapped_minor,
          Reads_nodup_mapped_minor,
          Percent_reads_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
-         abundance_minor,
+         percent_mapped_reads_minor,
          everything()) %>%
   distinct() # Remove any duplicated rows from the different joins
 
@@ -639,7 +639,7 @@ lw_import <- final %>%
         Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
         Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
         Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
-        abundance_minor = str_replace(abundance_minor, "\\.", ","),
+        percent_mapped_reads_minor = str_replace(percent_mapped_reads_minor, "\\.", ","),
         Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
         Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
         Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
@@ -655,7 +655,7 @@ lw_import <- final %>%
          "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
          "Percent covered above depth=9 without duplicates:" = Major_cov_breadth_min_10,
          "Most abundant minority genotype:" = Minor_genotype_mapping,
-         "Percent most abundant minority genotype:" = abundance_minor,
+         "Percent most abundant minority genotype:" = percent_mapped_reads_minor,
          "Number of mapped reads minor:" = Reads_withdup_mapped_minor,
          "Percent covered minor:" = Minor_cov_breadth_min_5,
          "Number of mapped reads minor without duplicates:" = Reads_nodup_mapped_minor,

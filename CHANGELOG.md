@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analyzing Spades contigs instead of scaffolds. For low coverage samples, sometimes scaffolds are not produced.
 - Publish blast plots in the `QC` directory.
 - Allow for co-infection of 1a and 1b subtypes. Otherwise, co-infections must belong to subtypes to be identified.
+- Renamed "abundance_major" and "abundance_minor" to "percent_mapped_reads_major" and "percent_mapped_reads_minor" in the summary file.
 
 ### `Fixed`
 - The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
