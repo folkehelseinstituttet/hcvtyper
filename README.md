@@ -58,9 +58,14 @@ This is only to see if you can get the pipeline up and running and will not run 
 
 To run a full test on a real dataset type:
 ```
+# First download the test dataset using nf-core/fetchngs
+nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcv_illumina/refs/heads/dev/assets/test_ids.csv' --outdir full_test
+
+# Then run the pipeline on the downloaded dataset
 nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test_full
 ```
 This will download a HCV Illumina dataset from SRA and run the entire pipeline. The results will be in a directory called `full_test`.
+Note that the pipeline will by default download and use the Kraken 2 [PlusPFP-8](https://benlangmead.github.io/aws-indexes/k2) database. This reqires at least 5 GB of free disk space and will take a few minutes to download and unpack. In addition, the default memory and cpu requirements of 12 cpus and 72 GB have been overridden to `50.GB` and `8`.
 
 ## Required parameters
 ### Samplesheet input
