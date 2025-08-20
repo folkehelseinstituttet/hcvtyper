@@ -11,6 +11,7 @@ process HCV_GLUE {
 
     input:
     path '*'
+    val hcvglue_threshold
 
     output:
     path("*.json")     , optional: true, emit: GLUE_json
@@ -79,7 +80,7 @@ process HCV_GLUE {
         cvrbioinformatics/gluetools:latest gluetools.sh \
          -p cmd-result-format:json \
         -EC \
-        -i project hcv module phdrReportingController invoke-function reportBam \${bam} 15.0 > \${bam%".bam"}.json || true
+        -i project hcv module phdrReportingController invoke-function reportBam \${bam} ${hcvglue_threshold} > \${bam%".bam"}.json || true
     done
 
     # Then create html report
@@ -92,7 +93,7 @@ process HCV_GLUE {
         --link gluetools-mysql \
         cvrbioinformatics/gluetools:latest gluetools.sh \
     	--console-option log-level:FINEST \
-        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml \${bam} 15.0 \${bam%".bam"}.html || true
+        --inline-cmd project hcv module phdrReportingController invoke-function reportBamAsHtml \${bam} ${hcvglue_threshold} \${bam%".bam"}.html || true
     done
 
     cat <<-END_VERSIONS > versions.yml

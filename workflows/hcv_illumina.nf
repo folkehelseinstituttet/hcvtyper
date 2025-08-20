@@ -329,7 +329,26 @@ workflow HCV_ILLUMINA {
     // SUBWORKFLOW: Map reads against the majority reference
     //
     if (params.strategy == "mapping") {
-        ch_major_mapping = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+        // Filter out if the majority reference has fewer that minRead mapped and less than minCov coverage
+        ch_major_tmp = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+        ch_major_join = ch_major_tmp.join(PARSEFIRSTMAPPING.out.csv) // meta, fasta, reads, csv
+
+        // Create a new channel with the structure tuple val(meta), path(fasta), path(reads)
+        // The meta will contain all the elements from meta and the csv file. meta, reads
+        ch_map_major = ch_major_join
+            .map { meta, fasta, reads, csv ->
+            def elements = csv.splitCsv( header: true, sep:',')
+            return [meta + elements[0], fasta, reads]
+            }
+
+        // Filter on read nr and coverage
+        // This will result in a channel with values that meet the read nr and coverage criteria
+        ch_major_mapping = ch_map_major
+        .filter { entry ->
+            def mappedReads = entry[0]['major_reads'].toInteger()
+            def majorCov = entry[0]['major_cov'].toInteger()
+            mappedReads > params.minRead && majorCov > params.minCov
+        }
     } else if (params.strategy == "denovo") {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     }
@@ -360,7 +379,7 @@ workflow HCV_ILLUMINA {
         // This will result in a channel with values that meet the read nr and coverage criteria
         ch_map_minor_filtered = ch_map_minor
         .filter { entry ->
-            def mappedReads = entry[0]['total_mapped_reads'].toInteger()
+            def mappedReads = entry[0]['minor_reads'].toInteger()
             def minorCov = entry[0]['minor_cov'].toInteger()
             mappedReads > params.minRead && minorCov > params.minCov
         }
@@ -392,9 +411,10 @@ workflow HCV_ILLUMINA {
     //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
-    if (params.agens == "HCV" && !params.skip_hcvglue) {
+    if (!params.skip_hcvglue) {
         HCV_GLUE (
-            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect() // Collect all files. Can only have one GLUE process running
+            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect(), // Collect all files. Can only have one GLUE process running
+            params.hcvglue_threshold
         )
         ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
 
