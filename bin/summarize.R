@@ -430,11 +430,16 @@ for (i in 1:length(id_files)) {
   # Get the sequencer id
   id <- read_tsv(id_files[i], col_names = FALSE)
 
-  # Extract the first field if header does not start with '@SRR'
-  if (str_detect(id$X1, "^@SRR")) {
+  # Check if file is empty (i.e., there were no FASTQ reads for this sample)
+  if (nrow(id) == 0 || ncol(id) == 0) {
+    # Set sequencer ID to NA
+    id_df$sequencer_id[i] <- NA
+  } else if (str_detect(id$X1, "^@SRR")) {
+    # Extract the first field if header start with '@SRR'
     id_df$sequencer_id[i] <- id %>% pull(X1)
   } else {
     id_df$sequencer_id[i] <- id %>%
+      pull(X1) %>%
       # Extract string up to the first ":".
       # The "?" means a "lazy", or non-greedy, match to get the shortest string that satisfies the criteria.
       # This is useful because there are several ":"
