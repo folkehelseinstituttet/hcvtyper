@@ -1,4 +1,4 @@
-# folkehelseinstituttet/viralseq: Changelog
+# folkehelseinstituttet/hcvtyper: Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish blast plots in the `QC` directory.
 - Allow for co-infection of 1a and 1b subtypes. Otherwise, co-infections must belong to subtypes to be identified.
 - Renamed "abundance_major" and "abundance_minor" to "percent_mapped_reads_major" and "percent_mapped_reads_minor" in the summary file.
+- Added total mapped reads (with duplicates) to the summary file and a calculation per sample of the fraction of mapped reads compared to the median for the entire batch.
 
 ### `Fixed`
 - The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
