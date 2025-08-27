@@ -17,6 +17,7 @@ process SUMMARIZE {
     val stringency_2
     path 'cutadapt/'
     path 'kraken_classified/'
+    path 'parsefirst_mapping/'
     path 'stats_withdup/'
     path 'stats_markdup/'
     path 'depth/'
@@ -26,7 +27,7 @@ process SUMMARIZE {
     path 'variation/'
 
     output:
-    path 'Summary.csv'        , emit: summary
+    path 'Summary.csv'      , emit: summary
     path '*mqc.csv'         , emit: mqc
     path '*LW_import.tsv'   , emit: lw
     path '*png'             , emit: png

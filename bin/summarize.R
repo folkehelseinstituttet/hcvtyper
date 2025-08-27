@@ -13,13 +13,14 @@ stringency_2 <- args[2]
 
 path_1 <- "cutadapt/"
 path_2 <- "kraken_classified/"
-path_3 <- "stats_withdup/"
-path_4 <- "stats_markdup/"
-path_5 <- "depth/"
-path_6 <- "blast/"
-path_7 <- "glue/"
-path_8 <- "id/"
-path_9 <- "variation/"
+path_3 <- "parsefirst_mapping/"
+path_4 <- "stats_withdup/"
+path_5 <- "stats_markdup/"
+path_6 <- "depth/"
+path_7 <- "blast/"
+path_8 <- "glue/"
+path_9 <- "id/"
+path_10 <- "variation/"
 
 
 
@@ -82,9 +83,40 @@ for (i in 1:length(kraken_files)) {
 }
 kraken_df <- as_tibble(kraken_df)
 
-# Reads mapped with duplicates --------------------------------------------
+# Total mapped reads to all references, with duplicates -------------------
+first_mapping_files <- list.files(path = path_3, pattern = "parsefirstmapping.csv$", full.names = TRUE)
+
+# Empty df
+parsefirstmapping_df <- as.data.frame(matrix(nrow = length(first_mapping_files), ncol = 2))
+colnames(parsefirstmapping_df) <- c("sampleName", "total_mapped_reads")
+
+# If the length of parsefirstmapping_files is non-zero
+if (length(first_mapping_files) > 0) {
+  for (i in 1:length(first_mapping_files)) {
+    try(rm(sample_parsefirstmapping))
+    # Get sample name
+    parsefirstmapping_df$sampleName[i] <- str_split(basename(first_mapping_files[i]), "\\.")[[1]][1]
+
+    # Read the mapping stats
+    sample_parsefirstmapping <- read_csv(first_mapping_files[i])
+
+    # Get number of mapped reads before duplicate removal
+    parsefirstmapping_df$total_mapped_reads[i] <- sample_parsefirstmapping %>% pull(total_mapped_reads)
+  }
+}
+
+parsefirstmapping_df <- as_tibble(parsefirstmapping_df) %>%
+  # Calculate the median of total mapped reads accross all samples, and then for each sample the fraction of mapped reads compared to the median
+  mutate(
+    median_mapped = median(total_mapped_reads),
+    fraction_mapped_reads_vs_median = total_mapped_reads / median_mapped
+  ) %>%
+  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median)
+
+
+# Second mapping, reads mapped with duplicates ----------------------------
 # List files
-stats_files <- list.files(path = path_3, pattern = "\\withdup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_4, pattern = "\\withdup.stats$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
@@ -148,7 +180,7 @@ df_with_dups <- tmp_df %>%
 
 # Reads mapped no duplicates ----------------------------------------------
 # List files
-stats_files <- list.files(path = path_4, pattern = "nodup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_5, pattern = "nodup.stats$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
@@ -210,7 +242,7 @@ df_nodups <- tmp_df %>%
 # All this is without duplicates
 
 # List files
-cov_files <- list.files(path = path_5, pattern = "tsv$", full.names = TRUE)
+cov_files <- list.files(path = path_6, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
 tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 7))
@@ -303,7 +335,7 @@ df_coverage <- tmp_df %>%
 # Length of contigs -------------------------------------------------------
 
 # Print the length of the longest scaffold matching the given reference
-blast_files <- list.files(path = path_6, pattern = "txt$", full.names = TRUE)
+blast_files <- list.files(path = path_7, pattern = "txt$", full.names = TRUE)
 
 if (length(blast_files > 0)) {
 
@@ -339,11 +371,11 @@ for (i in 1:length(blast_files)) {
 }
 # GLUE --------------------------------------------------------------------
 
-glue_file <- list.files(path = path_7, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
+glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
 glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
 
 # Collect also the minor GLUE report
-glue_file_minor <- list.files(path = path_7, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
+glue_file_minor <- list.files(path = path_8, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
 glue_report_minor <- read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character()))
 
 # Extract the GLUE genotypes and subtypes for major and minor and compare them
@@ -381,7 +413,7 @@ if (exists("major_gt") & exists("minor_gt")) {
 }
 
 # Sequencer ID ------------------------------------------------------------
-id_files <- list.files(path = path_8, pattern = "sequencerID.tsv$", full.names = TRUE)
+id_files <- list.files(path = path_9, pattern = "sequencerID.tsv$", full.names = TRUE)
 
 if (length(id_files > 0)) {
     # Empty df
@@ -416,7 +448,7 @@ id_df <- as_tibble(id_df)
 
 # Variation ---------------------------------------------------------------
 # Read both the major and minor variation plots
-variation_plot_files <- list.files(path = path_9, pattern = ".*variation_plot.*\\.png$", full.names = TRUE)
+variation_plot_files <- list.files(path = path_10, pattern = ".*variation_plot.*\\.png$", full.names = TRUE)
 
 # Create R-code that will gather all the variation plots, then plot them as a grid with four columns and as many rows as needed.
 # Make separate grids for files containing the string "major" and "minor"
@@ -477,7 +509,9 @@ final <-
   # Add coverage
   left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
   # Add sequencer id
-  left_join(id_df, join_by(sampleName))
+  left_join(id_df, join_by(sampleName)) %>%
+  # Add total mapped reads from first mapping
+  left_join(parsefirstmapping_df, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
@@ -617,7 +651,7 @@ header <- c("# id: 'summary'",
 tt <- as.data.frame(final)
 
 # Set up file name for writing to
-file <- "Genotype_mapping_summary_long_mqc.csv"
+file <- "Summary_mqc.csv"
 
 # Add MultiQC header to file
 write_lines(header, file)
@@ -634,6 +668,7 @@ write_csv(tt, file, append = TRUE) # colnames will not be included
 lw_import <- final %>%
     # Change "." to ","
     mutate(
+        fraction_mapped_reads_vs_median = str_replace(fraction_mapped_reads_vs_median, "\\.", ","),
         Percent_reads_mapped_of_trimmed_with_dups_major = str_replace(Percent_reads_mapped_of_trimmed_with_dups_major, "\\.", ","),
         Major_cov_breadth_min_1 = str_replace(Major_cov_breadth_min_1, "\\.", ","),
         Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
@@ -646,6 +681,8 @@ lw_import <- final %>%
         Minor_cov_breadth_min_10 = str_replace(Minor_cov_breadth_min_10, "\\.", ",")
   ) %>%
   select("Sample" = sampleName,
+         "Total mapped reads all references, with duplicates" = total_mapped_reads,
+         fraction_mapped_reads_vs_median,
          "Percent mapped reads of trimmed:" = Percent_reads_mapped_of_trimmed_with_dups_major,
          "Majority genotype:" = Major_genotype_mapping,
          "Number of mapped reads:" = Reads_withdup_mapped_major,

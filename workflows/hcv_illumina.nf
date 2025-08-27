@@ -429,10 +429,11 @@ workflow HCV_ILLUMINA {
     // MODULE: Summarize
     //
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
-    // Collect all the files in separate channels for clarixty. Don't need the meta
+    // Collect all the files in separate channels for clarity. Don't need the meta
     ch_sequence_id      = INSTRUMENTID.out.id.collect({it[1]})
     ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
+    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]})
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
     ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
     ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
@@ -453,6 +454,7 @@ workflow HCV_ILLUMINA {
         params.tanoti_stringency_2,
         ch_cutadapt.collect(),
         ch_classified_reads.collect(),
+        ch_summarize_first_mapping,
         ch_stats_withdup.collect(),
         ch_stats_markdup.collect(),
         ch_depth.collect(),
