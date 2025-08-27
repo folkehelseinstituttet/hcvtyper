@@ -650,11 +650,11 @@ header <- c("# id: 'summary'",
 # Convert final data to data frame
 tt <- as.data.frame(final)
 
-# Set up file name for writing to
-file <- "Summary_mqc.csv"
+# Set up file name for writing to (NB, can't use capital S i summary for MultiQC to pick it up)
+file <- "summary_mqc.csv"
 
 # Add MultiQC header to file
-write_lines(header, file)
+#write_lines(header, file)
 
 # Add the column names to file
 tt %>% colnames() %>% paste0(collapse = ",") %>% write_lines(file, append = TRUE)
