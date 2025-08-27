@@ -1,4 +1,4 @@
-# niph/viralseq: Citations
+# niph/hcvtyper: Citations
 
 ## [nf-core](https://pubmed.ncbi.nlm.nih.gov/32055031/)
 

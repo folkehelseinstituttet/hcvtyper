@@ -1,9 +1,9 @@
 #!/usr/bin/env nextflow
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    folkehelseinstituttet/viralseq
+    folkehelseinstituttet/hcvtyper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Github : https://github.com/folkehelseinstituttet/viralseq
+    Github : https://github.com/folkehelseinstituttet/hcvtyper
 ----------------------------------------------------------------------------------------
 */
 

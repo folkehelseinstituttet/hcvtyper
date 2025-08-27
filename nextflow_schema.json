@@ -1,8 +1,8 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
-    "$id": "https://raw.githubusercontent.com/niph/viralseq/master/nextflow_schema.json",
-    "title": "niph/viralseq pipeline parameters",
-    "description": "Assemble viral genomes from NGS data",
+    "$id": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/refs/heads/master/nextflow_schema.json",
+    "title": "folkehelseinstituttet/hcvtyper pipeline parameters",
+    "description": "Assemble abd genotype HCV genomes from NGS data",
     "type": "object",
     "definitions": {
         "input_output_options": {

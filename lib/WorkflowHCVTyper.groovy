@@ -5,7 +5,7 @@
 import nextflow.Nextflow
 import groovy.text.SimpleTemplateEngine
 
-class WorkflowViralseq {
+class WorkflowHCVTyper {
 
     //
     // Check and validate parameters
@@ -14,7 +14,7 @@ class WorkflowViralseq {
 
 
         if (!params.references & params.platform == 'illumina') {
-            Nextflow.error "Genome reference fasta file not specified with e.g. '--references references.fa' or via a detectable config file."
+            Nextflow.error "HCV genome reference fasta file not specified with e.g. '--references references.fa' or via a detectable config file."
         }
     }
 

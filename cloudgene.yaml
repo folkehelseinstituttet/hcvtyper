@@ -1,15 +1,15 @@
-id: viralseq
-name: viralseq
+id: hcvtyper
+name: hcvtyper
 description: Assemble HCV genomes and genotype
 version: dev
-website: https://github.com/folkehelseinstituttet/viralseq
+website: https://github.com/folkehelseinstituttet/hcvtyper
 author: Jon Bråte
 logo:
 
 workflow:
   steps:
     - name: Run pipeline
-      script: folkehelseinstituttet/viralseq
+      script: folkehelseinstituttet/hcvtyper
       revision: dev
 
   inputs:

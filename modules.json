@@ -1,6 +1,6 @@
 {
-    "name": "niph/viralseq",
-    "homePage": "https://github.com/niph/viralseq",
+    "name": "folkehelseinstituttet/hcvtyper",
+    "homePage": "https://github.com/folkehelseinstituttet/hcvtyper",
     "repos": {
         "https://github.com/nf-core/modules.git": {
             "modules": {
