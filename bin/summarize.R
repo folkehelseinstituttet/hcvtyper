@@ -8,8 +8,9 @@ args = commandArgs(trailingOnly=TRUE)
 
 # NB! Script name is currently hard coded. Needs to be changed
 script_name_version <- "hcv_illumina v1.0.6"
-stringency_1 <- args[1]
-stringency_2 <- args[2]
+samplesheet  <- args[1]
+stringency_1 <- args[2]
+stringency_2 <- args[3]
 
 path_1 <- "cutadapt/"
 path_2 <- "kraken_classified/"
@@ -144,10 +145,10 @@ for (i in 1:length(stats_files)) {
 }
 tmp_df <- as_tibble(tmp_df)
 
-# Add number of raw and trimmed reads
+# Add number of raw and trimmed reads - needed for calculation of percentages
 tmp_df <- left_join(tmp_df, cutadapt_df, by = "sampleName")
 
-# Add number of classified reads from Kraken2
+# Add number of classified reads from Kraken2 -  - needed for calculation of percentages
 tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
 
 df_with_dups <- tmp_df %>%
@@ -235,6 +236,11 @@ df_nodups <- tmp_df %>%
   fill(everything(), .direction = "downup") %>%
   slice(1)
 
+# Combine mapped reads data
+df_mapped_reads <- full_join(df_with_dups, df_nodups, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  # Remove columns for total_raw_reads, total_trimmed_reads and total_classified_reads.
+  # These will be added later to ensure info is kept for samples that were filtered out before the second mapping
+  select(-total_raw_reads, -total_trimmed_reads, -total_classified_reads)
 
 # Coverage ----------------------------------------------------------------
 
@@ -508,15 +514,23 @@ if (length(variation_plot_files) > 0) {
 
 # Join dataframes ---------------------------------------------------------
 
-final <-
-  # Combine mapped reads data
-  full_join(df_with_dups, df_nodups, join_by(sampleName, Major_reference, Minor_reference)) %>%
-  # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+# Start with the original input samplesheeet and extract only the sample names. This is to ensure that all samples are included in the final summary, even if they have no data.
+input_samplesheet <- read_csv(samplesheet) %>%
+  select("sampleName" = sample)
+
+final <- input_samplesheet %>%
   # Add sequencer id
   left_join(id_df, join_by(sampleName)) %>%
+  # Add number of raw and trimmed reads
+  left_join(cutadapt_df, by = "sampleName") %>%
+  # Add number of classified reads from Kraken2
+  left_join(kraken_df, by = "sampleName") %>%
   # Add total mapped reads from first mapping
-  left_join(parsefirstmapping_df, join_by(sampleName))
+  left_join(parsefirstmapping_df, join_by(sampleName)) %>%
+  # Add mapped reads stats
+  left_join(df_mapped_reads, join_by(sampleName)) %>%
+  # Add coverage
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%

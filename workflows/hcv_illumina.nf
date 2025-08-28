@@ -450,6 +450,7 @@ workflow HCV_ILLUMINA {
     ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
 
     SUMMARIZE (
+        file(params.input),
         params.tanoti_stringency_1,
         params.tanoti_stringency_2,
         ch_cutadapt.collect(),

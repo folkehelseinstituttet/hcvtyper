@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow for co-infection of 1a and 1b subtypes. Otherwise, co-infections must belong to subtypes to be identified.
 - Renamed "abundance_major" and "abundance_minor" to "percent_mapped_reads_major" and "percent_mapped_reads_minor" in the summary file.
 - Added total mapped reads (with duplicates) to the summary file and a calculation per sample of the fraction of mapped reads compared to the median for the entire batch.
+- Samples that are filtered out during the workflow, for example due to empty fastq files, will be included in the final summary file with NA values.
 
 ### `Fixed`
 - The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.

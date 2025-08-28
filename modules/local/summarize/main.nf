@@ -13,6 +13,7 @@ process SUMMARIZE {
         'community.wave.seqera.io/library/r-gridextra_r-png_r-seqinr_r-tidyverse:3536dd50a17de0ab' }"
 
     input:
+    path samplesheet
     val stringency_1
     val stringency_2
     path 'cutadapt/'
@@ -41,6 +42,7 @@ process SUMMARIZE {
 
     """
     summarize.R \\
+        $samplesheet \\
         $stringency_1 \\
         $stringency_2 \\
         $args
