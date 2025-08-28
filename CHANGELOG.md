@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
-- Changed name of pipeline to `hcv_illumina`.
+- Changed name of pipeline to `HCVTyper`.
 - Changed profile name for the minimal test from `test_illumina` to `test`.
 - Added plotting of variation per site in the bam files from the targeted mapping.
 - The Kraken2 database PlusPFP-8 by Ben Langmead will be downloaded automatically if not overridden.
@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed bug in the making of consensus sequence in cases of co-infection. The filenames would not separate between the two strains and only a single consensus would be written.
 - Spades may produce empty contigs.fa file. Filter out these instances.
 - Parsing the blast output and plotting may sometimes fail if there are a lot (hundreds) of contigs. Only use maximum 100 contigs for plotting (sorted by evalue and bitscore).
+- Fixed a bug in the plotting of the denovo blast results where the ordering of the contigs was lost. First, the blast hits per contig are sorted first by evalue and then by bitscore and the top blast hit per contig is retained. Then, if there are more than 100 contigs, only the top 100 contigs sorted by bitscore are retained for plotting.
 
 ### `Dependencies`
 

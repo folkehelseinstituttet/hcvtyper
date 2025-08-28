@@ -95,7 +95,8 @@ ggsave(
 ## ── 4. Top BLAST hit per scaffold (all lengths) ----------------------------
 scaf_top <- scaf %>%
   arrange(evalue, desc(bitscore)) %>%      # best hit = lowest e‑value, highest bitscore
-  group_by(qseqid) %>% slice(1) %>% ungroup() # take first hit per scaffold
+  group_by(qseqid) %>% slice(1) %>% ungroup() %>% # take first hit per scaffold
+  arrange(desc(bitscore)) # Arrange again by bitscore, because the order was unset after the previous line
 
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
