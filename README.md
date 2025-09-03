@@ -120,7 +120,7 @@ The database comes with a provided set of about 200 HCV reference sequences down
 ### Co-infections (major and minor strains)
 The pipeline will first map all HCV-classified reads against all HCV reference sequences. Then it will identify the reference sequence with the most mapped reads and use the genotype and subtype information from this reference sequence to call major genotype and subtype. To identify a potential co-infection (minor strain), the pipeline will identify the reference that belongs to a different genotype than the major strain (expect for genotypes 1a and 1b which are considered different enough so that we can distinguish them in a co-infection) and has the highest coverage (i.e., percent of the genome covered by 5 or more reads). By default we have set a threshold of minimum 500 reads and 30% genome coverage in order to consider a strain as a minor strain at all. This can be overridden using the parameters `--minRead` and `--minCov`.
 
-Note that there is a recombinant strain between gsubtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
+Note that there is a recombinant strain between subtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
 
 ## Starting and stopping the pipeline
 If the pipeline crashes, or stopped deliberately, it can be restarted from the last completed step by running the same command but with the `-resume` option. Read more about resuming a Nextflow pipeline [here](https://www.nextflow.io/docs/latest/cache-and-resume.html).
