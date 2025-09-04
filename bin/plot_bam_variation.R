@@ -110,9 +110,9 @@ p <- ggplot(variation_data, aes(x = pos, y = variation)) +
 output_filename <- paste0(sampleName,".variation_plot_", ref_name, "_", major_minor, ".png")
 ggsave(output_filename, plot = p, width = 10, height = 5, dpi = 300, bg = "white")
 
-# Write the raw noise data to a tsv file
+# Write the raw variation data to a tsv file
 output_data_filename <- paste0(sampleName,".bam_variation_", ref_name, "_", major_minor, ".tsv")
-write_tsv(noise_data, output_data_filename)
+write_tsv(variation_data, output_data_filename)
 
 # Write the complete pileup data to a tsv file
 output_pileup_filename <- paste0(sampleName,".bam_pileup_", ref_name, "_", major_minor, ".tsv")
