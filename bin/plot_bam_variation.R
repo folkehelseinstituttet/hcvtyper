@@ -23,8 +23,8 @@ if (prefix != sampleName) {
 # Extract if it's a major or minor variant from the bam file name
 major_minor <- unlist(str_split(basename(bam_file), pattern = "\\."))[3]
 
-# Set noise threshold for highlighting (modify as needed)
-noise_threshold <- 0.15  
+# Set variation threshold for highlighting (modify as needed)
+variation_threshold <- 0.15
 
 # Set minimum coverage for considering a position
 min_coverage <- 10
@@ -42,7 +42,7 @@ ref_name <- names(header[[1]]$targets)
 # Set up pileup parameters: here we distinguish nucleotides and ignore strand information for simplicity.
 p_param <- PileupParam(max_depth = 1000000,
                        min_nucleotide_depth = 0,
-                       distinguish_nucleotides = TRUE, 
+                       distinguish_nucleotides = TRUE,
                        distinguish_strands = FALSE,
                        ignore_query_Ns = TRUE)
 
@@ -71,38 +71,38 @@ complete_pileup <- all_positions %>%
   left_join(pileup_result, by = c("seqnames", "pos", "nucleotide")) %>%
   mutate(count = ifelse(is.na(count), 0, count))
 
-# Compute noise per position
-noise_data <- complete_pileup %>%
+# Compute variation per position
+variation_data <- complete_pileup %>%
   group_by(seqnames, pos) %>%
   summarise(
     total_count = sum(count),
     max_nucleotide_count = max(count, na.rm = TRUE),
-    noise = ifelse(total_count > 0, 1 - (max_nucleotide_count / total_count), 0)
+    variation = ifelse(total_count > 0, 1 - (max_nucleotide_count / total_count), 0)
   ) %>%
   ungroup()
 
 # Identify positions with zero coverage
-zero_coverage <- noise_data %>% filter(total_count == 0)
+zero_coverage <- variation_data %>% filter(total_count == 0)
 
 # Identify positions with total count of 9 or less
-low_coverage <- noise_data %>% filter(total_count > 0 & total_count < min_coverage)
+low_coverage <- variation_data %>% filter(total_count > 0 & total_count < min_coverage)
 
-# Set noise to zero for low coverage positions
-noise_data <- noise_data %>%
-  mutate(noise = ifelse(total_count > 0 & total_count <= 9, 0, noise))
+# Set variation to zero for low coverage positions
+variation_data <- variation_data %>%
+  mutate(variation = ifelse(total_count > 0 & total_count <= 9, 0, variation))
 
-# Identify positions with noise above the threshold
-high_noise <- noise_data %>% filter(noise > noise_threshold)
+# Identify positions with variation above the threshold
+high_variation <- variation_data %>% filter(variation > variation_threshold)
 
-# Plot noise per position
-p <- ggplot(noise_data, aes(x = pos, y = noise)) +
+# Plot variation per position
+p <- ggplot(variation_data, aes(x = pos, y = variation)) +
   geom_segment(aes(xend = pos, yend = 0), color = "black") +  # Black bars for variation
   geom_point(data = zero_coverage, aes(x = pos, y = 0), color = "blue", size = 2) +  # Blue dots for zero coverage
   geom_point(data = low_coverage, aes(x = pos, y = 0), color = "grey", size = 2) +  # Grey dots for low coverage
-  geom_point(data = high_noise, aes(x = pos, y = noise), color = "red", size = 2) +  # Red dots for high noise
-  labs(title = paste0(sampleName, ". Ref. ", ref_name, ". Noise threshold ", noise_threshold, ". Min. coverage ", min_coverage),
+  geom_point(data = high_variation, aes(x = pos, y = variation), color = "red", size = 2) +  # Red dots for high variation
+  labs(title = paste0(sampleName, ". Ref. ", ref_name, ". Variation threshold ", variation_threshold, ". Min. coverage ", min_coverage),
        x = "Position",
-       y = "Noise") +
+       y = "Nucleotide variation") +
   ylim(0, 1.0) +  # Hardcode the y-axis limit to 1.0
   theme_minimal()
 
