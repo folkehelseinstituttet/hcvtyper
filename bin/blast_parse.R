@@ -28,6 +28,9 @@ contigs    <- args[3]
 references <- args[4]
 # agens      <- args[5]   # not used
 
+if (!file.exists(references) || file.size(references) == 0) {
+  stop("Reference FASTA file '", references, "' does not exist or is empty.", call. = FALSE)
+}
 ref_fa     <- read.fasta(             # DNA FASTA with HCV references
   file    = references,
   seqtype = "DNA"
@@ -35,29 +38,77 @@ ref_fa     <- read.fasta(             # DNA FASTA with HCV references
 
 ## ── 2. Input files ----------------------------------------------------------
 # Contigs FASTA (for sequence export)
+if (!file.exists(contigs) || file.size(contigs) == 0) {
+  stop("Contigs FASTA file '", contigs, "' does not exist or is empty.", call. = FALSE)
+}
 contigs_fa <- read.fasta(file = contigs, seqtype = "DNA")
 
 # BLAST outfmt 6 table
-scaf <- read_tsv(
-  blast_out,
-  col_names = FALSE,
-  show_col_types = FALSE
-) %>%
-  rename(qseqid  = X1,  sseqid  = X2,  pident   = X3,  length   = X4,
-         mismatch = X5, gapopen = X6,  qstart   = X7,  qend     = X8,
-         sstart   = X9, send    = X10, evalue   = X11, bitscore = X12) %>%
-  # pull subtype from reference header (e.g. 3a_D1776 → subtype = "3a")
-  separate(sseqid, into = c("subtype", NA), remove = FALSE) %>%
-  # extract scaffold length & kmer coverage from header: NODE_?_length_<len>_cov_<cov>
-  mutate(
-    sc_length = as.numeric(str_extract(qseqid, "(?<=_length_)[0-9]+")),
-    kmer_cov  = as.numeric(str_extract(qseqid, "(?<=_cov_)[0-9.]+"))
+# Set up the empty tibble first, in case the blast_out is empty
+empty_scaf <- tibble(
+  qseqid   = character(0),
+  sseqid   = character(0),
+  pident   = double(0),
+  length   = integer(0),
+  mismatch = integer(0),
+  gapopen  = integer(0),
+  qstart   = integer(0),
+  qend     = integer(0),
+  sstart   = integer(0),
+  send     = integer(0),
+  evalue   = double(0),
+  bitscore = double(0),
+  subtype  = character(0),
+  sc_length = double(0),
+  kmer_cov  = double(0)
+)
+
+# Read BLAST outfmt 6 table
+if (!file.exists(blast_out) || file.size(blast_out) == 0) {
+  message("BLAST output '", blast_out, "' is missing or empty — continuing with no hits.")
+  scaf <- empty_scaf # Set scaf to empty_scaf if blast_out is empty
+} else {
+  scaf <- tryCatch(
+    {
+      read_tsv(
+        blast_out,
+        col_names = FALSE,
+        show_col_types = FALSE
+      ) %>%
+        rename(qseqid  = X1,  sseqid  = X2,  pident   = X3,  length   = X4,
+               mismatch = X5, gapopen = X6,  qstart   = X7,  qend     = X8,
+               sstart   = X9, send    = X10, evalue   = X11, bitscore = X12) %>%
+        # pull subtype from reference header (e.g. 3a_D1776 → subtype = "3a")
+        separate(sseqid, into = c("subtype", NA), remove = FALSE) %>%
+        # extract scaffold length & kmer coverage from header: NODE_?_length_<len>_cov_<cov>
+        mutate(
+          sc_length = as.numeric(str_extract(qseqid, "(?<=_length_)[0-9]+")),
+          kmer_cov  = as.numeric(str_extract(qseqid, "(?<=_cov_)[0-9.]+"))
+        )
+    },
+    error = function(e) {
+      warning("Failed to parse BLAST output '", blast_out, "': ", conditionMessage(e))
+      empty_scaf
+    }
   )
+}
 
 # Write reformatted BLAST output
 write_csv(scaf, paste0(prefix, "_blast_out.csv"))
 
 ## ── 3. Quick QC plots -------------------------------------------------------
+# Make empty plots if no blast_out
+if (nrow(scaf) == 0) {
+  # placeholder plots
+  p_blank <- ggplot() + theme_void() +
+    ggtitle(paste0(prefix, " — No BLAST hits found"))
+  ggsave(paste0(prefix, ".bitscore_plot.png"), plot = p_blank, dpi = 300, width = 9, height = 4, bg = "white")
+  ggsave(paste0(prefix, ".hitlength_plot.png"), plot = p_blank, dpi = 300, width = 9, height = 4, bg = "white")
+  ggsave(paste0(prefix, ".alignment_plot.png"), plot = p_blank, dpi = 300, width = 10, height = 4, bg = "white")
+  
+  # empty top hits
+  write_csv(tibble(), paste0(prefix, "_top_hits.csv"))
+} else {  
 # 3a. Top‑30 bitscores
 scaf %>%
   arrange(desc(bitscore)) %>% slice_head(n = 30) %>%
@@ -91,17 +142,22 @@ ggsave(
   paste0(prefix, ".hitlength_plot.png"),
   dpi = 300, width = 9, height = 4, bg = "white"
 )
+}
 
 ## ── 4. Top BLAST hit per scaffold (all lengths) ----------------------------
-scaf_top <- scaf %>%
+scaf_top <- if (nrow(scaf) > 0) {
+scaf %>%
   arrange(evalue, desc(bitscore)) %>%      # best hit = lowest e‑value, highest bitscore
   group_by(qseqid) %>% slice(1) %>% ungroup() %>% # take first hit per scaffold
   arrange(desc(bitscore)) # Arrange again by bitscore, because the order was unset after the previous line
-
+} else {
+  tibble()
+}
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
 ## ── 5. Alignment‑style bar plot (100 top hit contigs) ----------------------------
 # Create scaffold factor levels sorted by subtype, then by sstart
+if (nrow(scaf_top) > 0) {
 scaf_ordered <- scaf_top %>%
   slice_head(n = 100) %>% # Only use the 100 top hits
   arrange(subtype, sstart, qseqid) %>%
@@ -134,8 +190,10 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
        bg = "white",
        height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of contigs
        dpi = 300)
+}
 
 ## ── 6. Contig FASTAs ≥500 bp, grouped by subtype -------------------------
+if (nrow(scaf_top) > 0) {
 scaf_top_long <- scaf_top %>% filter(sc_length >= 500)
 
 # Write one FASTA per subtype
@@ -150,9 +208,9 @@ scaf_top_long %>%
       file.out  = paste0(prefix, ".", subtype_name, "_contigs.fa")
     )
   })
-
+}
 # --- 7. Major / minor reference summary + FASTA export ---------------------
-
+if (nrow(scaf_top) > 0) {
 # a) pick closest major and (optionally) minor reference names
 major_name <- scaf_top$sseqid[1]                 # best overall hit
 major_geno <- str_sub(major_name, 1, 1)
@@ -166,6 +224,11 @@ minor_vec  <- scaf_top %>%
   slice_head(n = 1) %>%
   pull(sseqid)
 minor_name <- if (length(minor_vec) == 0) NA_character_ else minor_vec
+} else {
+  major_name <- NA_character_
+  major_contig <- NA_character_
+  minor_name <- NA_character_
+}
 
 # b) FASTA export -----------------------------------------------------------
 # Helper that writes the sequence only if it exists
