@@ -17,9 +17,9 @@ process BLASTPARSE {
     val(agens)
 
     output:
-    tuple val(meta), path("*contigs.fa")    , emit: contigs
+    tuple val(meta), path("*contigs.fa")    , emit: contigs    , optional: true
     tuple val(meta), path('*blast_out.csv') , emit: blast_res
-    tuple val(meta), path("*major.fa")      , emit: major_fasta
+    tuple val(meta), path("*major.fa")      , emit: major_fasta, optional: true
     tuple val(meta), path("*minor.fa")      , emit: minor_fasta, optional: true
     tuple val(meta), path("*blastparse.csv"), emit: csv
     tuple val(meta), path("*.png")          , emit: png
