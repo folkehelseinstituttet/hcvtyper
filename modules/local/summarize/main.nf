@@ -16,7 +16,7 @@ process SUMMARIZE {
     path samplesheet
     val stringency_1
     val stringency_2
-    path 'cutadapt/'
+    path 'trimmed/'
     path 'kraken_classified/'
     path 'parsefirst_mapping/'
     path 'stats_withdup/'

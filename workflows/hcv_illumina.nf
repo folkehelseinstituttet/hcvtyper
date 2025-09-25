@@ -54,6 +54,7 @@ include { TARGETED_MAPPING as MINOR_MAPPING              } from '../subworkflows
 //include { fromSamplesheet                    } from 'plugin/nf-validation'
 include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
 include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
+include { FASTP                              } from '../modules/nf-core/fastp/main'
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
@@ -151,31 +152,48 @@ workflow HCV_ILLUMINA {
     ch_versions = ch_versions.mix(FASTQC_RAW.out.versions)
 
     //
-    // MODULE: Trim reads with Cutadapt
+    // MODULE: Trim reads with either Cutadapt or Fastp
     //
-    CUTADAPT(
-        reads
-    )
-    ch_versions = ch_versions.mix(CUTADAPT.out.versions)
-
+    if (params.trimmer == "fastp") {
+        FASTP(
+            reads
+                .map { meta, fastq ->
+                    def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+                    return [meta, fastq, n] // Add the count as the last element in the tuple
+                }
+                .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files because Fastp does not produce correct gzipped file if input fastq is empty
+                .map { meta, fastq, n -> [ meta, fastq, [] ] }, // Remove the count and add empty element to get the structure correct for Fastp
+            false,
+            false,
+            false
+        )
+        ch_trimmed_reads = FASTP.out.reads
+        ch_versions = ch_versions.mix(FASTP.out.versions)
+    } else if (params.trimmer == "cutadapt") {
+        CUTADAPT(
+            reads
+        )
+        ch_trimmed_reads = CUTADAPT.out.reads
+        ch_versions = ch_versions.mix(CUTADAPT.out.versions)
+    }
 
     //
     // MODULE: Run FastQC on trimmed reads
     //
     FASTQC_TRIM (
-        CUTADAPT.out.reads
+        ch_trimmed_reads
     )
     ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
     // NOTE:
     // In some cases there are empty fastq files after trimming. Remove these before Kraken2
-    ch_kraken = CUTADAPT.out.reads
+    ch_kraken = ch_trimmed_reads
         .map { meta, fastq ->
             def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
-        .map { meta, fastq, n -> [meta, fastq] } // Return the count to get the channel structure correct for KRAKEN2_KRAKEN2
+        .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for KRAKEN2_KRAKEN2
 
     //
     // MODULE: Run Kraken2 to classify reads
@@ -431,7 +449,11 @@ workflow HCV_ILLUMINA {
     // Create channel with this structure: path(stats), path(depth), path(blast), path(json)
     // Collect all the files in separate channels for clarity. Don't need the meta
     ch_sequence_id      = INSTRUMENTID.out.id.collect({it[1]})
-    ch_cutadapt         = CUTADAPT.out.log.collect({it[1]})
+    if (params.trimmer == "fastp") {
+        ch_trimmed_reads         = FASTP.out.log.collect({it[1]})
+    } else if (params.trimmer == "cutadapt") {
+        ch_trimmed_reads         = CUTADAPT.out.log.collect({it[1]})
+    }
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
     ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]})
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
@@ -453,7 +475,7 @@ workflow HCV_ILLUMINA {
         file(params.input),
         params.tanoti_stringency_1,
         params.tanoti_stringency_2,
-        ch_cutadapt.collect(),
+        ch_trimmed_reads.collect(),
         ch_classified_reads.collect(),
         ch_summarize_first_mapping,
         ch_stats_withdup.collect(),
@@ -487,7 +509,12 @@ workflow HCV_ILLUMINA {
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collectFile(name: 'software_mqc_versions.yml'))
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW.out.zip.collect{it[1]}.ifEmpty([]))
-    ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
+    if (params.trimmer == "cutadapt") {
+        ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
+    } else if (params.trimmer == "fastp") {
+        ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]}.ifEmpty([]))
+    }
+    ch_multiqc_files = ch_multiqc_files.mix(ch_trimmed_reads.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_FOCUSED.out.report.collect{it[1]}.ifEmpty([]))

@@ -12,7 +12,7 @@ samplesheet  <- args[1]
 stringency_1 <- args[2]
 stringency_2 <- args[3]
 
-path_1 <- "cutadapt/"
+path_1 <- "trimmed/"
 path_2 <- "kraken_classified/"
 path_3 <- "parsefirst_mapping/"
 path_4 <- "stats_withdup/"
@@ -25,43 +25,81 @@ path_10 <- "variation/"
 
 
 
-# Cutadapt ----------------------------------------------------------------
+# Trimmed ----------------------------------------------------------------
 
 # List files
-cutadapt_files <- list.files(path = path_1, pattern = ".log$", full.names = TRUE)
+trimmed_files <- list.files(path = path_1, pattern = ".log$", full.names = TRUE)
 
 # Empty df
-cutadapt_df <- as.data.frame(matrix(nrow = length(cutadapt_files), ncol = 3))
-colnames(cutadapt_df) <- c("sampleName", "total_raw_reads", "total_trimmed_reads")
+trimmed_df <- tibble(
+  sampleName = rep(NA_character_, length(trimmed_files)),
+  total_raw_reads = rep(NA_real_, length(trimmed_files)),
+  total_trimmed_reads = rep(NA_real_, length(trimmed_files))
+)
 
-for (i in 1:length(cutadapt_files)) {
-  try(rm(cutadapt_stats))
+for (i in seq_along(trimmed_files)) {
+  f <- trimmed_files[i]
+  # Get the sampleName
+  trimmed_df$sampleName[i] <- str_split(basename(f), "\\.")[[1]][1]
 
-  # Get sample name
-  cutadapt_df$sampleName[i] <- str_split(basename(cutadapt_files[i]), "\\.")[[1]][1]
-
-  # Get number of raw and trimmed read pairs
-  try(cutadapt_stats <- as_tibble(read_lines(cutadapt_files[i])))
-
-  raw <- filter(cutadapt_stats, str_detect(value, "Total read pairs processed:"))
-
-  if (nrow(raw) > 0) {
-    tmp <- str_split(raw, "\\s+")[[1]] # Split on white space and get the list content
-    tmp <- as.numeric(str_remove_all(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
-    tmp <- tmp*2 # Double to get reads
-    cutadapt_df$total_raw_reads[i] <- tmp
+  if (!file.exists(f) || file.size(f) == 0) {
+    warning(glue::glue("Log file missing or empty: {f}"))
+    next
   }
 
-  trimmed <- filter(cutadapt_stats, str_detect(value, "Pairs written \\(passing filters\\)"))
+  try(rm(trimmed_stats), silent = TRUE)
 
-  if (nrow(trimmed) > 0) {
-    tmp <- str_split(trimmed, "\\s+")[[1]] # Split on white space and get the list content
-    tmp <- as.numeric(str_remove_all(tmp[length(tmp)-1], ",")) # extract the second last element which contains the pair number, remove commas and create a numeric
-    tmp <- tmp*2 # Double to get reads
-    cutadapt_df$total_trimmed_reads[i] <- tmp
+  # Read the log file from either cutadapt or fastp
+  trimmed_stats <- read_lines(f) %>% tibble(value = .)
+
+  # Check if the string fastp is found in the log file. Then process accordingly
+  if (any(str_detect(trimmed_stats$value, "fastp v"))) {
+    ## ---- fastp logs ----
+
+    # Raw reads = Read1 before + Read2 before
+    raw1_idx <- which(str_detect(trimmed_stats$value, "Read1 before filtering:")) # Finds the line number
+    raw2_idx <- which(str_detect(trimmed_stats$value, "Read2 before filtering:"))
+
+    raw1_val <- if (length(raw1_idx) > 0) {
+      as.numeric(str_extract(trimmed_stats$value[raw1_idx + 1], "\\d+")) # Pull out the number on the line after
+    } else NA
+    raw2_val <- if (length(raw2_idx) > 0) {
+      as.numeric(str_extract(trimmed_stats$value[raw2_idx + 1], "\\d+"))
+    } else NA
+
+    if (!is.na(raw1_val) && !is.na(raw2_val)) {
+      trimmed_df$total_raw_reads[i] <- raw1_val + raw2_val
+    }
+
+    # Trimmed reads = "reads passed filter:"
+    passed <- trimmed_stats %>%
+      filter(str_detect(value, "^reads passed filter:"))
+    if (nrow(passed) > 0) {
+      tmp <- as.numeric(str_extract(passed$value, "\\d+"))
+      trimmed_df$total_trimmed_reads[i] <- tmp
+    }
+
+  } else {
+    ## ---- Cutadapt logs ----
+    raw <- filter(trimmed_stats, str_detect(value, "Total read pairs processed:"))
+    if (nrow(raw) > 0) {
+      tmp <- str_split(raw$value, "\\s+")[[1]] # Split on white space and get the list content
+      tmp <- as.numeric(str_remove_all(tmp[length(tmp)], ",")) # extract the last element which contains the pair number, remove commas and create a numeric
+      tmp <- tmp * 2 # Double to get reads
+      trimmed_df$total_raw_reads[i] <- tmp
+    }
+
+    trimmed <- filter(trimmed_stats, str_detect(value, "Pairs written \\(passing filters\\)"))
+    if (nrow(trimmed) > 0) {
+      tmp <- str_split(trimmed$value, "\\s+")[[1]]
+      tmp <- as.numeric(str_remove_all(tmp[length(tmp)-1], ","))
+      tmp <- tmp * 2
+      trimmed_df$total_trimmed_reads[i] <- tmp
+    }
   }
 }
-cutadapt_df <- as_tibble(cutadapt_df)
+
+trimmed_df <- as_tibble(trimmed_df)
 
 # Kraken ------------------------------------------------------------------
 # List files
@@ -146,7 +184,7 @@ for (i in 1:length(stats_files)) {
 tmp_df <- as_tibble(tmp_df)
 
 # Add number of raw and trimmed reads - needed for calculation of percentages
-tmp_df <- left_join(tmp_df, cutadapt_df, by = "sampleName")
+tmp_df <- left_join(tmp_df, trimmed_df, by = "sampleName")
 
 # Add number of classified reads from Kraken2 -  - needed for calculation of percentages
 tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
@@ -355,7 +393,7 @@ if (length(blast_files) == 0) {
 } else {
   for (bf in blast_files) {
     sampleName <- str_split(basename(bf), "\\.")[[1]][1]
-    
+
     # If the file is missing or zero-length, record a row with NA values
     if (!file.exists(bf) || file.size(bf) == 0) {
       df_contigs <- bind_rows(
@@ -364,7 +402,7 @@ if (length(blast_files) == 0) {
       )
       next
     }
-    
+
     # Try to read the file; read everything as character to avoid parsing errors
     dat <- tryCatch(
       read_tsv(bf, col_names = FALSE, col_types = cols(.default = col_character()), progress = FALSE),
@@ -373,7 +411,7 @@ if (length(blast_files) == 0) {
         NULL
       }
     )
-    
+
     # If read failed or produced no rows, add NA row and continue
     if (is.null(dat) || nrow(dat) == 0) {
       df_contigs <- bind_rows(
@@ -382,11 +420,11 @@ if (length(blast_files) == 0) {
       )
       next
     }
-    
+
     # Ensure expected columns exist (X1 = query header, X2 = subject header)
     if (!"X1" %in% names(dat)) dat$X1 <- NA_character_
     if (!"X2" %in% names(dat)) dat$X2 <- NA_character_
-    
+
     # Extract genotype (text before first underscore) and scaffold_length using regex
     processed <- dat %>%
       mutate(
@@ -404,7 +442,7 @@ if (length(blast_files) == 0) {
       distinct(X1, .keep_all = TRUE) %>%
       select(scaffold_length, reference = X2) %>%
       mutate(sampleName = sampleName)
-    
+
     # If processing resulted in zero rows, add NA row; otherwise append results
     if (nrow(processed) == 0) {
       df_contigs <- bind_rows(
@@ -564,7 +602,7 @@ final <- input_samplesheet %>%
   # Add sequencer id
   left_join(id_df, join_by(sampleName)) %>%
   # Add number of raw and trimmed reads
-  left_join(cutadapt_df, by = "sampleName") %>%
+  left_join(trimmed_df, by = "sampleName") %>%
   # Add number of classified reads from Kraken2
   left_join(kraken_df, by = "sampleName") %>%
   # Add total mapped reads from first mapping
