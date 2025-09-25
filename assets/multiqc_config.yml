@@ -21,6 +21,7 @@ run_modules:
   - custom_content
   - fastqc
   - cutadapt
+  - fastp
   - kraken
   - software_versions
 
@@ -33,6 +34,10 @@ module_order:
       name: "Cutadapt"
       path_filters:
         - "*.cutadapt.log"
+  - fastp:
+      name: "Fastp"
+      path_filters:
+        - "*.fastp.json"
   - fastqc:
       name: "FastQC (trimmed)"
       path_filters:
