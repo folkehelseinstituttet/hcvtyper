@@ -58,6 +58,7 @@ include { FASTP                              } from '../modules/nf-core/fastp/ma
 include { FASTQC as FASTQC_RAW               } from '../modules/nf-core/fastqc/main'
 include { FASTQC as FASTQC_TRIM              } from '../modules/nf-core/fastqc/main'
 include { CUTADAPT                           } from '../modules/nf-core/cutadapt/main'
+include { PRINSEQPLUSPLUS                    } from '../modules/nf-core/prinseqplusplus/main'
 include { MULTIQC                            } from '../modules/nf-core/multiqc/main'
 include { KRAKEN2_KRAKEN2                    } from '../modules/nf-core/kraken2/kraken2/main'
 include { KRAKEN2_KRAKEN2 as KRAKEN2_FOCUSED } from '../modules/nf-core/kraken2/kraken2/main'
@@ -103,7 +104,7 @@ workflow HCV_ILLUMINA {
     ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 
     //
-    // Prepare Kraken2 database for all domaines of life
+    // Prepare Kraken2 database for all domains of life
     //
     ch_kraken_all_db = Channel.empty()
     if (params.kraken_all_db) {
@@ -185,21 +186,29 @@ workflow HCV_ILLUMINA {
     )
     ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
+    //
+    // MODULE: Remove low complexity reads with Prinseq++
+    //
     // NOTE:
-    // In some cases there are empty fastq files after trimming. Remove these before Kraken2
-    ch_kraken = ch_trimmed_reads
+    // In some cases there are empty fastq files after trimming. Remove these before PRINSEQPLUSPLUS
+    ch_prinseq = ch_trimmed_reads
         .map { meta, fastq ->
             def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
         .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
-        .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for KRAKEN2_KRAKEN2
+        .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for PRINSEQPLUSPLUS
+
+    PRINSEQPLUSPLUS (
+        ch_prinseq
+    )
+    ch_versions = ch_versions.mix(PRINSEQPLUSPLUS.out.versions.first())
 
     //
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2 (
-        ch_kraken,
+        PRINSEQPLUSPLUS.out.good_reads,
         ch_kraken_all_db,
         false,
         false
@@ -210,7 +219,7 @@ workflow HCV_ILLUMINA {
     // MODULE: Run Kraken2 to identify target viral reads
     //
     KRAKEN2_FOCUSED (
-        ch_kraken,
+        PRINSEQPLUSPLUS.out.good_reads,
         Channel.value(file(params.kraken_focused)),
         params.save_output_fastqs,
         params.save_reads_assignment
@@ -514,6 +523,7 @@ workflow HCV_ILLUMINA {
     } else if (params.trimmer == "fastp") {
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]}.ifEmpty([]))
     }
+    ch_multiqc_files = ch_multiqc_files.mix(PRINSEQPLUSPLUS.out.log.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(ch_trimmed_reads.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))

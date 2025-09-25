@@ -22,6 +22,7 @@ run_modules:
   - fastqc
   - cutadapt
   - fastp
+  - prinseqplusplus
   - kraken
   - software_versions
 
@@ -38,6 +39,8 @@ module_order:
       name: "Fastp"
       path_filters:
         - "*.fastp.json"
+  - prinseqplusplus:
+      name: "prinseq++"
   - fastqc:
       name: "FastQC (trimmed)"
       path_filters:
