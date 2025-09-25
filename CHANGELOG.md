@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed "abundance_major" and "abundance_minor" to "percent_mapped_reads_major" and "percent_mapped_reads_minor" in the summary file.
 - Added total mapped reads (with duplicates) to the summary file and a calculation per sample of the fraction of mapped reads compared to the median for the entire batch.
 - Samples that are filtered out during the workflow, for example due to empty fastq files, will be included in the final summary file with NA values.
+- Added option to choose between cutadapt or fastp for read trimming. Default is cutadapt.
 
 ### `Fixed`
 - The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Spades may produce empty contigs.fa file. Filter out these instances.
 - Parsing the blast output and plotting may sometimes fail if there are a lot (hundreds) of contigs. Only use maximum 100 contigs for plotting (sorted by evalue and bitscore).
 - Fixed a bug in the plotting of the denovo blast results where the ordering of the contigs was lost. First, the blast hits per contig are sorted first by evalue and then by bitscore and the top blast hit per contig is retained. Then, if there are more than 100 contigs, only the top 100 contigs sorted by bitscore are retained for plotting.
+- Handling cases where the de novo assembled contigs produced no blast hits.
 
 ### `Dependencies`
 
