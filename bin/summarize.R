@@ -343,38 +343,80 @@ df_coverage <- tmp_df %>%
 # Print the length of the longest scaffold matching the given reference
 blast_files <- list.files(path = path_7, pattern = "txt$", full.names = TRUE)
 
-if (length(blast_files > 0)) {
+# Start with an empty tibble having correct column types
+df_contigs <- tibble(
+  scaffold_length = numeric(),
+  reference       = character(),
+  sampleName      = character()
+)
 
-# Empty df
-df_contigs <- tribble(
-  ~"scaffold_length", ~"reference", ~"sampleName",
-  )
-
-for (i in 1:length(blast_files)) {
-
-  # Read the length of contigs
-  blast_out <- read_tsv(blast_files[i], col_names = FALSE) %>%
-    # Separate the genotype from the subject header
-    separate(X2, into = c("genotype", NA), remove = FALSE) %>%
-    # Get scaffold length info
-    separate(X1, c(NA, NA, NA, "scaffold_length", NA, NA), sep = "_", remove = FALSE) %>%
-    mutate(scaffold_length = as.numeric(scaffold_length)) %>%
-    # Select the row with the longest scaffold lengths for each genotype/blast hit
-    group_by(genotype) %>%
-    slice_max(order_by = scaffold_length, n = 1) %>%
-    ungroup() %>%
-    # Sometimes the same contigs has two or more hits
-    distinct(X1, .keep_all = TRUE) %>%
-    select(scaffold_length,
-           "reference" = X2) %>%
-    # Legg til en kolonne med Sample Name
-    add_column("sampleName" = str_split(basename(blast_files[i]), "\\.")[[1]][1])
-
-  # Add to df_contigs
-  df_contigs <- bind_rows(df_contigs, blast_out)
-
+if (length(blast_files) == 0) {
+  message("No BLAST files found in: ", path_7)
+} else {
+  for (bf in blast_files) {
+    sampleName <- str_split(basename(bf), "\\.")[[1]][1]
+    
+    # If the file is missing or zero-length, record a row with NA values
+    if (!file.exists(bf) || file.size(bf) == 0) {
+      df_contigs <- bind_rows(
+        df_contigs,
+        tibble(scaffold_length = NA_real_, reference = NA_character_, sampleName = sampleName)
+      )
+      next
+    }
+    
+    # Try to read the file; read everything as character to avoid parsing errors
+    dat <- tryCatch(
+      read_tsv(bf, col_names = FALSE, col_types = cols(.default = col_character()), progress = FALSE),
+      error = function(e) {
+        warning("Failed to read '", bf, "': ", conditionMessage(e))
+        NULL
+      }
+    )
+    
+    # If read failed or produced no rows, add NA row and continue
+    if (is.null(dat) || nrow(dat) == 0) {
+      df_contigs <- bind_rows(
+        df_contigs,
+        tibble(scaffold_length = NA_real_, reference = NA_character_, sampleName = sampleName)
+      )
+      next
+    }
+    
+    # Ensure expected columns exist (X1 = query header, X2 = subject header)
+    if (!"X1" %in% names(dat)) dat$X1 <- NA_character_
+    if (!"X2" %in% names(dat)) dat$X2 <- NA_character_
+    
+    # Extract genotype (text before first underscore) and scaffold_length using regex
+    processed <- dat %>%
+      mutate(
+        genotype = str_extract(X2, "^[^_]+"),
+        scaffold_length = as.numeric(str_extract(X1, "(?<=_length_)[0-9]+"))
+      ) %>%
+      # prefer rows with largest scaffold_length per genotype (NA scaffold_length sorts last)
+      arrange(desc(scaffold_length)) %>%
+      group_by(genotype) %>%
+      # Select the row with the longest scaffold lengths for each genotype/blast hit
+      slice_head(n = 1) %>%
+      ungroup() %>%
+      # remove duplicate queries (same X1) keeping the first
+      # Sometimes the same contigs has two or more hits
+      distinct(X1, .keep_all = TRUE) %>%
+      select(scaffold_length, reference = X2) %>%
+      mutate(sampleName = sampleName)
+    
+    # If processing resulted in zero rows, add NA row; otherwise append results
+    if (nrow(processed) == 0) {
+      df_contigs <- bind_rows(
+        df_contigs,
+        tibble(scaffold_length = NA_real_, reference = NA_character_, sampleName = sampleName)
+      )
+    } else {
+      df_contigs <- bind_rows(df_contigs, processed)
+    }
+  }
 }
-}
+
 # GLUE --------------------------------------------------------------------
 
 glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
