@@ -492,7 +492,7 @@ if (nrow(glue_report_minor) > 0) {
            Minor_subtype = GLUE_subtype)
 }
 
-# Check if the same genotype has been called for major and minor. If Yes, then minor is not typbar
+# Check if the same genotype has been called for major and minor. If Yes, then minor is not typable
 if (exists("major_gt") & exists("minor_gt")) {
   gt_check <- major_gt %>%
     left_join(minor_gt, by = "Sample") %>%
@@ -635,29 +635,29 @@ final <- final %>%
   add_column("script_name_stringency" = script_name_version)
 
 
-# Decide if a sample is "typbar" or not
+# Decide if a sample is "typable" or not
 final <- final %>%
-  mutate(major_typbar = case_when(
+  mutate(major_typable = case_when(
     Major_cov_breadth_min_1 >= 10 & Major_avg_depth >= 2 ~ "YES",
     .default = "NO"
   )) %>%
-  mutate(minor_typbar = case_when(
+  mutate(minor_typable = case_when(
     Minor_cov_breadth_min_1 >= 10 & Minor_avg_depth >= 2 ~ "YES",
     .default = "NO"
   ))
 
-# If minor genotype is the same as major, then not typbar. But only possible if there are minor glue reports available
+# If minor genotype is the same as major, then not typable. But only possible if there are minor glue reports available
 # But allow for the co-infection of 1a and 1b even though these belong to the same genotype
 if (nrow(glue_report) > 0 & exists("gt_check")) {
   final <- final %>%
     left_join(gt_check, by = c("sampleName" = "Sample")) %>%
-    mutate(minor_typbar = case_when(
-      identical_geno == "NO" ~ "YES",                              # Different genotypes, so minor is typbar
+    mutate(minor_typable = case_when(
+      identical_geno == "NO" ~ "YES",                              # Different genotypes, so minor is typable
       identical_geno == "YES" & identical_subgeno == "NO" &
         ((Major_subtype == "1a" & Minor_subtype == "1b") |
-         (Major_subtype == "1b" & Minor_subtype == "1a")) ~ "YES", # If the genotype is the same and subtypes are different, but must be 1a and 1b combination. Then allow typbar Minor
-      identical_geno == "YES" & identical_subgeno == "NO" ~ "NO",  # If the genotype is the same and subtypes are different, but not 1a and 1b combination. Then not typbar Minor
-      identical_geno == "YES" & identical_subgeno == "YES" ~ "NO", # Same genotype & same subtype → not typbar
+         (Major_subtype == "1b" & Minor_subtype == "1a")) ~ "YES", # If the genotype is the same and subtypes are different, but must be 1a and 1b combination. Then allow typable Minor
+      identical_geno == "YES" & identical_subgeno == "NO" ~ "NO",  # If the genotype is the same and subtypes are different, but not 1a and 1b combination. Then not typable Minor
+      identical_geno == "YES" & identical_subgeno == "YES" ~ "NO", # Same genotype & same subtype → not typable
       is.na(identical_geno) ~ "UNKNOWN"
     ))
 }
@@ -728,10 +728,14 @@ final <- final %>%
          total_raw_reads,
          total_trimmed_reads,
          total_classified_reads,
+         total_mapped_reads,
+         fraction_mapped_reads_vs_median,
          Major_genotype_mapping,
          Major_reference,
          Minor_genotype_mapping,
          Minor_reference,
+         major_typable,
+         minor_typable,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
@@ -745,7 +749,8 @@ final <- final %>%
          Minor_cov_breadth_min_10,
          percent_mapped_reads_minor_firstmapping,
          everything()) %>%
-  distinct() # Remove any duplicated rows from the different joins
+  distinct() %>% # Remove any duplicated rows from the different joins
+  select(-Major_minor, -Reference, -identical_geno, -identical_subgeno)
 
 # Write file
 write_csv(final, file = "Summary.csv")
@@ -814,8 +819,8 @@ lw_import <- final %>%
          "Script name and stringency:" = script_name_stringency,
          "Total number of reads before trim:" = total_raw_reads,
          "Total number of reads after trim:" = total_trimmed_reads,
-         "Majority quality:" = major_typbar,
-         "Minor quality:" = minor_typbar,
+         "Majority quality:" = major_typable,
+         "Minor quality:" = minor_typable,
          sequencer_id,
          Reference,
          GLUE_genotype,
