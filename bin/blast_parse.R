@@ -105,10 +105,10 @@ if (nrow(scaf) == 0) {
   ggsave(paste0(prefix, ".bitscore_plot.png"), plot = p_blank, dpi = 300, width = 9, height = 4, bg = "white")
   ggsave(paste0(prefix, ".hitlength_plot.png"), plot = p_blank, dpi = 300, width = 9, height = 4, bg = "white")
   ggsave(paste0(prefix, ".alignment_plot.png"), plot = p_blank, dpi = 300, width = 10, height = 4, bg = "white")
-  
+
   # empty top hits
   write_csv(tibble(), paste0(prefix, "_top_hits.csv"))
-} else {  
+} else {
 # 3a. Top‑30 bitscores
 scaf %>%
   arrange(desc(bitscore)) %>% slice_head(n = 30) %>%
@@ -190,6 +190,38 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
        bg = "white",
        height = max(4, 0.2 * nrow(scaf_ordered)),  # scale with number of contigs
        dpi = 300)
+}
+
+## ── 5b. Contig length vs coverage dot plot ----------------------------
+if (nrow(scaf_top) > 0) {
+  scaf_dot <- scaf_top %>%
+    arrange(desc(kmer_cov), desc(sc_length)) %>%
+    mutate(contig_order = factor(qseqid, levels = unique(qseqid)))
+
+  p_dot <- ggplot(scaf_dot, aes(x = sc_length, y = contig_order)) +
+    geom_point(aes(size = kmer_cov, color = subtype), alpha = 0.8) +
+    scale_size_continuous(range = c(2, 10)) +
+    scale_color_viridis_d(option = "D") +
+    labs(
+      title = paste0(prefix, ": Contig length vs coverage"),
+      x = "Contig length (bp)",
+      y = "Contigs (ordered by coverage, then length)",
+      size = "K-mer coverage",
+      color = "Subtype"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.y = element_text(size = 6)
+    )
+
+  ggsave(
+    paste0(prefix, ".contig_dot_plot.png"),
+    plot = p_dot,
+    width = 9,
+    bg = "white",
+    height = max(4, 0.2 * nrow(scaf_dot)),  # scale height with number of contigs
+    dpi = 300
+  )
 }
 
 ## ── 6. Contig FASTAs ≥500 bp, grouped by subtype -------------------------
