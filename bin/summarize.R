@@ -750,7 +750,7 @@ final <- final %>%
          percent_mapped_reads_minor_firstmapping,
          everything()) %>%
   distinct() %>% # Remove any duplicated rows from the different joins
-  select(-Major_minor, -Reference, -identical_geno, -identical_subgeno)
+  select(-Major_minor, -identical_geno, -identical_subgeno)
 
 # Write file
 write_csv(final, file = "Summary.csv")
