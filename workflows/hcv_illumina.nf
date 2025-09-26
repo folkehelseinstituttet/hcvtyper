@@ -187,28 +187,37 @@ workflow HCV_ILLUMINA {
     ch_versions = ch_versions.mix(FASTQC_TRIM.out.versions.first())
 
     //
-    // MODULE: Remove low complexity reads with Prinseq++
+    // MODULE: Remove low complexity reads with Prinseq++ (optional)
     //
-    // NOTE:
-    // In some cases there are empty fastq files after trimming. Remove these before PRINSEQPLUSPLUS
-    ch_prinseq = ch_trimmed_reads
-        .map { meta, fastq ->
-            def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
-            return [meta, fastq, n] // Add the count as the last element in the tuple
-        }
-        .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
-        .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for PRINSEQPLUSPLUS
 
-    PRINSEQPLUSPLUS (
-        ch_prinseq
-    )
-    ch_versions = ch_versions.mix(PRINSEQPLUSPLUS.out.versions.first())
+    if (params.filter_low_complexity) {
+        // NOTE:
+        // In some cases there are empty fastq files after trimming. Remove these before PRINSEQPLUSPLUS
+        ch_prinseq = ch_trimmed_reads
+            .map { meta, fastq ->
+                def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
+                return [meta, fastq, n] // Add the count as the last element in the tuple
+            }
+            .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
+            .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for PRINSEQPLUSPLUS
+
+        PRINSEQPLUSPLUS (
+            ch_prinseq
+        )
+        ch_versions = ch_versions.mix(PRINSEQPLUSPLUS.out.versions.first())
+
+        // Kraken2 input is from PRINSEQPLUSPLUS
+        ch_kraken_input = PRINSEQPLUSPLUS.out.good_reads
+    } else {
+        // Skip PRINSEQPLUSPLUS and use trimmed reads as input to Kraken2
+        ch_kraken_input = ch_trimmed_reads
+    }
 
     //
     // MODULE: Run Kraken2 to classify reads
     //
     KRAKEN2_KRAKEN2 (
-        PRINSEQPLUSPLUS.out.good_reads,
+        ch_kraken_input,
         ch_kraken_all_db,
         false,
         false
@@ -219,7 +228,7 @@ workflow HCV_ILLUMINA {
     // MODULE: Run Kraken2 to identify target viral reads
     //
     KRAKEN2_FOCUSED (
-        PRINSEQPLUSPLUS.out.good_reads,
+        ch_kraken_input,
         Channel.value(file(params.kraken_focused)),
         params.save_output_fastqs,
         params.save_reads_assignment
