@@ -126,8 +126,12 @@ kraken_df <- as_tibble(kraken_df)
 first_mapping_files <- list.files(path = path_3, pattern = "parsefirstmapping.csv$", full.names = TRUE)
 
 # Empty df
-parsefirstmapping_df <- as.data.frame(matrix(nrow = length(first_mapping_files), ncol = 2))
-colnames(parsefirstmapping_df) <- c("sampleName", "total_mapped_reads")
+parsefirstmapping_df <- tibble(
+  sampleName = rep(NA_character_, length(first_mapping_files)),
+  total_mapped_reads = rep(NA_real_, length(first_mapping_files)),
+  major_mapped_reads = rep(NA_real_, length(first_mapping_files)),
+  minor_mapped_reads = rep(NA_real_, length(first_mapping_files))
+)
 
 # If the length of parsefirstmapping_files is non-zero
 if (length(first_mapping_files) > 0) {
@@ -141,17 +145,25 @@ if (length(first_mapping_files) > 0) {
 
     # Get number of mapped reads before duplicate removal
     parsefirstmapping_df$total_mapped_reads[i] <- sample_parsefirstmapping %>% pull(total_mapped_reads)
+
+    # Get the number of mapped reads against all major references belonging to the major subtype
+    parsefirstmapping_df$major_mapped_reads[i] <- sample_parsefirstmapping %>% pull(major_reads)
+
+    # Get the number of mapped reads against all minor references belonging to the minor subtype
+    parsefirstmapping_df$minor_mapped_reads[i] <- sample_parsefirstmapping %>% pull(minor_reads)
   }
 }
 
 parsefirstmapping_df <- as_tibble(parsefirstmapping_df) %>%
   # Calculate the median of total mapped reads accross all samples, and then for each sample the fraction of mapped reads compared to the median
+  # In addition calculate the fraction of mapped reads against major and minor references of the total mapped reads
   mutate(
     median_mapped = median(total_mapped_reads),
-    fraction_mapped_reads_vs_median = total_mapped_reads / median_mapped
+    fraction_mapped_reads_vs_median = total_mapped_reads / median_mapped,
+    percent_mapped_reads_major_firstmapping = round(major_mapped_reads / total_mapped_reads * 100, digits = 2),
+    percent_mapped_reads_minor_firstmapping = round(minor_mapped_reads / total_mapped_reads * 100, digits = 2)
   ) %>%
-  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median)
-
+  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping)
 
 # Second mapping, reads mapped with duplicates ----------------------------
 # List files
@@ -489,12 +501,12 @@ if (exists("major_gt") & exists("minor_gt")) {
         Major_genotype == Minor_genotype ~ "YES",
         is.na(Minor_genotype) ~ NA,
         .default = "NO"
-    ),
+      ),
       identical_subgeno = case_when(
         Major_subtype == Minor_subtype ~ "YES",
         is.na(Minor_subtype) ~ NA,
         .default = "NO"
-        )
+      )
     )
 }
 
@@ -618,18 +630,12 @@ if (nrow(glue_report) > 0) {
     left_join(glue_report, by = c("sampleName" = "Sample"))
 }
 
-# Add percentage of total classified reads belonging to major and minor genotype. Duplicates included. As a proxy for abundance.
-final <- final %>%
-  mutate(percent_mapped_reads_major = ( Reads_withdup_mapped_major / total_classified_reads) * 100 ) %>%
-  mutate(percent_mapped_reads_minor = ( Reads_withdup_mapped_minor / total_classified_reads) * 100 )
-
 # Add script name and version
 final <- final %>%
   add_column("script_name_stringency" = script_name_version)
 
 
 # Decide if a sample is "typbar" or not
-
 final <- final %>%
   mutate(major_typbar = case_when(
     Major_cov_breadth_min_1 >= 10 & Major_avg_depth >= 2 ~ "YES",
@@ -640,13 +646,18 @@ final <- final %>%
     .default = "NO"
   ))
 
-# If minor genotype is the sama as major, then not typbar. But only possible if there are minor glue reports available
+# If minor genotype is the same as major, then not typbar. But only possible if there are minor glue reports available
+# But allow for the co-infection of 1a and 1b even though these belong to the same genotype
 if (nrow(glue_report) > 0 & exists("gt_check")) {
   final <- final %>%
     left_join(gt_check, by = c("sampleName" = "Sample")) %>%
     mutate(minor_typbar = case_when(
-      identical_geno == "NO" & identical_subgeno == "NO" ~ "YES",
-      identical_geno == "YES" & identical_subgeno == "YES" ~ "NO",
+      identical_geno == "NO" ~ "YES",                              # Different genotypes, so minor is typbar
+      identical_geno == "YES" & identical_subgeno == "NO" &
+        ((Major_subtype == "1a" & Minor_subype == "1b") |
+         (Major_subtype == "1b" & Minor_subtype == "1a")) ~ "YES", # If the genotype is the same and subtypes are different, but must be 1a and 1b combination. Then allow typbar Minor
+      identical_geno == "YES" & identical_subgeno == "NO" ~ "NO",  # If the genotype is the same and subtypes are different, but not 1a and 1b combination. Then not typbar Minor
+      identical_geno == "YES" & identical_subgeno == "YES" ~ "NO", # Same genotype & same subtype → not typbar
       is.na(identical_geno) ~ "UNKNOWN"
     ))
 }
@@ -726,13 +737,13 @@ final <- final %>%
          Percent_reads_mapped_of_trimmed_with_dups_major,
          Major_cov_breadth_min_5,
          Major_cov_breadth_min_10,
-         percent_mapped_reads_major,
+         percent_mapped_reads_major_firstmapping,
          Reads_withdup_mapped_minor,
          Reads_nodup_mapped_minor,
          Percent_reads_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
-         percent_mapped_reads_minor,
+         percent_mapped_reads_minor_firstmapping,
          everything()) %>%
   distinct() # Remove any duplicated rows from the different joins
 
@@ -773,7 +784,8 @@ lw_import <- final %>%
         Major_avg_depth = str_replace(Major_avg_depth, "\\.", ","),
         Major_cov_breadth_min_5 = str_replace(Major_cov_breadth_min_5, "\\.", ","),
         Major_cov_breadth_min_10 = str_replace(Major_cov_breadth_min_10, "\\.", ","),
-        percent_mapped_reads_minor = str_replace(percent_mapped_reads_minor, "\\.", ","),
+        percent_mapped_reads_major_firstmapping = str_replace(percent_mapped_reads_major_firstmapping, "\\.", ","),
+        percent_mapped_reads_minor_firstmapping = str_replace(percent_mapped_reads_minor_firstmapping, "\\.", ","),
         Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
         Minor_avg_depth = str_replace(Minor_avg_depth, "\\.", ","),
         Minor_cov_breadth_min_5 = str_replace(Minor_cov_breadth_min_5, "\\.", ","),
@@ -787,11 +799,12 @@ lw_import <- final %>%
          "Number of mapped reads:" = Reads_withdup_mapped_major,
          "Percent covered:" = Major_cov_breadth_min_1,
          "Number of mapped reads without duplicates:" = Reads_nodup_mapped_major,
+         "Percent most abundant majority genotype" = percent_mapped_reads_major_firstmapping,
          "Average depth without duplicates:" = Major_avg_depth,
          "Percent covered above depth=5 without duplicates:" = Major_cov_breadth_min_5,
          "Percent covered above depth=9 without duplicates:" = Major_cov_breadth_min_10,
          "Most abundant minority genotype:" = Minor_genotype_mapping,
-         "Percent most abundant minority genotype:" = percent_mapped_reads_minor,
+         "Percent most abundant minority genotype:" = percent_mapped_reads_minor_firstmapping,
          "Number of mapped reads minor:" = Reads_withdup_mapped_minor,
          "Percent covered minor:" = Minor_cov_breadth_min_5,
          "Number of mapped reads minor without duplicates:" = Reads_nodup_mapped_minor,
