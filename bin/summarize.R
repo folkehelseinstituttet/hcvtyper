@@ -654,7 +654,7 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
     mutate(minor_typbar = case_when(
       identical_geno == "NO" ~ "YES",                              # Different genotypes, so minor is typbar
       identical_geno == "YES" & identical_subgeno == "NO" &
-        ((Major_subtype == "1a" & Minor_subype == "1b") |
+        ((Major_subtype == "1a" & Minor_subtype == "1b") |
          (Major_subtype == "1b" & Minor_subtype == "1a")) ~ "YES", # If the genotype is the same and subtypes are different, but must be 1a and 1b combination. Then allow typbar Minor
       identical_geno == "YES" & identical_subgeno == "NO" ~ "NO",  # If the genotype is the same and subtypes are different, but not 1a and 1b combination. Then not typbar Minor
       identical_geno == "YES" & identical_subgeno == "YES" ~ "NO", # Same genotype & same subtype → not typbar
