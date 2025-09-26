@@ -196,7 +196,7 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
 if (nrow(scaf_top) > 0) {
   scaf_dot <- scaf_top %>%
     arrange(desc(kmer_cov), desc(sc_length)) %>%
-    mutate(contig_order = factor(qseqid, levels = unique(qseqid)))
+    mutate(contig_order = factor(qseqid, levels = rev(unique(qseqid)))) # Reverse order so highest coverage is on top
 
   p_dot <- ggplot(scaf_dot, aes(x = sc_length, y = contig_order)) +
     geom_point(aes(size = kmer_cov, color = subtype), alpha = 0.8) +
