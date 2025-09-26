@@ -190,6 +190,8 @@ workflow HCV_ILLUMINA {
     // MODULE: Remove low complexity reads with Prinseq++ (optional)
     //
 
+    // Initialise a default empty channel
+    ch_prinseq_log = Channel.empty()
     if (params.filter_low_complexity) {
         // NOTE:
         // In some cases there are empty fastq files after trimming. Remove these before PRINSEQPLUSPLUS
@@ -208,6 +210,9 @@ workflow HCV_ILLUMINA {
 
         // Kraken2 input is from PRINSEQPLUSPLUS
         ch_kraken_input = PRINSEQPLUSPLUS.out.good_reads
+
+        // For MultiQC later
+        ch_prinseq_log = PRINSEQPLUSPLUS.out.log.collect { it[1] }.ifEmpty([])
     } else {
         // Skip PRINSEQPLUSPLUS and use trimmed reads as input to Kraken2
         ch_kraken_input = ch_trimmed_reads
@@ -532,7 +537,7 @@ workflow HCV_ILLUMINA {
     } else if (params.trimmer == "fastp") {
         ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect{it[1]}.ifEmpty([]))
     }
-    ch_multiqc_files = ch_multiqc_files.mix(PRINSEQPLUSPLUS.out.log.collect{it[1]}.ifEmpty([]))
+    ch_multiqc_files = ch_multiqc_files.mix(ch_prinseq_log)
     ch_multiqc_files = ch_multiqc_files.mix(ch_trimmed_reads.collect())
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIM.out.zip.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
