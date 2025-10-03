@@ -26,6 +26,10 @@ run_modules:
   - kraken
   - software_versions
 
+# Kraken module options (applies to both Kraken instances below)
+kraken:
+  top_n: 10
+
 module_order:
   - fastqc:
       name: "FastQC (raw)"
@@ -47,12 +51,10 @@ module_order:
         - "*.trimmed_*.zip"
   - kraken:
       name: "Kraken2 all database"
-      top_n: 10
       path_filters:
         - "*entireDB*.txt"
   - kraken:
       name: "Kraken2 focused"
-      top_n: 10
       path_filters:
         - "*focused*.txt"
 
