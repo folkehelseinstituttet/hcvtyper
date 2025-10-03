@@ -196,30 +196,36 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
 if (nrow(scaf_top) > 0) {
   scaf_dot <- scaf_top %>%
     arrange(desc(kmer_cov), desc(sc_length)) %>%
-    mutate(contig_order = factor(qseqid, levels = rev(unique(qseqid)))) # Reverse order so highest coverage is on top
+    mutate(
+      contig_key   = paste(subtype, qseqid, sep = "::"),
+      contig_order = factor(contig_key, levels = rev(unique(contig_key))) # highest coverage on top within subtype
+    )
 
   p_dot <- ggplot(scaf_dot, aes(x = sc_length, y = contig_order)) +
     geom_point(aes(size = kmer_cov, color = subtype), alpha = 0.8) +
+    scale_y_discrete(labels = function(x) sub(".*::", "", x)) +  # show only contig ID on axis
     scale_size_continuous(range = c(2, 10)) +
     scale_color_viridis_d(option = "D") +
     labs(
-      title = paste0(prefix, ": Contig length vs coverage"),
+      title = paste0(prefix, ": Contig length vs coverage by subtype"),
       x = "Contig length (bp)",
-      y = "Contigs (ordered by coverage, then length)",
+      y = "Contigs (within subtype: by coverage, then length)",
       size = "K-mer coverage",
       color = "Subtype"
     ) +
     theme_minimal() +
     theme(
-      axis.text.y = element_text(size = 6)
-    )
+      axis.text.y   = element_text(size = 6),
+      strip.text.y  = element_text(face = "bold")
+    ) +
+    facet_grid(rows = vars(subtype), scales = "free_y", space = "free_y")
 
   ggsave(
     paste0(prefix, ".contig_dot_plot.png"),
     plot = p_dot,
     width = 9,
     bg = "white",
-    height = max(4, 0.2 * nrow(scaf_dot)),  # scale height with number of contigs
+    height = max(4, 0.25 * n_distinct(scaf_dot$subtype) + 0.18 * nrow(scaf_dot)),  # scale with content
     dpi = 300
   )
 }
