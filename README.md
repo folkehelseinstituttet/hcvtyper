@@ -83,6 +83,23 @@ The samplesheet is input to the pipeline using the `--input` parameter, e.g.:
 
 An [example samplesheet](assets/samplesheet_illumina.csv) has been provided with the pipeline in the assets directory.
 
+**File naming requirements:**
+- FASTQ files should be gzipped and paired-end
+- Files should follow the naming pattern: `*_R1.fastq.gz` and `*_R2.fastq.gz` (or similar R1/R2 designation)
+- All FASTQ files for a project should be organized in a single directory or subdirectories
+
+**Creating a samplesheet automatically:**
+If you have many samples, you can use the provided Docker container to automatically generate a samplesheet from a directory containing FASTQ files. The paired fastq files can be in subdirectories, and you need to point to the directory above the sub-directories. You must also point to an existing directory where you want to write the samplesheet. The container can be run like this:
+
+```bash
+# Generate samplesheet from a directory containing FASTQ files
+docker run --rm \
+    -v /path/to/fastq/directory:/data \
+    -v /path/to/output/directory:/out \
+    ghcr.io/jonbra/viralseq_utils:latest \
+    /data /out/samplesheet.csv
+```
+
 ### Output directory
 The output directory is specified using the `--outdir` parameter, e.g.:
 `--outdir results`
