@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use Seqera containers to create conda, docker, and singularity environments.
 - Changed the names of the parameters `minAgensRead` and `minAgensCov` to `minRead` and `minCov`.
 - Renamed summary directory to `summary`.
-- Labware-formatted summary file will only be published when `--labware` is set to `true`.
 - Analyzing Spades contigs instead of scaffolds. For low coverage samples, sometimes scaffolds are not produced.
 - Publish blast plots in the `QC` directory.
 - Allow for co-infection of 1a and 1b subtypes. Otherwise, co-infections must belong to subtypes to be identified.

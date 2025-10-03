@@ -30,7 +30,6 @@ process SUMMARIZE {
     output:
     path 'Summary.csv'      , emit: summary
     path '*mqc.csv'         , emit: mqc
-    path '*LW_import.tsv'   , emit: lw
     path '*png'             , emit: png
     path "versions.yml"     , emit: versions
 
