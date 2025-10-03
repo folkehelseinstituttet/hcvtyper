@@ -6,8 +6,24 @@ args = commandArgs(trailingOnly=TRUE)
 
 # Define variables --------------------------------------------------------
 
-# NB! Script name is currently hard coded. Needs to be changed
-script_name_version <- "hcv_illumina v1.0.6"
+pipeline_name    <- Sys.getenv("PIPELINE_NAME", "HCVTyper") # Use HCVTyper if not set
+pipeline_version <- Sys.getenv("PIPELINE_VERSION", "")
+pipeline_rev     <- Sys.getenv("PIPELINE_REVISION", "")
+pipeline_commit  <- Sys.getenv("PIPELINE_COMMIT", "")
+
+# Precedence: version > revision > commit
+ver_label <- dplyr::coalesce(
+  na_if(pipeline_version, ""),
+  na_if(pipeline_rev, ""),
+  na_if(pipeline_commit, "")
+)
+
+script_name_version <- if (!is.na(ver_label)) {
+  paste(pipeline_name, ver_label)
+} else {
+  paste(pipeline_name, "(version unknown)")
+}
+
 samplesheet  <- args[1]
 stringency_1 <- args[2]
 stringency_2 <- args[3]
