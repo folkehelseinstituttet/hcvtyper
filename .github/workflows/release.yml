@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. v1.2.3)"
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        id: v
+        run: |
+          v="${{ github.event.inputs.version }}"
+          [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $v"; exit 1; }
+          echo "tag=$v" >> "$GITHUB_OUTPUT"
+          echo "next_dev=v$(echo "$v" | awk -F. '{printf "%d.%d.%d-dev",$1,$2,$3+1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Set git user
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump manifest.version to release
+        run: |
+          sed -i -E "s/(manifest\\s*\\{[\\s\\S]*?version\\s*=\\s*')([^']*)(')/\\1${{ steps.v.outputs.tag }}\\3/" nextflow.config
+          git add nextflow.config
+          git commit -m "chore(release): bump manifest.version to ${{ steps.v.outputs.tag }}"
+
+      - name: Tag release
+        run: |
+          git tag "${{ steps.v.outputs.tag }}"
+          git push origin "${{ steps.v.outputs.tag }}"
+          git push
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          generate_release_notes: true
+
+      - name: Bump manifest.version to next -dev on dev branch
+        if: success()
+        run: |
+          git checkout dev
+          sed -i -E "s/(manifest\\s*\\{[\\s\\S]*?version\\s*=\\s*')([^']*)(')/\\1${{ steps.v.outputs.next_dev }}\\3/" nextflow.config
+          git add nextflow.config
+          git commit -m "chore(dev): set manifest.version to ${{ steps.v.outputs.next_dev }}"
+          git push origin dev

@@ -38,17 +38,19 @@ class NfcoreTemplate {
     //
     public static String version(workflow) {
         String version_string = ""
+        // Prefer manifest.version when it's a real release; else use revision (tag/branch)
+        def mv = workflow.manifest.version
+        def rev = workflow.revision
+        def base = (mv && mv != 'dev') ? mv : (rev ?: mv)
 
-        if (workflow.manifest.version) {
-            def prefix_v = workflow.manifest.version[0] != 'v' ? 'v' : ''
-            version_string += "${prefix_v}${workflow.manifest.version}"
+        if (base) {
+            def prefix_v = base[0] != 'v' ? 'v' : ''
+            version_string += "${prefix_v}${base}"
         }
-
         if (workflow.commitId) {
             def git_shortsha = workflow.commitId.substring(0, 7)
             version_string += "-g${git_shortsha}"
         }
-
         return version_string
     }
 
