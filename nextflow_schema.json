@@ -1,8 +1,8 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema",
-    "$id": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/refs/heads/master/nextflow_schema.json",
+    "$schema": "https://json-schema.org/draft-07/schema",
+    "$id": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/master/nextflow_schema.json",
     "title": "folkehelseinstituttet/hcvtyper pipeline parameters",
-    "description": "Assemble abd genotype HCV genomes from NGS data",
+    "description": "Assemble and genotype HCV genomes from NGS data",
     "type": "object",
     "definitions": {
         "input_output_options": {
@@ -39,24 +39,6 @@
                     "type": "string",
                     "description": "MultiQC report title. Printed as page header, used for filename if not otherwise specified.",
                     "fa_icon": "fas fa-file-signature"
-                }
-            }
-        },
-        "reference_genome_options": {
-            "title": "Reference genome options",
-            "type": "object",
-            "fa_icon": "fas fa-dna",
-            "description": "Reference genome related files and options required for the workflow.",
-            "properties": {
-                "fasta": {
-                    "type": "string",
-                    "format": "file-path",
-                    "exists": true,
-                    "mimetype": "text/plain",
-                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
-                    "description": "Path to FASTA genome file.",
-                    "help_text": "This parameter is *mandatory* if `--genome` is not specified. If you don't have a BWA index available this will be generated for you automatically. Combine with `--save_reference` to save BWA index for future runs.",
-                    "fa_icon": "far fa-file-code"
                 }
             }
         },
@@ -126,7 +108,7 @@
                 "max_memory": {
                     "type": "string",
                     "description": "Maximum amount of memory that can be requested for any single job.",
-                    "default": "128.GB",
+                    "default": "250.GB",
                     "fa_icon": "fas fa-memory",
                     "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
                     "hidden": true,
@@ -260,9 +242,6 @@
             "$ref": "#/definitions/input_output_options"
         },
         {
-            "$ref": "#/definitions/reference_genome_options"
-        },
-        {
             "$ref": "#/definitions/institutional_config_options"
         },
         {
@@ -278,12 +257,80 @@
             "default": "rnaviral"
         },
         "spades_hmm": {
-            "type": "string",
-            "default": "None"
+            "type": "string"
         },
         "skip_assembly": {
+            "type": "boolean"
+        },
+        "platform": {
+            "type": "string",
+            "default": "illumina"
+        },
+        "trimmer": {
+            "type": "string",
+            "default": "fastp"
+        },
+        "filter_low_complexity": {
+            "type": "boolean"
+        },
+        "agens": {
+            "type": "string",
+            "default": "HCV"
+        },
+        "kraken_focused": {
+            "type": "string",
+            "default": "/home/jon.brate/hcv_illumina/data/kraken_db/db_hepacivirus/"
+        },
+        "kraken_all_db": {
+            "type": "string",
+            "default": "https://genome-idx.s3.amazonaws.com/kraken/k2_pluspfp_08gb_20250402.tar.gz"
+        },
+        "hcvglue_threshold": {
+            "type": "number",
+            "default": 15
+        },
+        "skip_hcvglue": {
+            "type": "boolean"
+        },
+        "strategy": {
+            "type": "string",
+            "default": "mapping"
+        },
+        "mapper": {
+            "type": "string",
+            "default": "bowtie2"
+        },
+        "kraken_all": {
             "type": "boolean",
-            "default": "true"
+            "default": true
+        },
+        "save_output_fastqs": {
+            "type": "boolean",
+            "default": true
+        },
+        "save_reads_assignment": {
+            "type": "boolean",
+            "default": true
+        },
+        "references": {
+            "type": "string",
+            "default": "/home/jon.brate/hcv_illumina/data/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
+        },
+        "tanoti_stringency_1": {
+            "type": "integer",
+            "default": 85
+        },
+        "tanoti_stringency_2": {
+            "type": "integer",
+            "default": 95
+        },
+        "minRead": {
+            "type": "integer",
+            "default": 499
+        },
+        "minCov": {
+            "type": "integer",
+            "default": 29
         }
     }
 }

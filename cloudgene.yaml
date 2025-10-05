@@ -1,6 +1,6 @@
 id: hcvtyper
 name: hcvtyper
-description: Assemble HCV genomes and genotype
+description: Assemble and genotype HCV genomes from NGS data
 version: dev
 website: https://github.com/folkehelseinstituttet/hcvtyper
 author: Jon Bråte
