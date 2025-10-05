@@ -23,7 +23,7 @@ lint:
   - nextflow_badge
 repository_type: pipeline
 template:
-  prefix: niph
+  prefix: folkehelseinstituttet
   skip:
   - github_badges
   - igenomes
