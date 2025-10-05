@@ -227,7 +227,7 @@ workflow HCV_ILLUMINA {
         false,
         false
     )
-    ch_versions = ch_versions.mix(KRAKEN2_KRAKEN2.out.versions.first().ifEmpty(null))
+    ch_versions = ch_versions.mix(KRAKEN2_KRAKEN2.out.versions.first())
 
     //
     // MODULE: Run Kraken2 to identify target viral reads
