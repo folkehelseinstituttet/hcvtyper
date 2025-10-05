@@ -1,23 +1,29 @@
-include { BOWTIE2_BUILD     } from '../../modules/nf-core/bowtie2/build/main'
-include { BOWTIE2_ALIGN     } from '../../modules/nf-core/bowtie2/align/main'
-include { PLOT_COVERAGE } from '../../modules/local/plotcoverage'
-include { TANOTI_ALIGN      } from '../../modules/local/tanoti.nf'
-include { SAMTOOLS_INDEX as INDEX_WITHDUP } from '../../modules/nf-core/samtools/index/main'
-include { SAMTOOLS_INDEX as INDEX_MARKDUP } from '../../modules/nf-core/samtools/index/main'
-include { SAMTOOLS_IDXSTATS } from '../../modules/nf-core/samtools/idxstats/main'
-include { SAMTOOLS_DEPTH    } from '../../modules/nf-core/samtools/depth/main'
-include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../modules/nf-core/samtools/stats/main'
-include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../modules/nf-core/samtools/stats/main'
-include { IVAR_CONSENSUS } from '../../modules/nf-core/ivar/consensus/main'
-include { PLOT_BAM_VARIATION } from '../../modules/local/bam_variation'
-include { SAMTOOLS_SORMADUP } from '../../modules/nf-core/samtools/sormadup/main'
+//
+// Map reads against major or minor reference, get mapping stats, create consensus and create QC plots.
+//
+
+include { BOWTIE2_BUILD                   } from '../../../modules/nf-core/bowtie2/build/main'
+include { BOWTIE2_ALIGN                   } from '../../../modules/nf-core/bowtie2/align/main'
+include { PLOT_COVERAGE                   } from '../../../modules/local/plotcoverage'
+include { TANOTI_ALIGN                    } from '../../../modules/local/tanoti.nf'
+include { SAMTOOLS_INDEX as INDEX_WITHDUP } from '../../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_INDEX as INDEX_MARKDUP } from '../../../modules/nf-core/samtools/index/main'
+include { SAMTOOLS_IDXSTATS               } from '../../../modules/nf-core/samtools/idxstats/main'
+include { SAMTOOLS_DEPTH                  } from '../../../modules/nf-core/samtools/depth/main'
+include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../../modules/nf-core/samtools/stats/main'
+include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../../modules/nf-core/samtools/stats/main'
+include { IVAR_CONSENSUS                  } from '../../../modules/nf-core/ivar/consensus/main'
+include { PLOT_BAM_VARIATION              } from '../../../modules/local/bam_variation'
+include { SAMTOOLS_SORMADUP               } from '../../../modules/nf-core/samtools/sormadup/main'
 
 workflow TARGETED_MAPPING {
+
     take:
     ch_major_mapping    //tuple val(meta), path(fasta), path(reads)
 
     main:
-    ch_input = ch_major_mapping
+
+        ch_input = ch_major_mapping
         .multiMap { meta, fasta, reads ->
             build: [ meta, fasta ]
             fasta: [ fasta ]
@@ -123,11 +129,11 @@ workflow TARGETED_MAPPING {
 
     emit:
     aligned = SAMTOOLS_SORMADUP.out.bam
-    versions = ch_versions
     depth = SAMTOOLS_DEPTH.out.tsv
     stats_withdup = STATS_WITHDUP.out.stats
     stats_markdup = STATS_MARKDUP.out.stats
     consensus = IVAR_CONSENSUS.out.fasta
     variation = PLOT_BAM_VARIATION.out.png
 
+    versions = ch_versions                     // channel: [ versions.yml ]
 }
