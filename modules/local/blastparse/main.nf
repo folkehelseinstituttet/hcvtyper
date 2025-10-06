@@ -31,7 +31,6 @@ process BLASTPARSE {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def agens  = task.ext.agens ?: "${agens}"
 
     """
     blast_parse.R \\
