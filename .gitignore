@@ -7,3 +7,4 @@ ROV*
 minimal_test/
 full_test/
 .nf-test/
+.nf-test*
