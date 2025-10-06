@@ -1,0 +1,158 @@
+{
+    "blastparse: stub": {
+        "content": [
+            {
+                "0": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.contigs.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "1": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.blast_out.csv:md5,854d3f407b6d8747e8dc79862c911522"
+                    ]
+                ],
+                "2": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.major.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "3": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "4": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.blastparse.csv:md5,cd5ec569f4a4411f5406d5222d2de0ef"
+                    ]
+                ],
+                "5": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.png:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "6": [
+                    "versions.yml:md5,1618d74e63656df309db763cabd3556a"
+                ],
+                "blast_res": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.blast_out.csv:md5,854d3f407b6d8747e8dc79862c911522"
+                    ]
+                ],
+                "contigs": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.contigs.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "csv": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.blastparse.csv:md5,cd5ec569f4a4411f5406d5222d2de0ef"
+                    ]
+                ],
+                "major_fasta": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.major.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "minor_fasta": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "png": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.png:md5,d41d8cd98f00b204e9800998ecf8427e"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,1618d74e63656df309db763cabd3556a"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T11:24:56.058643387"
+    },
+    "blastparse: blast6 + contigs + references": {
+        "content": [
+            {
+                "blast_res": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy_blast_out.csv:md5,e644132a7dafe4bc8fbb6f6271466f4e"
+                    ]
+                ],
+                "csv": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.blastparse.csv:md5,0a87503881d0247b8a311f097a908dbb"
+                    ]
+                ],
+                "png": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        [
+                            "toy.alignment_plot.png:md5,3d15dd45ed55e7b34dfe2726fb867e77",
+                            "toy.bitscore_plot.png:md5,6476ebee5eecfa61b8c004861b3eeff8",
+                            "toy.contig_dot_plot.png:md5,88e63d8f54e05a909db2119a70673610",
+                            "toy.hitlength_plot.png:md5,99d63c4ff172b695d7a1a5027a413d20"
+                        ]
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,2dc81e8053ed887ab8839a4dc176b569"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T11:24:47.002312611"
+    }
+}
