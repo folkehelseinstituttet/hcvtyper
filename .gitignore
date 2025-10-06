@@ -6,3 +6,4 @@ ROV*
 .Rproj.user
 minimal_test/
 full_test/
+.nf-test/
