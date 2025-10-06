@@ -1,0 +1,65 @@
+{
+    "stub": {
+        "content": [
+            {
+                "png": [
+                    "toy.png:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "tsv": [
+                    "toy.variation.tsv:md5,61aaa931293fb0c73cb5fec3d0186326"
+                ],
+                "versions": [
+                    "versions.yml:md5,9acf87e9d0d442a420b400f29f859650"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T13:31:11.653752814"
+    },
+    "tiny BAM from nf-core test-datasets": {
+        "content": [
+            {
+                "png": [
+                    
+                ],
+                "tsv": [
+                    
+                ],
+                "versions": [
+                    
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T13:30:57.596542667"
+    },
+    "HCV BAM (local)": {
+        "content": [
+            {
+                "png": [
+                    "toy.variation_plot_3a_D17763_NA.png:md5,785533668780176ba3645baef6c03cb5"
+                ],
+                "tsv": [
+                    [
+                        "toy.bam_pileup_3a_D17763_NA.tsv:md5,ed0771e9c0a72bcbb3cd795fe90cc782",
+                        "toy.bam_variation_3a_D17763_NA.tsv:md5,7a0d4c326e2e3a29749374c2d89e3cf4"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,8afc2164b2f1ccb5f07ddb3b69c453b3"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T13:44:54.273673571"
+    }
+}

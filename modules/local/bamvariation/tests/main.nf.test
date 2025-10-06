@@ -1,0 +1,55 @@
+nextflow_process {
+
+    name "Test Process PLOT_BAMVARIATION"
+    script "../main.nf"
+    process "PLOT_BAMVARIATION"
+
+    tag "modules"
+    tag "bamvariation"
+
+    // Real run with local BAM
+    test("HCV BAM (local)") {
+        when {
+            process {
+                """
+                // tuple val(meta), path(bam)
+                input[0] = [
+                  [ id: 'toy' ],
+                  file("${projectDir}/modules/local/bamvariation/tests/toy.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot([
+                    png: process.out.png,
+                    tsv: process.out.tsv,
+                    versions: process.out.versions
+                    ]).match() }
+            )
+        }
+    }
+
+    // Fast stub run
+    test("stub") {
+        options "-stub-run"
+        when {
+            process {
+                """
+                input[0] = [
+                  [ id: 'toy' ],
+                  file("${projectDir}/modules/local/bamvariation/tests/toy.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot([ png: process.out.png, tsv: process.out.tsv, versions: process.out.versions ]).match() }
+            )
+        }
+    }
+}

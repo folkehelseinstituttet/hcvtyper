@@ -13,7 +13,7 @@ include { SAMTOOLS_DEPTH                  } from '../../../modules/nf-core/samto
 include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../../modules/nf-core/samtools/stats/main'
 include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../../modules/nf-core/samtools/stats/main'
 include { IVAR_CONSENSUS                  } from '../../../modules/nf-core/ivar/consensus/main'
-include { PLOT_BAM_VARIATION              } from '../../../modules/local/bam_variation'
+include { PLOT_BAMVARIATION               } from '../../../modules/local/bamvariation'
 include { SAMTOOLS_SORMADUP               } from '../../../modules/nf-core/samtools/sormadup/main'
 
 workflow TARGETED_MAPPING {
@@ -112,10 +112,10 @@ workflow TARGETED_MAPPING {
     //
     // MODULE: Plot variation in mapping file
     //
-    PLOT_BAM_VARIATION (
+    PLOT_BAMVARIATION (
         SAMTOOLS_SORMADUP.out.bam
     )
-    ch_versions = ch_versions.mix(PLOT_BAM_VARIATION.out.versions)
+    ch_versions = ch_versions.mix(PLOT_BAMVARIATION.out.versions)
 
     //
     // MODULE: Create consensus sequence
@@ -133,7 +133,7 @@ workflow TARGETED_MAPPING {
     stats_withdup = STATS_WITHDUP.out.stats
     stats_markdup = STATS_MARKDUP.out.stats
     consensus = IVAR_CONSENSUS.out.fasta
-    variation = PLOT_BAM_VARIATION.out.png
+    variation = PLOT_BAMVARIATION.out.png
 
     versions = ch_versions                     // channel: [ versions.yml ]
 }
