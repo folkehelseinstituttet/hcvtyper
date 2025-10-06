@@ -1,15 +1,13 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
-# # TODO nf-core: Add a description of the module and list keywords
 name: "bamvariation"
-description: write your description here
+description: Plot the nucleotide variation per position in the mapping to a genome reference
 keywords:
-  - sort
-  - example
+  - mapping
+  - variation
   - genomics
 tools:
-  ## TODO nf-core: Add a description and other details for the software below
   - "bamvariation":
-      description: ""
+      description: "Plot the nucleotide variation per position in the mapping to a genome reference"
       homepage: ""
       documentation: ""
       tool_dev_url: ""
@@ -18,7 +16,6 @@ tools:
       identifier: null
 
 input:
-  ### TODO nf-core: Add a description of all of the variables used as input
   - - meta:
         type: map
         description: |
@@ -26,29 +23,22 @@ input:
           e.g. `[ id:'sample1' ]`
     - bam:
         type: file
-        description: Sorted BAM/CRAM/SAM file
-        pattern: "*.{bam,cram,sam}"
+        description: Sorted BAM file
+        pattern: "*.{bam}"
         ontologies:
           - edam: "http://edamontology.org/format_2572" # BAM
-          - edam: "http://edamontology.org/format_2573" # CRAM
-          - edam: "http://edamontology.org/format_3462" # SAM
 
 output:
-  ### TODO nf-core: Add a description of all of the variables used as output
-  bam:
-    - - meta:
-          type: map
-          description: |
-            Groovy Map containing sample information
-            e.g. `[ id:'sample1' ]`
-      - "*.bam":
+  png:
+      - "*.png":
           type: file
-          description: Sorted BAM/CRAM/SAM file
-          pattern: "*.{bam,cram,sam}"
-          ontologies:
-            - edam: "http://edamontology.org/format_2572" # BAM
-            - edam: "http://edamontology.org/format_2573" # CRAM
-            - edam: "http://edamontology.org/format_3462" # SAM
+          description: Plot of the nucleotide variation
+          pattern: "*.{png}"
+  tsv:
+      - "*.tsv":
+          type: file
+          description: Raw output of the nucleotide variation per genome position
+          pattern: "*.{tsv}"
   versions:
     - "versions.yml":
         type: file
