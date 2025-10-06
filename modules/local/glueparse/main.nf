@@ -38,22 +38,21 @@ process GLUEPARSE {
 
     stub:
     def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
-    // TODO nf-core: A stub section should mimic the execution of the original module as best as possible
-    //               Have a look at the following examples:
-    //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
-    //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
-    // TODO nf-core: If the module doesn't use arguments ($args), you SHOULD remove:
-    //               - The definition of args `def args = task.ext.args ?: ''` above.
-    //               - The use of the variable in the script `echo $args ` below.
-    """
-    echo $args
 
-    touch ${prefix}.bam
+    """
+    # Safe echo under -u (interpolated by Groovy)
+    echo "${args}"
+
+    # Deterministic minimal output matching emit pattern
+    # Write the expected TSV header
+    printf "Sample\tReference\tMajor_minor\tGLUE_genotype\tGLUE_subtype\tglecaprevir\tglecaprevir_mut\tglecaprevir_mut_short\tgrazoprevir\tgrazoprevir_mut\tgrazoprevir_mut_short\tparitaprevir\tparitaprevir_mut\tparitaprevir_mut_short\tvoxilaprevir\tvoxilaprevir_mut\tvoxilaprevir_mut_short\tNS34A\tNS34A_short\tdaclatasvir\tdaclatasvir_mut\tdaclatasvir_mut_short\telbasvir\telbasvir_mut\telbasvir_mut_short\tledipasvir\tledipasvir_mut\tledipasvir_mut_short\tombitasvir\tombitasvir_mut\tombitasvir_mut_short\tpibrentasvir\tpibrentasvir_mut\tpibrentasvir_mut_short\tvelpatasvir\tvelpatasvir_mut\tvelpatasvir_mut_short\tNS5A\tNS5A_short\tdasabuvir\tdasabuvir_mut\tdasabuvir_mut_short\tsofosbuvir\tsofosbuvir_mut\tsofosbuvir_mut_short\tNS5B\tNS5B_short\tHCV project version\tGLUE engine version\tPHE drug resistance extension version\n" > GLUE_summary.tsv
+
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        glueparse: \$(glueparse --version)
+        r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
+        tidyverse: \$(Rscript -e "library(tidyverse); cat(as.character(packageVersion('tidyverse')))")
+        jsonlite: \$(Rscript -e "library(jsonlite); cat(as.character(packageVersion('jsonlite')))")
     END_VERSIONS
     """
 }
