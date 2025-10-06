@@ -1,0 +1,39 @@
+{
+    "glueparse: real JSON": {
+        "content": [
+            {
+                "GLUE_summary": [
+                    [
+                        "GLUE_collected_report_major.tsv:md5,16ba6ce94fd04c726829f1752cce6f94",
+                        "GLUE_collected_report_minor.tsv:md5,dbac9e27dc30c54ab781aaca85e3d887"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,2693e68a7ccc95c54fdd7b1ed501c03f"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T15:45:18.948138739"
+    },
+    "glueparse: stub": {
+        "content": [
+            {
+                "GLUE_summary": [
+                    "GLUE_summary.tsv:md5,dbac9e27dc30c54ab781aaca85e3d887"
+                ],
+                "versions": [
+                    "versions.yml:md5,c44e5b8d1e7f0f28758617183c153555"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-06T15:45:29.590592831"
+    }
+}
