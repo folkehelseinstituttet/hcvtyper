@@ -100,7 +100,7 @@ p <- ggplot(variation_data, aes(x = pos, y = variation)) +
   geom_point(data = zero_coverage, aes(x = pos, y = 0), color = "blue", size = 2) +  # Blue dots for zero coverage
   geom_point(data = low_coverage, aes(x = pos, y = 0), color = "grey", size = 2) +  # Grey dots for low coverage
   geom_point(data = high_variation, aes(x = pos, y = variation), color = "red", size = 2) +  # Red dots for high variation
-  labs(title = paste0(sampleName, ". Ref. ", ref_name, ". Variation threshold ", variation_threshold, ". Min. coverage ", min_coverage),
+  labs(title = paste0(sampleName, ".", major_minor,".", ref_name, ". Variation threshold ", variation_threshold, ". Min. coverage ", min_coverage),
        x = "Position",
        y = "Nucleotide variation") +
   ylim(0, 1.0) +  # Hardcode the y-axis limit to 1.0
