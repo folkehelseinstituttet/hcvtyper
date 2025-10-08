@@ -1,0 +1,64 @@
+// TODO nf-core: Once you have added the required tests, please run the following command to build this file:
+// nf-core modules test hcvglue
+nextflow_process {
+
+    name "Test Process HCVGLUE"
+    script "../main.nf"
+    process "HCVGLUE"
+
+    tag "modules"
+    tag "hcvglue"
+
+    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
+    test("hcv - bam") {
+
+        when {
+            process {
+                """
+                input[0] = file('${moduleDir}/tests/Test_2.3a_D17763_major.major.nodup.bam', checkIfExists: true)
+                input[1] = 15.0  // hcvglue_threshold
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(
+                    process.out.versions,
+                    file(process.out.GLUE_json[0]).name,
+                    file(process.out.GLUE_html[0]).name
+                ).match() }
+            )
+        }
+
+    }
+
+    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used but keep the " - stub" suffix.
+    test("hcv - bam - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file('${moduleDir}/tests/Test_2.3a_D17763_major.major.nodup.bam', checkIfExists: true)
+                input[1] = 15.0  // hcvglue_threshold
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(
+                    process.out.versions,
+                    file(process.out.GLUE_json[0]).name,
+                    file(process.out.GLUE_html[0]).name
+                ).match() }
+            )
+        }
+
+    }
+
+}
