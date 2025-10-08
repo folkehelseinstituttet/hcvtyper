@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "hcvglue"
+description: Run HCV-GLUE on the mapping file to identify resistance variants
+keywords:
+  - resistance
+
+tools:
+
+  - "hcvglue":
+      description: "Run HCV-GLUE on the mapping file to identify resistance variants"
+      homepage: "https://github.com/giffordlabcvr/HCV-GLUE"
+      documentation: "https://github.com/giffordlabcvr/HCV-GLUE"
+      tool_dev_url: "https://github.com/giffordlabcvr/HCV-GLUE"
+      doi: "https://github.com/giffordlabcvr/HCV-GLUE"
+      licence: null
+      identifier: null
+
+input:
+  - bam:
+      type: file
+      description: Sorted BAM file
+      pattern: "*.{bam}"
+      ontologies:
+        - edam: http://edamontology.org/format_2572 # BAM
+  - hcvglue_threshold:
+        type: val
+        description: Threshold for calling variant in mapping file
+
+output:
+  GLUE_json:
+    - "*.json":
+        type: file
+        description: json file of the GLUE report
+        pattern: "*.{json}"
+  GLUE_html:
+    - "*.html":
+        type: file
+        description: html file of the GLUE report
+        pattern: "*.{html}"
+  versions:
+    - versions.yml:
+        type: file
+        description: File containing software versions
+        pattern: versions.yml
+        ontologies:
+          - edam: http://edamontology.org/format_3750 # YAML
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"
