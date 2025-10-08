@@ -1,0 +1,6 @@
+name: hcvglue
+channels:
+  - conda-forge
+dependencies:
+  - docker-compose  # Provides Docker CLI
+  - bash           # Ensures bash is available
