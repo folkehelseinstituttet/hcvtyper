@@ -1,0 +1,48 @@
+{
+    "summarize: comprehensive summary": {
+        "content": [
+            {
+                "summary": [
+                    "Summary.csv:md5,5788053a8f5bf730235d9b5732713d97"
+                ],
+                "mqc": [
+                    "summary_mqc.csv:md5,5788053a8f5bf730235d9b5732713d97"
+                ],
+                "png": [
+                    "Variation_plot_major.png:md5,e19d8e3b61bdcb781ebb43e0328a6af4"
+                ],
+                "versions": [
+                    "versions.yml:md5,bdc410e5c9e6ecec2ea6f41acaf3f8ef"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-08T12:13:25.270423308"
+    },
+    "summarize: stub": {
+        "content": [
+            {
+                "summary": [
+                    "Summary.csv:md5,093506819671498252da3ee2a6d3513a"
+                ],
+                "mqc": [
+                    "summary_mqc.csv:md5,093506819671498252da3ee2a6d3513a"
+                ],
+                "png": [
+                    "summary_plot.png:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "versions": [
+                    "versions.yml:md5,6a95a24db9848e61173bfd3c05ee2bde"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-08T12:02:42.30178343"
+    }
+}

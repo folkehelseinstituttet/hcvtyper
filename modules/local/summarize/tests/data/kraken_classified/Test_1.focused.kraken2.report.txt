@@ -1,0 +1,1 @@
+/home/jon.brate/hcv_illumina/work/1e/ad65bfe8fc3c2e7c5ed5299987e6b8/Test_1.focused.kraken2.report.txt

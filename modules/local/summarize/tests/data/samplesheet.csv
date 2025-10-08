@@ -1,0 +1,4 @@
+sample,fastq_1,fastq_2
+Test_1,Test_1_R1.fastq.gz,Test_1_R2.fastq.gz
+Test_2,Test_2_R1.fastq.gz,Test_2_R2.fastq.gz
+Neg,Neg_R1.fastq.gz,Neg_R2.fastq.gz
