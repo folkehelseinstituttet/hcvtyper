@@ -47,21 +47,25 @@ process PARSEFIRSTMAPPING {
     stub:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    // TODO nf-core: A stub section should mimic the execution of the original module as best as possible
-    //               Have a look at the following examples:
-    //               Simple example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bcftools/annotate/main.nf#L47-L63
-    //               Complex example: https://github.com/nf-core/modules/blob/818474a292b4860ae8ff88e149fbcda68814114d/modules/nf-core/bedtools/split/main.nf#L38-L54
-    // TODO nf-core: If the module doesn't use arguments ($args), you SHOULD remove:
-    //               - The definition of args `def args = task.ext.args ?: ''` above.
-    //               - The use of the variable in the script `echo $args ` below.
     """
-    echo $args
+    # Safe echo (interpolated by Groovy)
+    echo "${args}"
 
-    touch ${prefix}.bam
+    # Create outputs matching the declared emit patterns
+    printf "reference,mapped_reads,unmapped_reads,depth_mean\n" > ${prefix}.mapping_summary.csv
+    printf "3a_D17763,8079,1,94.3\n" >> ${prefix}.mapping_summary.csv
+    printf "4k_EU392173,40,0,5.3\n" >> ${prefix}.mapping_summary.csv
 
-    cat <<-END_VERSIONS > versions.yml
+    # Optional FASTA outputs (touch to create empty files)
+    : > ${prefix}.major.fa
+    : > ${prefix}.minor.fa
+
+    # Stable versions file
+    cat > versions.yml <<'YAML'
     "${task.process}":
-        parsefirstmapping: \$(parsefirstmapping --version)
+      r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
+      tidyverse: \$(Rscript -e "library(tidyverse); cat(as.character(packageVersion('tidyverse')))")
+      seqinr: \$(Rscript -e "library(seqinr); cat(as.character(packageVersion('seqinr')))")
     END_VERSIONS
     """
 }

@@ -1,0 +1,46 @@
+{
+    "instrumentid: stub": {
+        "content": [
+            {
+                "id": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.sequencerID.tsv:md5,685fe635d9f55633963e5c04d6f04b91"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,7fd787368f19b6f004808dc74ebeb98c"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-08T11:30:41.136218685"
+    },
+    "instrumentid: paired reads": {
+        "content": [
+            {
+                "id": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.sequencerID.tsv:md5,685fe635d9f55633963e5c04d6f04b91"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,7fd787368f19b6f004808dc74ebeb98c"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.2"
+        },
+        "timestamp": "2025-10-08T11:29:42.527077154"
+    }
+}
