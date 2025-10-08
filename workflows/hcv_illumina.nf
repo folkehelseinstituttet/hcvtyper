@@ -78,7 +78,7 @@ include { BLASTPARSE                         } from '../modules/local/blastparse
 include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
-include { HCV_GLUE                           } from '../modules/local/hcvglue'
+include { HCVGLUE                           } from '../modules/local/hcvglue/main'
 include { SUMMARIZE                          } from '../modules/local/summarize/main'
 
 /*
@@ -453,15 +453,15 @@ workflow HCV_ILLUMINA {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
-        HCV_GLUE (
+        HCVGLUE (
             MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect(), // Collect all files. Can only have one GLUE process running
             params.hcvglue_threshold
         )
-        ch_versions = ch_versions.mix(HCV_GLUE.out.versions)
+        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
 
         // Collect all glue reports and parse them
         HCV_GLUE_PARSER (
-            HCV_GLUE.out.GLUE_json.collect()
+            HCVGLUE.out.GLUE_json.collect()
         )
         ch_versions = ch_versions.mix(HCV_GLUE_PARSER.out.versions)
     }
