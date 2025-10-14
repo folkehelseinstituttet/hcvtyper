@@ -17,7 +17,7 @@ process SAMPLESHEET_CHECK {
     when:
     task.ext.when == null || task.ext.when
 
-    script: // This script is bundled with the pipeline, in hcv_illumina/bin/
+    script: // This script is bundled with the pipeline, in hcvtyper/bin/
     """
     check_samplesheet.py \\
         $samplesheet \\

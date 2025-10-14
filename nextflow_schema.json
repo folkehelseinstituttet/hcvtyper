@@ -279,7 +279,7 @@
         },
         "kraken_focused": {
             "type": "string",
-            "default": "/home/jon.brate/hcv_illumina/data/kraken_db/db_hepacivirus/"
+            "default": "/home/jon.brate/hcvtyper/data/kraken_db/db_hepacivirus/"
         },
         "kraken_all_db": {
             "type": "string",
@@ -314,7 +314,7 @@
         },
         "references": {
             "type": "string",
-            "default": "/home/jon.brate/hcv_illumina/data/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
+            "default": "/home/jon.brate/hcvtyper/data/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
         },
         "tanoti_stringency_1": {
             "type": "integer",

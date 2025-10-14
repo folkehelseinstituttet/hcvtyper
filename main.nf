@@ -40,17 +40,17 @@ WorkflowMain.initialise(workflow, params, log)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { HCV_ILLUMINA } from './workflows/hcv_illumina'
+include { HCVTYPER } from './workflows/hcvtyper'
 
 //
-// WORKFLOW: Run main folkehelseinstituttet/hcv_illumina analysis pipeline
+// WORKFLOW: Run main folkehelseinstituttet/hcvtyper analysis pipeline
 //
 workflow {
 
     //
     // WORKFLOW: HCV genome assembly and analysis from Illumina capture data
     //
-    HCV_ILLUMINA ()
+    HCVTYPER ()
 
 }
 

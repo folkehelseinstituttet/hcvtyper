@@ -90,7 +90,7 @@ include { SUMMARIZE                          } from '../modules/local/summarize/
 // Info required for completion email and summary
 def multiqc_report = []
 
-workflow HCV_ILLUMINA {
+workflow HCVTYPER {
 
     ch_versions = Channel.empty()
 

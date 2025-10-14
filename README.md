@@ -1,4 +1,4 @@
-# ![folkehelseinstituttet/hcv_illumina](docs/images/logo-engelsk-hele-navnet.jpg#gh-light-mode-only) ![folkehelseinstituttet/hcv_illumina](docs/images/logo-engelsk-hele-navnet-hvit.png#gh-dark-mode-only)
+# ![folkehelseinstituttet/hcvtyper](docs/images/logo-engelsk-hele-navnet.jpg#gh-light-mode-only) ![folkehelseinstituttet/hcvtyper](docs/images/logo-engelsk-hele-navnet-hvit.png#gh-dark-mode-only)
 
 [![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
@@ -24,7 +24,7 @@
 
 ## About HCV Illumina
 
-**folkehelseinstituttet/hcv_illumina** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
+**folkehelseinstituttet/hcvtyper** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
 maps Illumina reads to a reference genome and creates a consensus sequence.
 
 ## Requirements
@@ -36,7 +36,7 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 ## Run the pipeline
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 ```
-nextflow run folkehelseinstituttet/hcv_illumina -r v1.0.6 \
+nextflow run folkehelseinstituttet/hcvtyper -r v1.0.6 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
@@ -45,7 +45,7 @@ Nextflow will pull the pipeline from the GitHub repo automatically when it is la
 
 If you want to download a local copy of the pipeline you can run:
 ```
-nextflow pull folkehelseinstituttet/hcv_illumina -r v1.0.6
+nextflow pull folkehelseinstituttet/hcvtyper -r v1.0.6
 ```
 Again, `-r` is optional.
 
@@ -53,17 +53,17 @@ Again, `-r` is optional.
 ## Test the pipeline
 To run a minimal test:
 ```
-nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test
+nextflow run folkehelseinstituttet/hcvtyper -profile docker,test
 ```
 This is only to see if you can get the pipeline up and running and will not run the entire pipeline such as HCV-GLUE. The results will be in a directory called `minimal_test`.
 
 To run a full test on a real dataset type:
 ```
 # First download the test dataset using nf-core/fetchngs
-nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcv_illumina/refs/heads/dev/assets/test_ids.csv' --outdir full_test
+nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/refs/heads/dev/assets/test_ids.csv' --outdir full_test
 
 # Then run the pipeline on the downloaded dataset
-nextflow run folkehelseinstituttet/hcv_illumina -profile docker,test_full
+nextflow run folkehelseinstituttet/hcvtyper -profile docker,test_full
 ```
 This will download a HCV Illumina dataset from SRA and run the entire pipeline. The results will be in a directory called `full_test`.
 Note that the pipeline will by default download and use the Kraken 2 [PlusPFP-8](https://benlangmead.github.io/aws-indexes/k2) database. This reqires at least 5 GB of free disk space and will take a few minutes to download and unpack. In addition, the default memory and cpu requirements of 12 cpus and 72 GB have been overridden to `50.GB` and `8`.
@@ -150,7 +150,7 @@ Changing the arguments given to the various sub-tools can be done in several way
 ## Citations
 
 <!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use  folkehelseinstituttet/hcv_illumina for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
+<!-- If you use  folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
 
 <!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
 
