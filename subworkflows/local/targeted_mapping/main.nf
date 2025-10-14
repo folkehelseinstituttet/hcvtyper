@@ -38,7 +38,7 @@ workflow TARGETED_MAPPING {
             ch_input.align
             // Add the reference name to the meta map
                 .map { meta, fasta, reads ->
-                    new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
+                    def new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
                 return [new_meta, reads]
                 },
             BOWTIE2_BUILD.out.index,
