@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+# # TODO nf-core: Add a description of the module and list keywords
+name: "plotcoverage"
+description: write your description here
+keywords:
+  - sort
+  - example
+  - genomics
+tools:
+  ## TODO nf-core: Add a description and other details for the software below
+  - "plotcoverage":
+      description: ""
+      homepage: ""
+      documentation: ""
+      tool_dev_url: ""
+      doi: ""
+      licence: null
+      identifier: biotools:plotcoverage
+
+input:
+  # TODO nf-core: Update the information obtained from bio.tools and make sure that it is correct
+  - - meta:
+        type: map
+        description: Groovy Map containing sample information. e.g. `[ id:'sample1'
+          ]`
+    - annotation_track:
+        type: file
+        description: annotation_track file
+        pattern: "*.{bed}"
+        ontologies:
+          - edam: http://edamontology.org/data_3002 # Annotation track
+          - edam: http://edamontology.org/format_3003 # BED
+  - - meta2:
+        type: map
+        description: Groovy Map containing sample information. e.g. `[ id:'sample1'
+          ]`
+    - data:
+        type: file
+        description: data file
+        pattern: "*.{gtf}"
+        ontologies:
+          - edam: http://edamontology.org/data_0006 # Data
+          - edam: http://edamontology.org/format_2306 # GTF
+  - - meta3:
+        type: map
+        description: Groovy Map containing sample information. e.g. `[ id:'sample1'
+          ]`
+    - sequence_trace:
+        type: file
+        description: sequence_trace file
+        pattern: "*.{sam}"
+        ontologies:
+          - edam: http://edamontology.org/data_0924 # Sequence trace
+          - edam: http://edamontology.org/format_2573 # SAM
+  - - meta4:
+        type: map
+        description: Groovy Map containing sample information. e.g. `[ id:'sample1'
+          ]`
+    - sequence_alignment:
+        type: file
+        description: sequence_alignment file
+        pattern: "*.{fasta}"
+        ontologies:
+          - edam: http://edamontology.org/data_0863 # Sequence alignment
+          - edam: http://edamontology.org/format_1929 # FASTA
+output:
+  # TODO nf-core: Update the information obtained from bio.tools and make sure that it is correct
+  data:
+    - - meta:
+          type: map
+          description: Groovy Map containing sample information. e.g. `[ id:'sample1'
+            ]`
+      - "*.{textual}":
+          type: file
+          description: data file
+          pattern: "*.{textual}"
+          ontologies:
+            - edam: http://edamontology.org/data_0006 # Data
+            - edam: http://edamontology.org/format_2330 # Textual format
+  versions:
+    - versions.yml:
+        type: file
+        description: File containing software versions
+        pattern: versions.yml
+        ontologies:
+          - edam: http://edamontology.org/format_3750 # YAML
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"

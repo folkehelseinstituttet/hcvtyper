@@ -1,0 +1,28 @@
+{
+    "hcv - depth tsv - stub": {
+        "content": [
+            [
+                "versions.yml:md5,8f76ebb71c1e290c493f125e17b9d739"
+            ],
+            "toy.dummy.png"
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.8"
+        },
+        "timestamp": "2025-10-14T19:09:37.78441706"
+    },
+    "hcv - depth tsv": {
+        "content": [
+            [
+                "versions.yml:md5,8f76ebb71c1e290c493f125e17b9d739"
+            ],
+            "toy.major.3a_D17763.png"
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "25.04.8"
+        },
+        "timestamp": "2025-10-14T19:09:27.37461944"
+    }
+}

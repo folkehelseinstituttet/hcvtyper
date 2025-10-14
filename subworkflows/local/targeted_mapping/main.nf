@@ -4,7 +4,7 @@
 
 include { BOWTIE2_BUILD                   } from '../../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN                   } from '../../../modules/nf-core/bowtie2/align/main'
-include { PLOT_COVERAGE                   } from '../../../modules/local/plotcoverage'
+include { PLOTCOVERAGE                    } from '../../../modules/local/plotcoverage/main'
 include { TANOTI_ALIGN                    } from '../../../modules/local/tanoti.nf'
 include { SAMTOOLS_INDEX as INDEX_WITHDUP } from '../../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_INDEX as INDEX_MARKDUP } from '../../../modules/nf-core/samtools/index/main'
@@ -104,10 +104,10 @@ workflow TARGETED_MAPPING {
     //
     // MODULE: Plot coverage from mapping
     //
-    PLOT_COVERAGE (
+    PLOTCOVERAGE (
         SAMTOOLS_DEPTH.out.tsv
     )
-    ch_versions = ch_versions.mix(PLOT_COVERAGE.out.versions)
+    ch_versions = ch_versions.mix(PLOTCOVERAGE.out.versions)
 
     //
     // MODULE: Plot variation in mapping file

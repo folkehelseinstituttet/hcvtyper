@@ -1,0 +1,62 @@
+nextflow_process {
+
+    name "Test Process PLOTCOVERAGE"
+    script "../main.nf"
+    process "PLOTCOVERAGE"
+
+    tag "modules"
+    tag "plotcoverage"
+
+    test("hcv - depth tsv") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'toy' ], // meta map
+                    file("${projectDir}/modules/local/plotcoverage/tests/toy.3a_D17763_major.major.nodup.tsv", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(
+                    process.out.versions,
+                    file(process.out.png[0]).name
+                ).match() }
+            )
+        }
+
+    }
+
+    test("hcv - depth tsv - stub") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'toy' ], // meta map
+                    file("${projectDir}/modules/local/plotcoverage/tests/toy.3a_D17763_major.major.nodup.tsv", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(
+                    process.out.versions,
+                    file(process.out.png[0]).name
+                ).match() }
+            )
+        }
+
+    }
+
+}
