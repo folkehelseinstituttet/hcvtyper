@@ -37,6 +37,11 @@
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/bowtie2/build/bowtie2-build.diff"
                     },
+                    "csvtk/sort": {
+                        "branch": "master",
+                        "git_sha": "d01263b60ce84d777f09819709e94dd17b11ce92",
+                        "installed_by": ["modules"]
+                    },
                     "custom/dumpsoftwareversions": {
                         "branch": "master",
                         "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",

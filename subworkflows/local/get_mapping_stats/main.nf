@@ -4,7 +4,7 @@
 
 include { SAMTOOLS_INDEX    } from '../../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_IDXSTATS } from '../../../modules/nf-core/samtools/idxstats/main'
-include { SORT_IDXSTATS     } from '../../../modules/local/idxstats_sort.nf'
+include { CSVTK_SORT        } from '../../../modules/nf-core/csvtk/sort/main'
 include { SAMTOOLS_DEPTH    } from '../../../modules/nf-core/samtools/depth/main'
 include { SAMTOOLS_STATS    } from '../../../modules/nf-core/samtools/stats/main'
 
@@ -37,10 +37,12 @@ workflow GET_MAPPING_STATS {
     //
     // MODULE: Sort the idxstats output
     //
-    SORT_IDXSTATS (
-        SAMTOOLS_IDXSTATS.out.idxstats
+    CSVTK_SORT (
+        SAMTOOLS_IDXSTATS.out.idxstats,
+        'tsv',
+        'tsv'
     )
-    ch_versions = ch_versions.mix(SORT_IDXSTATS.out.versions)
+    ch_versions = ch_versions.mix(CSVTK_SORT.out.versions)
 
     //
     // MODULE: Run samtools depth
