@@ -83,9 +83,8 @@
                     },
                     "kraken2/kraken2": {
                         "branch": "master",
-                        "git_sha": "d6549f46c3c1c3fe3def110f3d18059a68a65cc6",
-                        "installed_by": ["modules"],
-                        "patch": "modules/nf-core/kraken2/kraken2/kraken2-kraken2.diff"
+                        "git_sha": "0821737e529094ddf3c355b76d19c49ea1469141",
+                        "installed_by": ["modules"]
                     },
                     "minimap2/index": {
                         "branch": "master",
