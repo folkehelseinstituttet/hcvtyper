@@ -22,7 +22,6 @@ include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-schema'
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
 include { INPUT_CHECK                                    } from '../subworkflows/local/input_check'
-include { BAM_MARKDUPLICATES_SAMTOOLS                    } from '../subworkflows/nf-core/bam_markduplicates_samtools/main'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows/local/get_mapping_stats'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
 include { TARGETED_MAPPING as MAJOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
