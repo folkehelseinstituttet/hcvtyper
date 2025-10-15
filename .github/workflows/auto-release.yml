@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
             # Triggered by release publish
             TAG_NAME="${{ github.event.release.tag_name }}"
           fi
-          
+
           # Remove 'v' prefix if present (e.g., v1.1.0 -> 1.1.0)
           VERSION=${TAG_NAME#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -46,26 +46,26 @@ jobs:
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           echo "Updating nextflow.config version to: $VERSION"
-          
-          # Update the version line in nextflow.config
-          sed -i -E "s/(manifest\\s*\\{[\\s\\S]*?version\\s*=\\s*')([^']*)(')/\\1$VERSION\\3/" nextflow.config
-          
+
+          # Simple and reliable version update - just target the version line directly
+          sed -i "s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$VERSION'/" nextflow.config
+
           # Verify the change
           echo "Updated nextflow.config:"
-          grep -A 5 "manifest {" nextflow.config | grep version
+          grep "version.*=" nextflow.config
 
       - name: Commit version update to tag
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           TAG_NAME="${{ steps.get_version.outputs.tag_name }}"
-          
+
           # Add and commit changes
           git add nextflow.config
-          
+
           # Check if there are changes to commit
           if ! git diff --staged --quiet; then
             git commit -m "chore(release): update manifest.version to $VERSION"
-            
+
             # Update the tag to point to this commit
             git tag -f "$TAG_NAME"
             git push origin "$TAG_NAME" --force
@@ -82,31 +82,31 @@ jobs:
       - name: Prepare next development version
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          
+
           # Calculate next development version (increment minor version)
           IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
           MAJOR=${VERSION_PARTS[0]}
           MINOR=${VERSION_PARTS[1]}
           PATCH=${VERSION_PARTS[2]}
-          
+
           # Increment minor version for next development cycle
           NEXT_MINOR=$((MINOR + 1))
           NEXT_DEV_VERSION="${MAJOR}.${NEXT_MINOR}.0-dev"
-          
+
           echo "Setting up next development version: $NEXT_DEV_VERSION"
-          
+
           # Switch to dev branch (create if doesn't exist)
           git checkout dev 2>/dev/null || git checkout -b dev
-          
+
           # Update nextflow.config for development
-          sed -i -E "s/(manifest\\s*\\{[\\s\\S]*?version\\s*=\\s*')([^']*)(')/\\1$NEXT_DEV_VERSION\\3/" nextflow.config
-          
+          sed -i "s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$NEXT_DEV_VERSION'/" nextflow.config
+
           # Commit and push to dev branch
           git add nextflow.config
           git commit -m "chore(dev): prepare next development version $NEXT_DEV_VERSION
 
           Auto-updated after release $VERSION
-          
+
           [skip ci]"
-          
+
           git push origin dev
