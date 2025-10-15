@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
+- Updated main.nf to latest nf-core template standards with proper workflow hierarchy and PIPELINE_INITIALISATION/COMPLETION subworkflows.
+- Implemented nf-core standard workflow completion handlers following template patterns.
 - Changed name of pipeline to `HCVTyper`.
 - Changed profile name for the minimal test from `test_illumina` to `test`.
 - Added plotting of variation per site in the bam files from the targeted mapping.
@@ -27,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added option to choose between cutadapt or fastp for read trimming. Default is cutadapt.
 
 ### `Fixed`
+- Resolved all configuration warnings by updating process selectors to match nf-core workflow naming conventions.
+- Fixed extensive linting errors in workflows/hcvtyper.nf including variable declarations and parameter naming conflicts.
+- Corrected workflow.onComplete handler placement and implementation following nf-core patterns.
 - The summarize R script can handle cases when GLUE report is missing. GLUE columns will all be NA.
 - Fixed bug in the making of consensus sequence in cases of co-infection. The filenames would not separate between the two strains and only a single consensus would be written.
 - Spades may produce empty contigs.fa file. Filter out these instances.
@@ -35,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Handling cases where the de novo assembled contigs produced no blast hits.
 
 ### `Dependencies`
+- Updated pipeline structure to comply with latest nf-core template standards and DSL2 best practices.
 
 ### `Deprecated`
 

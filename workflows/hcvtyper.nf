@@ -6,25 +6,11 @@
 
 include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-validation'
 
-def logo = NfcoreTemplate.logo(workflow, params.monochrome_logs)
-def citation = '\n' + WorkflowMain.citation(workflow) + '\n'
-def summary_params = paramsSummaryMap(workflow)
-
-// Print parameter summary log to screen
-log.info logo + paramsSummaryLog(workflow) + citation
-
-WorkflowHCVTyper.initialise(params, log)
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     CONFIG FILES
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
-
-ch_multiqc_config          = Channel.fromPath("$projectDir/assets/multiqc_config.yml", checkIfExists: true)
-ch_multiqc_custom_config   = params.multiqc_config ? Channel.fromPath( params.multiqc_config, checkIfExists: true ) : Channel.empty()
-ch_multiqc_logo            = params.multiqc_logo   ? Channel.fromPath( params.multiqc_logo, checkIfExists: true ) : Channel.empty()
-ch_multiqc_custom_methods_description = params.multiqc_methods_description ? file(params.multiqc_methods_description, checkIfExists: true) : file("$projectDir/assets/methods_description_template.yml", checkIfExists: true)
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,12 +73,19 @@ include { SUMMARIZE                          } from '../modules/local/summarize/
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// Info required for completion email and summary
-def multiqc_report = []
-
 workflow HCVTYPER {
 
+    main:
+
     ch_versions = Channel.empty()
+
+    //
+    // CONFIG FILES
+    //
+    ch_multiqc_config          = Channel.fromPath("$projectDir/assets/multiqc_config.yml", checkIfExists: true)
+    ch_multiqc_custom_config   = params.multiqc_config ? Channel.fromPath( params.multiqc_config, checkIfExists: true ) : Channel.empty()
+    ch_multiqc_logo            = params.multiqc_logo   ? Channel.fromPath( params.multiqc_logo, checkIfExists: true ) : Channel.empty()
+    ch_multiqc_custom_methods_description = params.multiqc_methods_description ? file(params.multiqc_methods_description, checkIfExists: true) : file("$projectDir/assets/methods_description_template.yml", checkIfExists: true)
 
     //
     // SUBWORKFLOW: Read in samplesheet, validate and stage input files
@@ -162,8 +155,8 @@ workflow HCVTYPER {
                     def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
                     return [meta, fastq, n] // Add the count as the last element in the tuple
                 }
-                .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files because Fastp does not produce correct gzipped file if input fastq is empty
-                .map { meta, fastq, n -> [ meta, fastq, [] ] }, // Remove the count and add empty element to get the structure correct for Fastp
+                .filter { _meta, _fastq, n -> n > 0 } // Filter out empty fastq files because Fastp does not produce correct gzipped file if input fastq is empty
+                .map { meta, fastq, _n -> [ meta, fastq, [] ] }, // Remove the count and add empty element to get the structure correct for Fastp
             false,
             false,
             false
@@ -200,8 +193,8 @@ workflow HCVTYPER {
                 def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
                 return [meta, fastq, n] // Add the count as the last element in the tuple
             }
-            .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
-            .map { meta, fastq, n -> [meta, fastq] } // Remove the count to get the channel structure correct for PRINSEQPLUSPLUS
+            .filter { _meta, _fastq, n -> n > 0 } // Filter out empty fastq files
+            .map { meta, fastq, _n -> [meta, fastq] } // Remove the count to get the channel structure correct for PRINSEQPLUSPLUS
 
         PRINSEQPLUSPLUS (
             ch_prinseq
@@ -251,8 +244,8 @@ workflow HCVTYPER {
             def n = fastq[0].countFastq() // Count fastq reads in the R1 fastq file
             return [meta, fastq, n] // Add the count as the last element in the tuple
         }
-        .filter { meta, fastq, n -> n > 0 } // Filter out empty fastq files
-        .map { meta, fastq, n -> [ meta, fastq, [], [] ] } // Recreate the channel structure correct for SPADES
+        .filter { _meta, _fastq, n -> n > 0 } // Filter out empty fastq files
+        .map { meta, fastq, _n -> [ meta, fastq, [], [] ] } // Recreate the channel structure correct for SPADES
 
     if (!params.skip_assembly) {
             SPADES (
@@ -262,9 +255,6 @@ workflow HCVTYPER {
             )
             ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
-            // Collect all contigs from all samples. The intention is to align them all against each other and create a distance matrix and a tree.
-            ch_contigs = SPADES.out.contigs.collect({it[1]})
-
             //
             // MODULE: Blast assembled contigs against viral references.
             //
@@ -272,11 +262,11 @@ workflow HCVTYPER {
             // In some cases there is an empty contig file produced by Spades. Filter out these
             ch_blastn = SPADES.out.contigs
                 .map { meta, contigs ->
-                n = contigs.countFasta() // Count fasta records
+                def n = contigs.countFasta() // Count fasta records
                 return [meta, contigs, n] // Add the count as the last element in the tuple
             }
-            .filter { n > 0 } // Filter out empty fasta files
-            .map { meta, contigs, n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
+            .filter { _meta, _contigs, n -> n > 0 } // Filter out empty fasta files
+            .map { meta, contigs, _n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
             BLAST_BLASTN (
                 ch_blastn,
                 BLAST_MAKEBLASTDB.out.db
@@ -356,7 +346,7 @@ workflow HCVTYPER {
     // MODULE: Identify the two references with most mapped reads, duplicates included
     //
     ch_parsefirstmapping = GET_MAPPING_STATS_WITHDUP.out.idxstats.join(GET_MAPPING_STATS_WITHDUP.out.tsv) // val(meta), path(idxstats), path(tsv)
-        .filter { meta, idxstats, tsv ->
+        .filter { _meta, _idxstats, tsv ->
             tsv.size() > 0 // Filter out empty tsv files
         }
 
@@ -377,9 +367,9 @@ workflow HCVTYPER {
         // Create a new channel with the structure tuple val(meta), path(fasta), path(reads)
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_major = ch_major_join
-            .map { meta, fasta, reads, csv ->
+            .map { meta, fasta, reads_file, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
-            return [meta + elements[0], fasta, reads]
+            return [meta + elements[0], fasta, reads_file]
             }
 
         // Filter on read nr and coverage
@@ -411,9 +401,9 @@ workflow HCVTYPER {
         // Create a new channel with the structure tuple val(meta), path(fasta), path(reads)
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_minor = ch_join_2
-            .map { meta, fasta, reads, csv ->
+            .map { meta, fasta, reads_file, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
-            return [meta + elements[0], fasta, reads]
+            return [meta + elements[0], fasta, reads_file]
             }
 
         // Filter on read nr and coverage
@@ -431,9 +421,9 @@ workflow HCVTYPER {
         // Create a new channel with the structure tuple val(meta), path(reads)
         // The meta will contain all the elements from meta and the csv file. meta, reads
         ch_map_minor = ch_join_2
-            .map { meta, fasta, reads, csv ->
+            .map { meta, fasta, reads_file, csv ->
             def elements = csv.splitCsv( header: true, sep:',')
-            return [meta + elements[0], fasta, reads]
+            return [meta + elements[0], fasta, reads_file]
             }
 
         // Filter on read nr and coverage
@@ -521,6 +511,7 @@ workflow HCVTYPER {
     //
     // MODULE: MultiQC
     //
+    def summary_params = paramsSummaryMap(workflow)
     workflow_summary    = WorkflowHCVTyper.paramsSummaryMultiqc(workflow, summary_params)
     ch_workflow_summary = Channel.value(workflow_summary)
 
@@ -552,26 +543,10 @@ workflow HCVTYPER {
         [],
         []
     )
-    multiqc_report = MULTIQC.out.report.toList()
 
-}
+    emit:
+    multiqc_report = MULTIQC.out.report
 
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    COMPLETION EMAIL AND SUMMARY
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-workflow.onComplete {
-    if (params.email || params.email_on_fail) {
-        NfcoreTemplate.email(workflow, params, summary_params, projectDir, log, multiqc_report)
-    }
-    NfcoreTemplate.dump_parameters(workflow, params)
-    NfcoreTemplate.summary(workflow, params, log)
-    if (params.hook_url) {
-        NfcoreTemplate.IM_notification(workflow, params, summary_params, projectDir, log)
-    }
 }
 
 /*
