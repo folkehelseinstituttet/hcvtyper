@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### `Added`
+- **Major nf-core compliance update**: Achieved 100% nf-core lint compliance (0 failed tests) with comprehensive modernization
+  - Migrated from nf-validation to nf-schema plugin (v2.1.0)
+  - Updated JSON schemas to draft-2020-12 format
+  - Implemented resourceLimits instead of deprecated max_* parameters
+  - Added proper nf-test infrastructure with default.nf.test and .nftignore files
+  - Created external script (`bin/run_hcvglue.sh`) to resolve Docker template string issues
+  - Fixed parameter type consistency (`hcvglue_threshold` as integer)
+  - Updated validation configuration for nf-schema compatibility
 - Updated main.nf to latest nf-core template standards with proper workflow hierarchy and PIPELINE_INITIALISATION/COMPLETION subworkflows.
 - Implemented nf-core standard workflow completion handlers following template patterns.
 - Changed name of pipeline to `HCVTyper`.

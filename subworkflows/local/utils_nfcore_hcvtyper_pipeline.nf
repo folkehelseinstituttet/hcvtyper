@@ -8,8 +8,8 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { validateParameters; paramsHelp } from 'plugin/nf-validation'
-include { paramsSummaryMap } from 'plugin/nf-validation'
+include { validateParameters; paramsHelp } from 'plugin/nf-schema'
+include { paramsSummaryMap } from 'plugin/nf-schema'
 include { INPUT_CHECK } from './input_check'
 
 /*
