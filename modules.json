@@ -17,7 +17,7 @@
                     },
                     "blast/blastn": {
                         "branch": "master",
-                        "git_sha": "4262a04142431275e54e1f4b413628a2201ed6e6",
+                        "git_sha": "6330227ba2a71d39f35b0ef60e381f456489c6ee",
                         "installed_by": ["modules"]
                     },
                     "blast/makeblastdb": {
@@ -164,7 +164,7 @@
                     },
                     "spades": {
                         "branch": "master",
-                        "git_sha": "b3f04d8392f4571d5869eb3a345892dd2cbea225",
+                        "git_sha": "41dfa3f7c0ffabb96a6a813fe321c6d1cc5b6e46",
                         "installed_by": ["modules"]
                     },
                     "untar": {
