@@ -14,9 +14,9 @@ process SUMMARIZE {
 
     // Set environment variables for summarize.R
     env "PIPELINE_NAME",      "${workflow.manifest.name}"
-    env "PIPELINE_VERSION",   "${workflow.manifest.version ?: 'unknown'}"     // e.g. v1.2.3
-    env "PIPELINE_REVISION",  "${workflow.revision ?: 'local'}"              // branch/tag if set with -r
-    env "PIPELINE_COMMIT",    "${workflow.commitId ?: 'NA'}"
+    env "PIPELINE_VERSION",   "${workflow.manifest.version}"                 // Primary version source
+    env "PIPELINE_REVISION",  "${workflow.revision ?: ''}"                  // Secondary (branch/tag info)
+    env "PIPELINE_COMMIT",    "${workflow.commitId ?: ''}"                  // Tertiary (commit info)
 
     input:
     path samplesheet

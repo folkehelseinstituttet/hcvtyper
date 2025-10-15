@@ -1,10 +1,10 @@
-name: Release
+name: Manual Release (Legacy)
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.2.3)"
+        description: "Release version (e.g. v1.2.3) - DEPRECATED: Use git tag instead"
         required: true
 
 jobs:
