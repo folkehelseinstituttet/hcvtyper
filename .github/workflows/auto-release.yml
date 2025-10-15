@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'  # Triggers on version tags like v1.1.0
-  release:
-    types: [published]  # Also supports GitHub UI releases
 
 jobs:
   release:
@@ -17,121 +15,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Extract version from tag
         id: get_version
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            # Triggered by tag push
-            TAG_NAME="${{ github.ref_name }}"
-          else
-            # Triggered by release publish
-            TAG_NAME="${{ github.event.release.tag_name }}"
-          fi
-
+          TAG_NAME="${{ github.ref_name }}"
           # Remove 'v' prefix if present (e.g., v1.1.0 -> 1.1.0)
           VERSION=${TAG_NAME#v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "Release version: $VERSION"
 
-      - name: Set git user
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Update version in nextflow.config
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          echo "Updating nextflow.config version to: $VERSION"
-
-          # Update only the manifest version line (in the manifest block)
-          sed -i "/manifest[[:space:]]*{/,/}/ s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$VERSION'/" nextflow.config
-
-          # Verify the change
-          echo "Updated nextflow.config manifest version:"
-          grep -A 10 "manifest {" nextflow.config | grep version
-
-      - name: Commit version update to tag
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          TAG_NAME="${{ steps.get_version.outputs.tag_name }}"
-
-          # Add and commit changes
-          git add nextflow.config
-
-          # Check if there are changes to commit
-          if ! git diff --staged --quiet; then
-            git commit -m "chore(release): update manifest.version to $VERSION"
-
-            # Update the tag to point to this commit
-            git tag -f "$TAG_NAME"
-            git push origin "$TAG_NAME" --force
-
-            # Also push the clean version to master branch
-            git push origin HEAD:master
-          fi
-
-      - name: Create GitHub Release (if triggered by tag)
-        if: github.event_name == 'push'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.tag_name }}
           generate_release_notes: true
           draft: false
-
-      - name: Prepare next development version
-        continue-on-error: true  # Don't fail the entire workflow if this step fails
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-
-          # Calculate next development version (increment patch version)
-          IFS='.' read -ra VERSION_PARTS <<< "$VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]}
-
-          # Increment patch version for next development cycle
-          NEXT_PATCH=$((PATCH + 1))
-          NEXT_DEV_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-dev"
-
-          echo "Current release version: $VERSION"
-          echo "Next development version: $NEXT_DEV_VERSION"
-
-          # Check if dev branch exists locally or remotely
-          if git show-ref --verify --quiet refs/heads/dev; then
-            echo "Local dev branch exists, checking it out"
-            git checkout dev
-          elif git show-ref --verify --quiet refs/remotes/origin/dev; then
-            echo "Remote dev branch exists, checking it out"
-            git checkout -b dev origin/dev
-          else
-            echo "Dev branch doesn't exist, creating from master"
-            git checkout -b dev
-          fi
-
-          # Update nextflow.config for development
-          sed -i "/manifest[[:space:]]*{/,/}/ s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$NEXT_DEV_VERSION'/" nextflow.config
-
-          # Verify the change
-          echo "Updated manifest version in nextflow.config:"
-          grep -A 10 "manifest {" nextflow.config | grep version
-
-          # Commit and push to dev branch
-          git add nextflow.config
-
-          # Check if there are actually changes to commit
-          if ! git diff --staged --quiet; then
-            git commit -m "chore(dev): prepare next development version $NEXT_DEV_VERSION
-
-          Auto-updated after release $VERSION
-
-          [skip ci]"
-
-            git push origin dev
-            echo "Successfully updated dev branch to $NEXT_DEV_VERSION"
-          else
-            echo "No changes needed in dev branch"
-          fi
