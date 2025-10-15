@@ -47,12 +47,12 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           echo "Updating nextflow.config version to: $VERSION"
 
-          # Simple and reliable version update - just target the version line directly
-          sed -i "s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$VERSION'/" nextflow.config
+          # Update only the manifest version line (in the manifest block)
+          sed -i "/manifest[[:space:]]*{/,/}/ s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$VERSION'/" nextflow.config
 
           # Verify the change
-          echo "Updated nextflow.config:"
-          grep "version.*=" nextflow.config
+          echo "Updated nextflow.config manifest version:"
+          grep -A 10 "manifest {" nextflow.config | grep version
 
       - name: Commit version update to tag
         run: |
@@ -113,11 +113,11 @@ jobs:
           fi
 
           # Update nextflow.config for development
-          sed -i "s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$NEXT_DEV_VERSION'/" nextflow.config
+          sed -i "/manifest[[:space:]]*{/,/}/ s/version[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]$/version         = '$NEXT_DEV_VERSION'/" nextflow.config
 
           # Verify the change
-          echo "Updated version in nextflow.config:"
-          grep "version.*=" nextflow.config
+          echo "Updated manifest version in nextflow.config:"
+          grep -A 10 "manifest {" nextflow.config | grep version
 
           # Commit and push to dev branch
           git add nextflow.config
