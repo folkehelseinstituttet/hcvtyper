@@ -76,13 +76,13 @@ process HCVGLUE {
     echo "Container runtime: \$CONTAINER_CMD"
 
     # Remove the container in case it is already running
-    if \$CONTAINER_CMD ps -a --filter "name=gluetools-mysql" --format '{{ .Names }}' | grep -q "^gluetools-mysql\$"; then
+    if \$CONTAINER_CMD ps -a --filter "name=gluetools-mysql" --format '{{.Names}}' | grep -q "^gluetools-mysql\$"; then
         echo "Container 'gluetools-mysql' is running or exists."
         # Stop the container
         \$CONTAINER_CMD stop gluetools-mysql || echo "Failed to stop container or it is already stopped."
 
         # Wait for removal if already in progress
-        while \$CONTAINER_CMD ps -a --filter "name=gluetools-mysql" --format '{{ .State }}' | grep -q "removing"; do
+        while \$CONTAINER_CMD ps -a --filter "name=gluetools-mysql" --format '{{.State}}' | grep -q "removing"; do
             echo "Container 'gluetools-mysql' is being removed. Waiting..."
             sleep 1
         done
