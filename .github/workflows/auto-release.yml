@@ -69,6 +69,9 @@ jobs:
             # Update the tag to point to this commit
             git tag -f "$TAG_NAME"
             git push origin "$TAG_NAME" --force
+
+            # Also push the clean version to master branch
+            git push origin HEAD:master
           fi
 
       - name: Create GitHub Release (if triggered by tag)
