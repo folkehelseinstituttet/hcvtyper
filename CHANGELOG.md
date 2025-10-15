@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created external script (`bin/run_hcvglue.sh`) to resolve Docker template string issues
   - Fixed parameter type consistency (`hcvglue_threshold` as integer)
   - Updated validation configuration for nf-schema compatibility
+  - Updated all nf-core modules to latest versions
 - Updated main.nf to latest nf-core template standards with proper workflow hierarchy and PIPELINE_INITIALISATION/COMPLETION subworkflows.
 - Implemented nf-core standard workflow completion handlers following template patterns.
 - Changed name of pipeline to `HCVTyper`.
