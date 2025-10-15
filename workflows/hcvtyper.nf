@@ -269,7 +269,10 @@ workflow HCVTYPER {
             .map { meta, contigs, _n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
             BLAST_BLASTN (
                 ch_blastn,
-                BLAST_MAKEBLASTDB.out.db
+                BLAST_MAKEBLASTDB.out.db,
+                [], // taxidlist - empty, no taxonomic filtering
+                "", // taxids - empty string, no taxonomic filtering
+                false // negative_tax - false, not using negative filtering
             )
             ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
 
