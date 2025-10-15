@@ -14,8 +14,8 @@ process SUMMARIZE {
 
     // Set environment variables for summarize.R
     env "PIPELINE_NAME",      "${workflow.manifest.name}"
-    env "PIPELINE_VERSION",   "${NfcoreTemplate.version(workflow)}"   // e.g. v1.2.3-gabc1234
-    env "PIPELINE_REVISION",  "${workflow.revision ?: 'local'}"       // branch/tag if set with -r
+    env "PIPELINE_VERSION",   "${workflow.manifest.version ?: 'unknown'}"     // e.g. v1.2.3
+    env "PIPELINE_REVISION",  "${workflow.revision ?: 'local'}"              // branch/tag if set with -r
     env "PIPELINE_COMMIT",    "${workflow.commitId ?: 'NA'}"
 
     input:
