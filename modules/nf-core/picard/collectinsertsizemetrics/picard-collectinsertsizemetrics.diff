@@ -1,0 +1,23 @@
+Changes in component 'nf-core/picard/collectinsertsizemetrics'
+'modules/nf-core/picard/collectinsertsizemetrics/meta.yml' is unchanged
+Changes in 'picard/collectinsertsizemetrics/main.nf':
+--- modules/nf-core/picard/collectinsertsizemetrics/main.nf
++++ modules/nf-core/picard/collectinsertsizemetrics/main.nf
+@@ -11,9 +11,9 @@
+     tuple val(meta), path(bam)
+ 
+     output:
+-    tuple val(meta), path("*.txt"), emit: metrics
+-    tuple val(meta), path("*.pdf"), emit: histogram
+-    path "versions.yml"           , emit: versions
++    tuple val(meta), path("*.txt"), emit: metrics, optional: true
++    tuple val(meta), path("*.pdf"), emit: histogram, optional: true
++    path "versions.yml"           , emit: versions, optional: true
+ 
+     when:
+     task.ext.when == null || task.ext.when
+
+'modules/nf-core/picard/collectinsertsizemetrics/environment.yml' is unchanged
+'modules/nf-core/picard/collectinsertsizemetrics/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/picard/collectinsertsizemetrics/tests/main.nf.test' is unchanged
+************************************************************
