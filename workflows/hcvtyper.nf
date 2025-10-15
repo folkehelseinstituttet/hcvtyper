@@ -292,11 +292,12 @@ workflow HCVTYPER {
         BOWTIE2_ALIGN (
             KRAKEN2_FOCUSED.out.classified_reads_fastq,
             BOWTIE2_BUILD.out.index,
+            [ [], file(params.references) ], // Add empty meta map and reference fasta for CRAM support
             false, // Do not save unmapped reads
             true // Sort bam file
         )
         ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
-        ch_aligned = BOWTIE2_ALIGN.out.aligned
+        ch_aligned = BOWTIE2_ALIGN.out.bam
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (

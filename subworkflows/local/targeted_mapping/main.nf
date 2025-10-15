@@ -27,7 +27,7 @@ workflow TARGETED_MAPPING {
         .multiMap { meta, fasta, reads ->
             build: [ meta, fasta ]
             fasta: [ fasta ]
-            align: [ meta, fasta, reads ]
+            reads: [ meta, fasta, reads ]
         }
 
     if (params.mapper == "bowtie2") {
@@ -35,22 +35,23 @@ workflow TARGETED_MAPPING {
             ch_input.build // val(meta), path(fasta)
         )
         BOWTIE2_ALIGN (
-            ch_input.align
+            ch_input.reads
             // Add the reference name to the meta map
                 .map { meta, fasta, reads ->
                     def new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
                 return [new_meta, reads]
                 },
             BOWTIE2_BUILD.out.index,
+            ch_input.build, // tuple val(meta3), path(fasta) - reference fasta for CRAM support
             false, // Do not save unmapped reads
             true // Sort bam file
         )
-        ch_aligned = BOWTIE2_ALIGN.out.aligned
+        ch_aligned = BOWTIE2_ALIGN.out.bam
         ch_versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
-            ch_input.align,
+            ch_input.reads,
             ch_input.build,
             true, // Sort bam file
             params.tanoti_stringency_2
