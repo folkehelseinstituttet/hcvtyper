@@ -488,8 +488,6 @@ workflow HCVTYPER {
     ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
 
     SUMMARIZE (
-        workflow.manifest.version,
-        workflow.manifest.name,
         file(params.input),
         params.tanoti_stringency_1,
         params.tanoti_stringency_2,

@@ -6,17 +6,27 @@ args = commandArgs(trailingOnly=TRUE)
 
 # Define variables --------------------------------------------------------
 
-samplesheet      <- args[1]
-stringency_1     <- args[2]
-stringency_2     <- args[3]
-pipeline_version <- args[4]
-pipeline_name    <- args[5]
+pipeline_name    <- Sys.getenv("PIPELINE_NAME", "HCVTyper") # Use HCVTyper if not set
+pipeline_version <- Sys.getenv("PIPELINE_VERSION", "")
+pipeline_rev     <- Sys.getenv("PIPELINE_REVISION", "")
+pipeline_commit  <- Sys.getenv("PIPELINE_COMMIT", "")
 
-script_name_version <- if (!is.na(pipeline_version)) {
-  paste(pipeline_name, pipeline_version)
+# Precedence: version > revision > commit
+ver_label <- dplyr::coalesce(
+  na_if(pipeline_version, ""),
+  na_if(pipeline_rev, ""),
+  na_if(pipeline_commit, "")
+)
+
+script_name_version <- if (!is.na(ver_label)) {
+  paste(pipeline_name, ver_label)
 } else {
   paste(pipeline_name, "(version unknown)")
 }
+
+samplesheet  <- args[1]
+stringency_1 <- args[2]
+stringency_2 <- args[3]
 
 path_1 <- "trimmed/"
 path_2 <- "kraken_classified/"
