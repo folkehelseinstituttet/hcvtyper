@@ -19,6 +19,8 @@ process SUMMARIZE {
     env "PIPELINE_COMMIT",    "${workflow.commitId ?: ''}"                  // Tertiary (commit info)
 
     input:
+    val version
+    val name
     path samplesheet
     val stringency_1
     val stringency_2
