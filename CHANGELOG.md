@@ -13,7 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Deprecated`
 
-## v1.1.1 - 2025.10.15
+## v1.1.2 - 2025.10.16
+
+### `Added`
+
+### `Fixed`
+Pipeline version is now fetched from the manifest block of `nextflow.config` and passed to the SUMMARIZE process and included in the final `Summary.csv` file.
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.1.0 and v1.1.1 - 2025.10.15
 
 ### `Added`
 - **Major nf-core compliance update**: Achieved 100% nf-core lint compliance (0 failed tests) with comprehensive modernization
