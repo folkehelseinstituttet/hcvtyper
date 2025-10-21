@@ -1,4 +1,0 @@
-sample,fastq_1,fastq_2
-Test_1,data/reads/Test_1_R1.fastq.gz,data/reads/Test_1_R2.fastq.gz
-Test_2,data/reads/Test_2_R1.fastq.gz,data/reads/Test_2_R2.fastq.gz
-Neg,data/reads/Neg_R1.fastq.gz,data/reads/Neg_R2.fastq.gz
