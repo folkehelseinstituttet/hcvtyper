@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### `Added`
 
 ### `Fixed`
+- Updated wrong config references to KRAKEN2 database process names in the server config file.
 
 ### `Dependencies`
 
