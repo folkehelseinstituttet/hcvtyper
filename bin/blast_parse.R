@@ -194,7 +194,10 @@ ggsave(paste0(prefix, ".alignment_plot.png"),
 
 ## ── 5b. Contig length vs coverage dot plot ----------------------------
 if (nrow(scaf_top) > 0) {
+  # Limit to the same 100 top contigs as in the alignment plot
   scaf_dot <- scaf_top %>%
+    arrange(desc(bitscore)) %>%
+    slice_head(n = 100) %>%  # limit to top 100 contigs
     arrange(desc(kmer_cov), desc(sc_length)) %>%
     mutate(
       contig_key   = paste(subtype, qseqid, sep = "::"),
