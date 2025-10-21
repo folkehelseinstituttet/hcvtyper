@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Fixed`
 - Updated wrong config references to KRAKEN2 database process names in the server config file.
+- Limit blastparse dot plot to top 100 contigs
 
 ### `Dependencies`
 
