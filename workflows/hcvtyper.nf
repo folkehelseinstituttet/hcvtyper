@@ -53,7 +53,8 @@ include { BLAST_BLASTN                       } from '../modules/nf-core/blast/bl
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
 include { SAMTOOLS_SORMADUP                  } from '../modules/nf-core/samtools/sormadup/main'
 include { PICARD_COLLECTINSERTSIZEMETRICS    } from '../modules/nf-core/picard/collectinsertsizemetrics/main'
-include { UNTAR as UNTAR_KRAKEN2_DB          } from '../modules/nf-core/untar/main'
+include { UNTAR as UNTAR_KRAKEN_ALL          } from '../modules/nf-core/untar/main'
+include { UNTAR as UNTAR_KRAKEN_FOCUSED      } from '../modules/nf-core/untar/main'
 
 //
 // Local modules
@@ -63,7 +64,7 @@ include { BLASTPARSE                         } from '../modules/local/blastparse
 include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
-include { HCVGLUE                           } from '../modules/local/hcvglue/main'
+include { HCVGLUE                            } from '../modules/local/hcvglue/main'
 include { SUMMARIZE                          } from '../modules/local/summarize/main'
 
 /*
@@ -101,13 +102,29 @@ workflow HCVTYPER {
     ch_kraken_all_db = Channel.empty()
     if (params.kraken_all_db) {
         if (params.kraken_all_db.endsWith('.tar.gz')) {
-            UNTAR_KRAKEN2_DB (
+            UNTAR_KRAKEN_ALL (
                 [ [:], params.kraken_all_db ] // Add empty meta map
             )
-            ch_kraken_all_db = UNTAR_KRAKEN2_DB.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
-            ch_versions = ch_versions.mix(UNTAR_KRAKEN2_DB.out.versions.first())
+            ch_kraken_all_db = UNTAR_KRAKEN_ALL.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
+            ch_versions = ch_versions.mix(UNTAR_KRAKEN_ALL.out.versions.first())
         } else {
             ch_kraken_all_db = Channel.value(file(params.kraken_all_db))
+        }
+    }
+
+    //
+    // Prepare Kraken2 database for HCV only
+    //
+    ch_kraken_focused = Channel.empty()
+    if (params.kraken_focused) {
+        if (params.kraken_focused.endsWith('.tar.gz')) {
+            UNTAR_KRAKEN_FOCUSED (
+                [ [:], params.kraken_focused ] // Add empty meta map
+            )
+            ch_kraken_focused = UNTAR_KRAKEN_FOCUSED.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
+            ch_versions = ch_versions.mix(UNTAR_KRAKEN_FOCUSED.out.versions.first())
+        } else {
+            ch_kraken_focused = Channel.value(file(params.kraken_focused))
         }
     }
 
