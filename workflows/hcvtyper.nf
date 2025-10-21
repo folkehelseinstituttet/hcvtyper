@@ -243,7 +243,7 @@ workflow HCVTYPER {
     //
     KRAKEN2_FOCUSED (
         ch_kraken_input,
-        Channel.value(file(params.kraken_focused)),
+        ch_kraken_focused,
         params.save_output_fastqs,
         params.save_reads_assignment
     )
