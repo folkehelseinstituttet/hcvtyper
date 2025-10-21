@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced custom dumpsoftwareversions module with built-in softwareVersionsToYAML functionality in the main workflow.
 
 ### `Fixed`
-- Fixed wrong path name to KRAKEN2_KRAKEN2 process in the server config file
+- Fixed wrong path name to KRAKEN2_KRAKEN2 process in the server config file.
+- Correct samplesheet input now available when running the minimal test profile.
 
 ### `Dependencies`
 
