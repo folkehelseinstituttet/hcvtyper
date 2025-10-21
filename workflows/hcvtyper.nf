@@ -115,10 +115,10 @@ workflow HCVTYPER {
     //
     // Prepare Kraken2 database for HCV only
     //
-    ch_kraken_focused_db_db = Channel.empty()
-        if (params.kraken_focused_db_db.endsWith('.tar.gz')) {
+    ch_kraken_focused_db = Channel.empty()
+        if (params.kraken_focused_db.endsWith('.tar.gz')) {
             UNTAR_KRAKEN_FOCUSED (
-                [ [:], params.kraken_focused_db_db ] // Add empty meta map
+                [ [:], params.kraken_focused_db ] // Add empty meta map
             )
             ch_kraken_focused_db = UNTAR_KRAKEN_FOCUSED.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
             ch_versions = ch_versions.mix(UNTAR_KRAKEN_FOCUSED.out.versions.first())
