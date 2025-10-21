@@ -129,7 +129,7 @@ The pipeline uses [Kraken2](https://github.com/DerrickWood/kraken2) for two purp
 
 By default, the pipeline will download and use the [PlusPFP-8 database](https://benlangmead.github.io/aws-indexes/k2) compiled by Ben Langmead for the broad classification. This requires the download and upacking of a fairly large file (>5 GB) and we recommend that you download and unpack this yourself and specify the path to the database using the `--kraken_all_db` parameter.
 
-For the HCV-specific classification, the pipeline will use a very small and provided database which consists of around 200 different HCV strains. You can specify a custom HCV-datavase using the `--kraken_focused` paramter.
+For the HCV-specific classification, the pipeline will use a very small and provided database which consists of around 200 different HCV strains. You can specify a custom HCV-datavase using the `--kraken_focused_db` paramter.
 
 ### HCV reference sequences
 The database comes with a provided set of about 200 HCV reference sequences downloaded from NCBI. See the file [data/blast_db/HCVgenosubtypes_8.5.19_clean.fa](data/blast_db/HCVgenosubtypes_8.5.19_clean.fa). The fasta headers have been modified to begin with the genotype and subtype information (e.g., `1a`, `3b`, etc.) followed by an underscore and the NCBI accession number (e.g, `1a_AF009606`).  You can for example add or remove HCV strains by modifying this file. Remember to format the fasta headers accordingly. This file will then be used in the mapping and analysis of the de novo assembled contigs to identify genotype and subtype. You need to provide the path to this file like this: `--references /path/to/HCV-sequences.fasta`.

@@ -78,7 +78,7 @@
             "type": "string",
             "default": "HCV"
         },
-        "kraken_focused": {
+        "kraken_focused_db": {
             "type": "string",
             "default": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/test-datasets/kraken2/db_hepacivirus.tar.gz"
         },

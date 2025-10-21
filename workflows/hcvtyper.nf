@@ -115,18 +115,16 @@ workflow HCVTYPER {
     //
     // Prepare Kraken2 database for HCV only
     //
-    ch_kraken_focused = Channel.empty()
-    if (params.kraken_focused) {
-        if (params.kraken_focused.endsWith('.tar.gz')) {
+    ch_kraken_focused_db_db = Channel.empty()
+        if (params.kraken_focused_db_db.endsWith('.tar.gz')) {
             UNTAR_KRAKEN_FOCUSED (
-                [ [:], params.kraken_focused ] // Add empty meta map
+                [ [:], params.kraken_focused_db_db ] // Add empty meta map
             )
-            ch_kraken_focused = UNTAR_KRAKEN_FOCUSED.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
+            ch_kraken_focused_db = UNTAR_KRAKEN_FOCUSED.out.untar.map { it[1] } // Do not extract the meta map which is emitted by default
             ch_versions = ch_versions.mix(UNTAR_KRAKEN_FOCUSED.out.versions.first())
         } else {
-            ch_kraken_focused = Channel.value(file(params.kraken_focused))
+            ch_kraken_focused_db = Channel.value(file(params.kraken_focused_db))
         }
-    }
 
     //
     // MODULE: Identify the instrument ID
@@ -243,7 +241,7 @@ workflow HCVTYPER {
     //
     KRAKEN2_FOCUSED (
         ch_kraken_input,
-        ch_kraken_focused,
+        ch_kraken_focused_db,
         params.save_output_fastqs,
         params.save_reads_assignment
     )
