@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### `Added`
+
+### `Fixed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.1.3 - 2025.10.21
+
+### `Added`
 - Replaced custom dumpsoftwareversions module with built-in softwareVersionsToYAML functionality in the main workflow.
 - Moved test datasets to a dedicated branch `test-datasets` to reduce repository size.
 
