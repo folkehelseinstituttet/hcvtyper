@@ -21,7 +21,7 @@ include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-schema'
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { INPUT_CHECK                                    } from '../subworkflows/local/input_check'
+include { softwareVersionsToYAML                         } from '../subworkflows/nf-core/utils_nfcore_pipeline/main.nf'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows/local/get_mapping_stats'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
 include { TARGETED_MAPPING as MAJOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
@@ -37,6 +37,7 @@ include { TARGETED_MAPPING as MINOR_MAPPING              } from '../subworkflows
 // MODULE: Installed directly from nf-core/modules
 //
 //include { fromSamplesheet                    } from 'plugin/nf-validation'
+include { INPUT_CHECK                        } from '../subworkflows/local/input_check'
 include { BOWTIE2_BUILD                      } from '../modules/nf-core/bowtie2/build/main'
 include { BLAST_MAKEBLASTDB                  } from '../modules/nf-core/blast/makeblastdb/main'
 include { FASTP                              } from '../modules/nf-core/fastp/main'
@@ -52,7 +53,6 @@ include { BLAST_BLASTN                       } from '../modules/nf-core/blast/bl
 include { BOWTIE2_ALIGN                      } from '../modules/nf-core/bowtie2/align/main'
 include { SAMTOOLS_SORMADUP                  } from '../modules/nf-core/samtools/sormadup/main'
 include { PICARD_COLLECTINSERTSIZEMETRICS    } from '../modules/nf-core/picard/collectinsertsizemetrics/main'
-include { CUSTOM_DUMPSOFTWAREVERSIONS        } from '../modules/nf-core/custom/dumpsoftwareversions/main'
 include { UNTAR as UNTAR_KRAKEN2_DB          } from '../modules/nf-core/untar/main'
 
 //
@@ -507,11 +507,16 @@ workflow HCVTYPER {
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 
     //
-    // MODULE: Dump software versions
+    // Collate and save software versions
     //
-    CUSTOM_DUMPSOFTWAREVERSIONS (
-        ch_versions.unique().collectFile(name: 'collated_versions.yml')
-    )
+    softwareVersionsToYAML(ch_versions)
+        .collectFile(
+            storeDir: "${params.outdir}/pipeline_info",
+            name: "software_mqc_versions.yml",
+            sort: true,
+            newLine: true
+        )
+        .set { ch_collated_versions }
 
     //
     // MODULE: MultiQC
@@ -526,7 +531,7 @@ workflow HCVTYPER {
     ch_multiqc_files = Channel.empty()
     ch_multiqc_files = ch_multiqc_files.mix(ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_methods_description.collectFile(name: 'methods_description_mqc.yaml'))
-    ch_multiqc_files = ch_multiqc_files.mix(CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collectFile(name: 'software_mqc_versions.yml'))
+    ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW.out.zip.collect{it[1]}.ifEmpty([]))
     if (params.trimmer == "cutadapt") {
         ch_multiqc_files = ch_multiqc_files.mix(CUTADAPT.out.log.collect{it[1]}.ifEmpty([]))
