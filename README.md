@@ -4,7 +4,7 @@
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 
 ## Table of Contents
-- [About HCV Illumina](#about-hcv-illumina)
+- [About HCVTyper](#about-hcvtyper)
 - [Requirements](#requirements)
 - [Run the pipeline](#run-the-pipeline)
 - [Test the pipeline](#test-the-pipeline)
@@ -22,7 +22,7 @@
 - [Output files](#output-files)
 - [Citations](#citations)
 
-## About HCV Illumina
+## About HCVTyper
 
 **folkehelseinstituttet/hcvtyper** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
 maps Illumina reads to a reference genome and creates a consensus sequence.
