@@ -12,12 +12,6 @@ process SUMMARIZE {
         'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/2a/2a1764abd77b9638883a202b96952a48f46cb0ee6c4f65874b836b9455a674d1/data':
         'community.wave.seqera.io/library/r-gridextra_r-png_r-seqinr_r-tidyverse:3536dd50a17de0ab' }"
 
-    // Set environment variables for summarize.R
-    env "PIPELINE_NAME",      "${workflow.manifest.name}"
-    env "PIPELINE_VERSION",   "${workflow.manifest.version}"                 // Primary version source
-    env "PIPELINE_REVISION",  "${workflow.revision ?: ''}"                  // Secondary (branch/tag info)
-    env "PIPELINE_COMMIT",    "${workflow.commitId ?: ''}"                  // Tertiary (commit info)
-
     input:
     val version
     val name
@@ -52,6 +46,8 @@ process SUMMARIZE {
         $samplesheet \\
         $stringency_1 \\
         $stringency_2 \\
+        $version \\
+        $name \\
         $args
 
     cat <<-END_VERSIONS > versions.yml

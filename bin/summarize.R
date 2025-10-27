@@ -12,7 +12,7 @@ stringency_2     <- args[3]
 pipeline_version <- args[4]
 pipeline_name    <- args[5]
 
-script_name_version <- if (!is.na(pipeline_version)) {
+script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
 } else {
   paste(pipeline_name, "(version unknown)")
