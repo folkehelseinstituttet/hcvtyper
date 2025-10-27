@@ -172,7 +172,7 @@
         },
         "references": {
             "type": "string",
-            "default": "/home/jon.brate/hcvtyper/data/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
+            "default": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/test-datasets/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
         },
         "tanoti_stringency_1": {
             "type": "integer",
