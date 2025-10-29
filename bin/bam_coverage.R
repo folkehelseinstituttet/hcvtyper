@@ -9,8 +9,12 @@ if (length(args) < 2) {
 
 depth <- args[1]
 prefix <- args[2]
+# Get the sample name, reference, major_minor from the depth filename.
+# Use this to control against the prefix and info in bam file.
 sampleName <- unlist(str_split(basename(depth), pattern = "\\."))[1]
 major_minor <- unlist(str_split(basename(depth), pattern = "\\."))[3]
+ref_from_filename <- unlist(str_split(basename(depth), pattern = "\\."))[2] %>%
+    str_remove(stringr::fixed(paste0("_", major_minor)))
 
 df <- read_tsv(depth, col_names = FALSE)
 
@@ -27,8 +31,13 @@ if (nrow(df) > 0) {
            "Position" = X2,
            "Coverage" = X3)
 
-# Get the mapped reference
+# Get the mapped reference from the tsv-file produced by samtools depth
 reference <- df %>% distinct(Reference) %>% pull(Reference)
+
+# Check that ref_from_filename and reference are identical. If not, stop the script and print an error message
+if (ref_from_filename != reference) {
+  stop("Error: Reference from filename and reference from depth file do not match. Please check the input files.", call.=FALSE)
+}
 
 # Define the coverage cutoff
 coverage_cutoff <- 10
