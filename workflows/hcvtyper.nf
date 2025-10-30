@@ -378,26 +378,29 @@ workflow HCVTYPER {
     // SUBWORKFLOW: Map reads against the majority reference
     //
     if (params.strategy == "mapping") {
-        // Filter out if the majority reference has fewer that minRead mapped and less than minCov coverage
-        ch_major_tmp = PARSEFIRSTMAPPING.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
-        ch_major_join = ch_major_tmp.join(PARSEFIRSTMAPPING.out.csv) // meta, fasta, reads, csv
+        // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
+        // Then filter out cases where the majority reference has fewer that minRead mapped and less than minCov coverage
+        ch_major_mapping = PARSEFIRSTMAPPING.out.major_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
 
-        // Create a new channel with the structure tuple val(meta), path(fasta), path(reads)
-        // The meta will contain all the elements from meta and the csv file. meta, reads
-        ch_map_major = ch_major_join
-            .map { meta, fasta, reads_file, csv ->
-            def elements = csv.splitCsv( header: true, sep:',')
-            return [meta + elements[0], fasta, reads_file]
+        // Then create a new channel whith all the elements from the csv file in the meta map.
+        // The new channel has the structure tuple val(meta), path(fasta), path(reads)
+            .map { meta, _csv, major_fasta, _reads ->
+            def elements = _csv.splitCsv( header: true, sep:',')
+            def new_meta = meta + elements[0]
+
+            // Fail if meta.id is not identical to meta.sample (from the csv)
+            assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
+
+            tuple(new_meta, major_fasta, _reads)
             }
 
-        // Filter on read nr and coverage
+        // Then filter on read nr and coverage. This info is from the csv elements
         // This will result in a channel with values that meet the read nr and coverage criteria
-        ch_major_mapping = ch_map_major
-        .filter { entry ->
-            def mappedReads = entry[0]['major_reads'].toInteger()
-            def majorCov = entry[0]['major_cov'].toInteger()
-            mappedReads > params.minRead && majorCov > params.minCov
-        }
+            .filter { entry ->
+                def mappedReads = entry[0]['major_reads'].toInteger()
+                def majorCov = entry[0]['major_cov'].toInteger()
+                mappedReads > params.minRead && majorCov > params.minCov
+            }
     } else if (params.strategy == "denovo") {
         ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
     }
@@ -410,23 +413,25 @@ workflow HCVTYPER {
     //
     // SUBWORKFLOW: Map reads against a potential minority reference
     //
-
-    // Create input channel for mapping against a subset of the references
     if (params.strategy == "mapping") {
-        ch_join = PARSEFIRSTMAPPING.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
-        ch_join_2 = ch_join.join(PARSEFIRSTMAPPING.out.csv) // meta, fasta, reads, csv
+        // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
+        // Then filter out cases where the minority reference has fewer that minRead mapped and less than minCov coverage
+        ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
 
-        // Create a new channel with the structure tuple val(meta), path(fasta), path(reads)
-        // The meta will contain all the elements from meta and the csv file. meta, reads
-        ch_map_minor = ch_join_2
-            .map { meta, fasta, reads_file, csv ->
-            def elements = csv.splitCsv( header: true, sep:',')
-            return [meta + elements[0], fasta, reads_file]
+        // Then create a new channel whith all the elements from the csv file in the meta map.
+        // The new channel has the structure tuple val(meta), path(fasta), path(reads)
+            .map { meta, _csv, minor_fasta, _reads ->
+            def elements = _csv.splitCsv( header: true, sep:',')
+            def new_meta = meta + elements[0]
+
+            // Fail if meta.id is not identical to meta.sample (from the csv)
+            assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
+
+            tuple(new_meta, minor_fasta, _reads)
             }
 
-        // Filter on read nr and coverage
+        // Then filter on read nr and coverage. This info is from the csv elements
         // This will result in a channel with values that meet the read nr and coverage criteria
-        ch_map_minor_filtered = ch_map_minor
         .filter { entry ->
             def mappedReads = entry[0]['minor_reads'].toInteger()
             def minorCov = entry[0]['minor_cov'].toInteger()
@@ -446,7 +451,7 @@ workflow HCVTYPER {
 
         // Filter on read nr and coverage
         // This will result in a channel with values that meet the read nr and coverage criteria
-        ch_map_minor_filtered = ch_map_minor
+        ch_minor_mapping = ch_map_minor
         .filter { entry ->
             def minorLength = entry[0]['minor_contig_length'].toInteger()
             minorLength > params.minDenovoLength
@@ -454,7 +459,7 @@ workflow HCVTYPER {
     }
 
     MINOR_MAPPING (
-        ch_map_minor_filtered, // val(meta), path(fasta), path(reads)
+        ch_minor_mapping // val(meta), path(fasta), path(reads)
     )
 
     //
