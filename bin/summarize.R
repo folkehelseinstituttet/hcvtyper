@@ -638,7 +638,7 @@ if (nrow(glue_report) > 0) {
 
 # Add script name and version
 final <- final %>%
-  add_column("script_name_stringency" = script_name_version)
+  add_column("pipeline_version" = script_name_version)
 
 
 # Decide if a sample is "typable" or not
