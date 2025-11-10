@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### `Added`
+
+### `Fixed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.1.5 - 2025.11.10
+
+### `Added`
 - Added check in `bam_coverage.R` to ensure that the reference name extracted from the depth filename matches the reference name found in the depth file itself. If they do not match, the script will stop and print an error message.
 - Added validation to ensure that the sample IDs from the metadata match those in the CSV file when joining channels before the MAJOR_MAPPING and MINOR_MAPPING processes. If there is a mismatch, the workflow will fail with an informative error message.
 - Renamed `script_name_stringency` to `pipeline_version`
