@@ -147,12 +147,83 @@ Changing the arguments given to the various sub-tools can be done in several way
 
 ## Output files
 
+The pipeline generates a comprehensive set of output files from various processes to facilitate result interpretation and quality control. By default, many intermediate files are published to help you understand the analysis. You can customize which files are published by modifying the `publishDir` settings in the configuration files. For example, to disable publishing for a specific process:
+
+```groovy
+withName: 'PROCESS_NAME' {
+    publishDir = [enabled: false]
+}
+```
+
+### Main output files
+
+#### Summary.csv
+The primary output file containing per-sample genotyping and quality metrics. Key columns include:
+
+**Read statistics:**
+- `sampleName` - Sample identifier
+- `total_raw_reads` - Total number of raw reads
+- `total_trimmed_reads` - Reads after quality trimming
+- `total_classified_reads` - Reads classified by Kraken2 as target organism
+- `total_mapped_reads` - Reads mapped to all reference genomes
+- `fraction_mapped_reads_vs_median` - Fraction of mapped reads relative to median across all samples. Useful for identifying outliers in a sequencing batch.
+
+**Genotyping results:**
+- `Major_genotype_mapping` / `Minor_genotype_mapping` - Identified genotypes (major/minor variants) from the reference mapping
+- `Major_reference` / `Minor_reference` - CLosest references identified in the mapping against all references. These were used for genotyping and re-mapping
+- `major_typable` / `minor_typable` - Whether the sample meets quality thresholds for reliable genotyping (YES/NO)
+
+**Mapping statistics (major/minor):**
+- `Reads_withdup_mapped_major/minor` - Mapped reads including duplicates
+- `Reads_nodup_mapped_major/minor` - Mapped reads after duplicate removal
+- `Percent_reads_mapped_of_trimmed_with_dups_major/minor` - Percentage of trimmed reads that mapped, duplicates included
+- `Major/Minor_cov_breadth_min_5/10` - Percentage of reference covered at ≥5× or ≥10× depth
+- `Major/Minor_avg_depth` - Average sequencing depth across the reference
+
+**HCV-specific outputs (if applicable):**
+- `GLUE_genotype` / `GLUE_subtype` - Genotype and subtype determined by HCV-GLUE. "Typable" only if this matches the mapping genotype.
+- `Reference` - GLUE reference sequence
+- Drug resistance markers for NS3/4A inhibitors (glecaprevir, grazoprevir, paritaprevir, voxilaprevir)
+- Drug resistance markers for NS5A inhibitors (daclatasvir, elbasvir, ledipasvir, ombitasvir, pibrentasvir, velpatasvir)
+- Drug resistance markers for NS5B inhibitors (dasabuvir, sofosbuvir)
+- `*_mut` columns - Detailed mutation information
+- `*_mut_short` columns - Abbreviated mutation notation
+
+**Technical metadata:**
+- `sequencer_id` - Sequencing instrument identifier
+- `pipeline_version` - Version of the folkehelseinstituttet/hcvtyper pipeline
+- `HCV_project_version` - HCV-GLUE version
+- `GLUE_engine_version` - GLUE engine version
+- `PHE_drug_resistance_extension_version` - Version of the Public Health England (PHE) drug resistance extension applied in HCV-GLUE
+
+
+#### MultiQC Report
+A comprehensive HTML report (`multiqc_report.html`) that summarizes:
+- Run information and pipeline parameters
+- Command line and configuration used
+- Pipeline version and software versions
+- Quality control metrics (FastQC, trimming statistics)
+- Read classification and mapping statistics
+- Genotyping results and drug resistance summaries (for HCV)
+- Visualization of coverage and variant distributions
+
+The MultiQC report provides an interactive overview of all samples and is the recommended starting point for result interpretation.
+
+### Additional output directories
+
+- `fastqc/` - Raw and trimmed read quality reports
+- `fastp/` or `cutadapt/` - Read trimming logs and statistics
+- `kraken2/` - Taxonomic classification reports
+- `samtools/` - BAM file statistics and mapping metrics
+- `bowtie2/` or `tanoti/` - Alignment files and indices
+- `spades/` - De novo assembly results (if enabled)
+- `blast/` - BLAST results against reference database
+- `hcvglue/` - HCV-GLUE genotyping and resistance reports (for HCV samples)
+- `pipeline_info/` - Execution reports, timeline, and software versions
+
 ## Citations
 
-<!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use  folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
-
-<!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
+If you use  folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [https://doi.org/10.1101/2025.10.21.683612](https://doi.org/10.1101/2025.10.21.683612)
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
