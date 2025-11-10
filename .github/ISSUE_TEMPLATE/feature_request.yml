@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an idea for the niph/viralseq pipeline
+description: Suggest an idea for the folkehelseinstituttet/hcvtyper pipeline
 labels: enhancement
 body:
   - type: textarea

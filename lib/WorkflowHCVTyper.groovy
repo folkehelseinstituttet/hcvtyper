@@ -1,5 +1,5 @@
 //
-// This file holds several functions specific to the workflow/viralseq.nf in the niph/viralseq pipeline
+// This file holds several functions specific to the workflow/hcvtyper.nf in the folkehelseinstituttet/hcvtyper pipeline
 //
 
 import nextflow.Nextflow

@@ -1,5 +1,5 @@
 //
-// This file is based on the file in the nf-core/viralrecon pipeline. But is adapted to the niph/viralseq pipeline
+// This file is based on the file in the nf-core/viralrecon pipeline. But is adapted to the folkehelseinstituttet/hcvtyper pipeline
 //
 
 import nextflow.Nextflow
