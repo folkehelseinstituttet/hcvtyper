@@ -136,7 +136,9 @@ parsefirstmapping_df <- tibble(
   sampleName = rep(NA_character_, length(first_mapping_files)),
   total_mapped_reads = rep(NA_real_, length(first_mapping_files)),
   major_mapped_reads = rep(NA_real_, length(first_mapping_files)),
-  minor_mapped_reads = rep(NA_real_, length(first_mapping_files))
+  minor_mapped_reads = rep(NA_real_, length(first_mapping_files)),
+  major_cov_firstmapping = rep(NA_real_, length(first_mapping_files)),
+  major_ref_firstmapping = rep(NA_character_, length(first_mapping_files))
 )
 
 # If the length of parsefirstmapping_files is non-zero
@@ -157,6 +159,14 @@ if (length(first_mapping_files) > 0) {
 
     # Get the number of mapped reads against all minor references belonging to the minor subtype
     parsefirstmapping_df$minor_mapped_reads[i] <- sample_parsefirstmapping %>% pull(minor_reads)
+
+    # If present, capture coverage and reference from the first-mapping report
+    if ("major_cov" %in% colnames(sample_parsefirstmapping)) {
+      parsefirstmapping_df$major_cov_firstmapping[i] <- sample_parsefirstmapping %>% pull(major_cov)
+    }
+    if ("major_ref" %in% colnames(sample_parsefirstmapping)) {
+      parsefirstmapping_df$major_ref_firstmapping[i] <- sample_parsefirstmapping %>% pull(major_ref)
+    }
   }
 }
 
@@ -169,7 +179,7 @@ parsefirstmapping_df <- as_tibble(parsefirstmapping_df) %>%
     percent_mapped_reads_major_firstmapping = round(major_mapped_reads / total_mapped_reads * 100, digits = 2),
     percent_mapped_reads_minor_firstmapping = round(minor_mapped_reads / total_mapped_reads * 100, digits = 2)
   ) %>%
-  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping)
+  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping, major_cov_firstmapping, major_ref_firstmapping)
 
 # Second mapping, reads mapped with duplicates ----------------------------
 # List files
