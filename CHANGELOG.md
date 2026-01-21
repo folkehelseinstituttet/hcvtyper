@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 - Do not publish fastq files from FASTP by default
+- Added major coverage and major reference from the first mapping to Summary.csv
 
 ### `Fixed`
 
