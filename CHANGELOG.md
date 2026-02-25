@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+- Added cross-sample contamination detection subworkflow (`CONTAMINATION_CHECK`). After de novo assembly, contigs ≥ `params.contamination_min_length` bp (default 1000 bp) are filtered per sample and their FASTA headers are prefixed with the sample ID. All filtered contigs are concatenated and run through an all-vs-all BLAST search. Hits between different samples at ≥ `params.contamination_min_id` % identity (default 95%) are flagged as potentially contaminated. Outputs: `contamination_pairs.tsv` (per-pair identity, alignment length, mismatches, gap openings, and SNP distance), `contamination_heatmap.png` (sample×sample matrix of shared contig pair counts), and a MultiQC-compatible JSON table. The subworkflow can be skipped with `--skip_contamination_check true`.
+
 ### `Fixed`
 
 ### `Dependencies`
