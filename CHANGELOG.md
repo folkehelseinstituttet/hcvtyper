@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### `Added`
+
+### `Fixed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.1.6 - 2026.02.25
+
+### `Added`
 - Do not publish fastq files from FASTP by default
 - Added major coverage and major reference from the first mapping to Summary.csv
 
