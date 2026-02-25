@@ -23,35 +23,47 @@ workflow TARGETED_MAPPING {
 
     main:
 
+        // Enrich the meta map with the reference name before splitting the channel.
+        // This ensures all branches (build, fasta, reads) share the same meta key so
+        // that downstream joins and positional pairings are always in sync.
         ch_input = ch_major_mapping
+        .map { meta, fasta, reads ->
+            def new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
+            tuple(new_meta, fasta, reads)
+        }
         .multiMap { meta, fasta, reads ->
             build: [ meta, fasta ]
-            fasta: [ fasta ]
-            reads: [ meta, fasta, reads ]
+            fasta: [ fasta ]       // consumed by IVAR_CONSENSUS (positional, no meta needed)
+            reads: [ meta, reads ]
         }
 
     if (params.mapper == "bowtie2") {
         BOWTIE2_BUILD (
             ch_input.build // val(meta), path(fasta)
         )
+
+        // Join reads, index, and fasta by meta key before calling BOWTIE2_ALIGN.
+        // BOWTIE2_BUILD emits index items in completion order (not submission order),
+        // so a positional join would pair the wrong index with the wrong sample when
+        // multiple samples are processed in parallel. Joining by meta key guarantees
+        // that each BOWTIE2_ALIGN task always receives the correct matched triple.
+        ch_aligned_input = ch_input.reads       // meta, reads
+            .join( BOWTIE2_BUILD.out.index )   // meta, reads, index
+            .join( ch_input.build )            // meta, reads, index, fasta
+
         BOWTIE2_ALIGN (
-            ch_input.reads
-            // Add the reference name to the meta map
-                .map { meta, fasta, reads ->
-                    def new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
-                return [new_meta, reads]
-                },
-            BOWTIE2_BUILD.out.index,
-            ch_input.build, // tuple val(meta3), path(fasta) - reference fasta for CRAM support
+            ch_aligned_input.map { meta, reads, _index, _fasta -> [ meta, reads ] },
+            ch_aligned_input.map { meta, _reads, index, _fasta -> [ meta, index ] },
+            ch_aligned_input.map { meta, _reads, _index, fasta -> [ meta, fasta ] },
             false, // Do not save unmapped reads
-            true // Sort bam file
+            true   // Sort bam file
         )
         ch_aligned = BOWTIE2_ALIGN.out.bam
         ch_versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
     }
     else if (params.mapper == "tanoti") {
         TANOTI_ALIGN (
-            ch_input.reads,
+            ch_input.reads, // tuple val(meta), path(reads) — fasta is no longer bundled in here
             ch_input.build,
             true, // Sort bam file
             params.tanoti_stringency_2
