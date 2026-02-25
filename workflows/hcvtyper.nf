@@ -26,6 +26,7 @@ include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
 include { TARGETED_MAPPING as MAJOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
 include { TARGETED_MAPPING as MINOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
+include { CONTAMINATION_CHECK                            } from '../subworkflows/local/contamination_check/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,6 +301,14 @@ workflow HCVTYPER {
                 params.agens
             )
             ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+
+            //
+            // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
+            //
+            if (!params.skip_contamination_check) {
+                CONTAMINATION_CHECK(SPADES.out.contigs)
+                ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
+            }
     }
 
     //
@@ -564,6 +573,9 @@ workflow HCVTYPER {
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_FOCUSED.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
+    if (!params.skip_assembly && !params.skip_contamination_check) {
+        ch_multiqc_files = ch_multiqc_files.mix(CONTAMINATION_CHECK.out.mqc)
+    }
 
     MULTIQC (
         ch_multiqc_files.collect(),
