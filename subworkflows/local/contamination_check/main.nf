@@ -30,6 +30,7 @@ workflow CONTAMINATION_CHECK {
 
     // Discard samples that produced no long contigs (empty output files)
     // then collect all filtered FASTAs into a single list for concatenation.
+    // This step collects all samples so needs to wait until SPADES is completed for all samples.
     ch_all_fas = CONTIG_FILTER_RENAME.out.filtered
         .filter { _meta, fa -> fa.size() > 0 }
         .map    { _meta, fa -> fa }
