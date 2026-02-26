@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper//nextflow_schema.json",
+    "$id": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/master/nextflow_schema.json",
     "title": "folkehelseinstituttet/hcvtyper pipeline parameters",
     "description": "Assemble and genotype HCV genomes from NGS data",
     "type": "object",
@@ -189,6 +189,20 @@
         "minCov": {
             "type": "integer",
             "default": 29
+        },
+        "skip_contamination_check": {
+            "type": "boolean",
+            "description": "Skip the cross-sample contamination check based on all-vs-all BLAST of assembled contigs."
+        },
+        "contamination_min_length": {
+            "type": "integer",
+            "default": 1000,
+            "description": "Minimum contig length (bp) to include in the cross-sample contamination BLAST."
+        },
+        "contamination_min_id": {
+            "type": "integer",
+            "default": 95,
+            "description": "Minimum BLAST percent identity to flag a cross-sample contamination hit."
         }
     }
 }
