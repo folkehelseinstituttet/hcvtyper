@@ -104,7 +104,7 @@ p <- ggplot(grid, aes(x = sample2, y = sample1, fill = n_pairs)) +
     geom_text(
         aes(label = if_else(!is.na(n_pairs) & n_pairs > 0,
                             as.character(n_pairs), "")),
-        size = 3
+        size = 5
     ) +
     scale_fill_gradient(
         low      = "white",
