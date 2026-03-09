@@ -223,7 +223,7 @@ The MultiQC report provides an interactive overview of all samples and is the re
 
 ## Citations
 
-If you use  folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [https://doi.org/10.1101/2025.10.21.683612](https://doi.org/10.1101/2025.10.21.683612)
+If you use  folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [https://doi.org/10.1099/acmi.0.001193.v1](https://doi.org/10.1099/acmi.0.001193.v1)
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
