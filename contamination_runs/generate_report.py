@@ -18,44 +18,49 @@ doc = Document()
 
 # ── Page margins ──────────────────────────────────────────────────────────────
 for section in doc.sections:
-    section.top_margin    = Cm(2.5)
+    section.top_margin = Cm(2.5)
     section.bottom_margin = Cm(2.5)
-    section.left_margin   = Cm(2.8)
-    section.right_margin  = Cm(2.8)
+    section.left_margin = Cm(2.8)
+    section.right_margin = Cm(2.8)
+
 
 # ── Styles helpers ────────────────────────────────────────────────────────────
 def heading(text, level=1):
     p = doc.add_heading(text, level=level)
     return p
 
+
 def para(text, bold=False, italic=False, size=None):
     p = doc.add_paragraph()
     run = p.add_run(text)
-    run.bold   = bold
+    run.bold = bold
     run.italic = italic
     if size:
         run.font.size = Pt(size)
     return p
+
 
 def bullet(text, level=0):
     p = doc.add_paragraph(text, style="List Bullet")
     p.paragraph_format.left_indent = Cm(level * 0.5)
     return p
 
+
 def code_block(text):
     p = doc.add_paragraph()
-    p.paragraph_format.left_indent  = Cm(1)
+    p.paragraph_format.left_indent = Cm(1)
     p.paragraph_format.space_before = Pt(2)
-    p.paragraph_format.space_after  = Pt(2)
+    p.paragraph_format.space_after = Pt(2)
     run = p.add_run(text)
     run.font.name = "Courier New"
     run.font.size = Pt(9)
     shading = OxmlElement("w:shd")
-    shading.set(qn("w:val"),   "clear")
+    shading.set(qn("w:val"), "clear")
     shading.set(qn("w:color"), "auto")
-    shading.set(qn("w:fill"),  "F2F2F2")
+    shading.set(qn("w:fill"), "F2F2F2")
     p._p.pPr.append(shading)
     return p
+
 
 def add_table(headers, rows, col_widths=None, header_shading="2E4057"):
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
@@ -70,9 +75,9 @@ def add_table(headers, rows, col_widths=None, header_shading="2E4057"):
         run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
         run.font.size = Pt(9)
         shd = OxmlElement("w:shd")
-        shd.set(qn("w:val"),   "clear")
+        shd.set(qn("w:val"), "clear")
         shd.set(qn("w:color"), "auto")
-        shd.set(qn("w:fill"),  header_shading)
+        shd.set(qn("w:fill"), header_shading)
         hdr_cells[i]._tc.get_or_add_tcPr().append(shd)
     # Data rows
     for r_idx, row in enumerate(rows):
@@ -87,6 +92,7 @@ def add_table(headers, rows, col_widths=None, header_shading="2E4057"):
                 r.cells[i].width = Cm(w)
     return table
 
+
 def add_image_if_exists(path, caption, width=14):
     if os.path.exists(path):
         doc.add_picture(path, width=Cm(width))
@@ -98,6 +104,7 @@ def add_image_if_exists(path, caption, width=14):
         c.runs[0].font.size = Pt(9)
     else:
         para(f"[Figure not available: {os.path.basename(path)}]", italic=True)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TITLE PAGE
@@ -152,20 +159,24 @@ para(
 )
 para("The pipeline consists of five steps:")
 for step in [
-    ("Contig filtering and renaming",
-     "Per-sample contigs shorter than 1,000 bp are discarded to reduce noise from small, "
-     "low-complexity fragments. Each remaining contig header is prefixed with the sample ID "
-     "(e.g. 2619488-HCV|NODE_1_length_9398_cov_15208.0)."),
-    ("Concatenation",
-     "All per-sample filtered FASTA files are combined into a single multi-sample FASTA."),
-    ("BLAST database construction",
-     "A nucleotide BLAST database is built from the combined FASTA."),
-    ("All-vs-all BLAST",
-     "The combined FASTA is BLASTed against itself at ≥95% nucleotide identity. "
-     "Self-hits are automatically present but are filtered in the next step."),
-    ("Report generation",
-     "The R script contamination_report.R parses the BLAST output, removes self-hits and "
-     "intra-sample hits, and produces all output files described in Section 3."),
+    (
+        "Contig filtering and renaming",
+        "Per-sample contigs shorter than 1,000 bp are discarded to reduce noise from small, "
+        "low-complexity fragments. Each remaining contig header is prefixed with the sample ID "
+        "(e.g. 2619488-HCV|NODE_1_length_9398_cov_15208.0).",
+    ),
+    ("Concatenation", "All per-sample filtered FASTA files are combined into a single multi-sample FASTA."),
+    ("BLAST database construction", "A nucleotide BLAST database is built from the combined FASTA."),
+    (
+        "All-vs-all BLAST",
+        "The combined FASTA is BLASTed against itself at ≥95% nucleotide identity. "
+        "Self-hits are automatically present but are filtered in the next step.",
+    ),
+    (
+        "Report generation",
+        "The R script contamination_report.R parses the BLAST output, removes self-hits and "
+        "intra-sample hits, and produces all output files described in Section 3.",
+    ),
 ]:
     p = doc.add_paragraph(style="List Number")
     p.add_run(step[0] + ": ").bold = True
@@ -179,9 +190,7 @@ para(
     "fraction, the source contig will always have substantially higher SPAdes coverage than the "
     "equivalent contig in the recipient sample."
 )
-para(
-    "For every cross-sample contig pair the pipeline calculates:"
-)
+para("For every cross-sample contig pair the pipeline calculates:")
 bullet("source_cov = max(contig1_cov, contig2_cov)")
 bullet("recipient_cov = min(contig1_cov, contig2_cov)")
 bullet("cov_ratio = source_cov / recipient_cov")
@@ -229,9 +238,7 @@ para(
     "For each cross-sample contig pair the pipeline intersects the RAS sets of the two samples and "
     "computes the Jaccard similarity index:"
 )
-code_block(
-    "Jaccard(A, B) = |A ∩ B| / |A ∪ B|"
-)
+code_block("Jaccard(A, B) = |A ∩ B| / |A ∪ B|")
 para(
     "A Jaccard of 1.0 means both samples have exactly the same set of resistance mutations — "
     "strong corroborating evidence that the same viral quasispecies is present in both. "
@@ -248,27 +255,24 @@ para(
 heading("3. Output Files")
 
 heading("3.1  contamination_pairs.tsv", level=2)
-para(
-    "One row per unique cross-sample contig pair that passed the BLAST identity threshold (≥95%). "
-    "Columns:"
-)
+para("One row per unique cross-sample contig pair that passed the BLAST identity threshold (≥95%). " "Columns:")
 add_table(
     ["Column", "Description"],
     [
-        ["sample1, sample2",        "The two samples that share this contig segment"],
-        ["contig1, contig2",        "Full SPAdes contig names (embed length and coverage depth)"],
-        ["pident",                  "BLAST percent nucleotide identity (≥95 by filter)"],
-        ["alignment_length",        "Number of aligned bases"],
-        ["snp_distance",            "Mismatches + gap openings — effectively the SNP distance between the two contigs"],
-        ["evalue / bitscore",       "Standard BLAST statistics"],
-        ["contig1_cov, contig2_cov","SPAdes k-mer coverage depth parsed from the contig name"],
+        ["sample1, sample2", "The two samples that share this contig segment"],
+        ["contig1, contig2", "Full SPAdes contig names (embed length and coverage depth)"],
+        ["pident", "BLAST percent nucleotide identity (≥95 by filter)"],
+        ["alignment_length", "Number of aligned bases"],
+        ["snp_distance", "Mismatches + gap openings — effectively the SNP distance between the two contigs"],
+        ["evalue / bitscore", "Standard BLAST statistics"],
+        ["contig1_cov, contig2_cov", "SPAdes k-mer coverage depth parsed from the contig name"],
         ["source_sample / recipient_sample", "Higher-coverage sample inferred as source; lower-coverage as recipient"],
-        ["cov_ratio",               "source_cov / recipient_cov"],
-        ["index_hop_threshold",     "The run-specific hop threshold in units of × coverage"],
-        ["flag_index_hopping",      "TRUE if recipient_cov < index_hop_threshold"],
-        ["n_shared_mutations",      "Number of GLUE RAS mutations present in both samples"],
-        ["jaccard_similarity",      "Jaccard index of the two samples' RAS sets"],
-        ["shared_mutations",        "Semicolon-separated list of shared RAS mutation names"],
+        ["cov_ratio", "source_cov / recipient_cov"],
+        ["index_hop_threshold", "The run-specific hop threshold in units of × coverage"],
+        ["flag_index_hopping", "TRUE if recipient_cov < index_hop_threshold"],
+        ["n_shared_mutations", "Number of GLUE RAS mutations present in both samples"],
+        ["jaccard_similarity", "Jaccard index of the two samples' RAS sets"],
+        ["shared_mutations", "Semicolon-separated list of shared RAS mutation names"],
     ],
     col_widths=[5, 11],
 )
@@ -282,14 +286,14 @@ para(
 add_table(
     ["Column", "Description"],
     [
-        ["source_sample",          "Inferred source of contamination"],
-        ["recipient_sample",       "Inferred recipient of contamination"],
-        ["n_contig_pairs",         "Total number of shared contig pairs supporting this direction"],
-        ["n_above_hop_threshold",  "Pairs where recipient coverage exceeds the index-hop threshold (strong evidence)"],
-        ["median_cov_ratio",       "Median source/recipient coverage ratio across all pairs"],
-        ["median_source_cov",      "Median SPAdes coverage of the source contigs"],
-        ["median_recipient_cov",   "Median SPAdes coverage of the recipient contigs"],
-        ["median_jaccard_ras",     "Median pairwise GLUE Jaccard similarity"],
+        ["source_sample", "Inferred source of contamination"],
+        ["recipient_sample", "Inferred recipient of contamination"],
+        ["n_contig_pairs", "Total number of shared contig pairs supporting this direction"],
+        ["n_above_hop_threshold", "Pairs where recipient coverage exceeds the index-hop threshold (strong evidence)"],
+        ["median_cov_ratio", "Median source/recipient coverage ratio across all pairs"],
+        ["median_source_cov", "Median SPAdes coverage of the source contigs"],
+        ["median_recipient_cov", "Median SPAdes coverage of the recipient contigs"],
+        ["median_jaccard_ras", "Median pairwise GLUE Jaccard similarity"],
         ["shared_mutations_union", "Union of all shared RAS mutations across all pairs"],
     ],
     col_widths=[5, 11],
@@ -335,14 +339,34 @@ para(
 add_table(
     ["Criterion", "Value", "Interpretation"],
     [
-        ["n_above_hop_threshold", "≥1", "At least one contig pair has recipient coverage exceeding the index-hop floor → physical contamination cannot be excluded"],
-        ["n_above_hop_threshold", "0",  "All recipient-side contigs are at index-hop floor coverage → likely index-hopping noise; low concern"],
-        ["median_cov_ratio",      "≥10×","Direction is reliable; source sample clearly identified"],
-        ["median_cov_ratio",      "1–10×","Direction uncertain; could be co-circulating strains, not contamination"],
-        ["median_jaccard_ras",    "1.0", "Identical resistance mutation profile → strong evidence same strain in both samples"],
-        ["median_jaccard_ras",    "0",   "No shared mutations → argues against shared strain; may be same subtype HCV"],
-        ["n_contig_pairs",        "≥5 and n_above_hop ≥1", "High concern — investigate sample origin, plate map, sample handling"],
-        ["shared_mutations",      "treatment-selected RAS (e.g. NS5A:93H, NS3:168A)", "Especially significant — resistance mutations are patient/treatment specific"],
+        [
+            "n_above_hop_threshold",
+            "≥1",
+            "At least one contig pair has recipient coverage exceeding the index-hop floor → physical contamination cannot be excluded",
+        ],
+        [
+            "n_above_hop_threshold",
+            "0",
+            "All recipient-side contigs are at index-hop floor coverage → likely index-hopping noise; low concern",
+        ],
+        ["median_cov_ratio", "≥10×", "Direction is reliable; source sample clearly identified"],
+        ["median_cov_ratio", "1–10×", "Direction uncertain; could be co-circulating strains, not contamination"],
+        [
+            "median_jaccard_ras",
+            "1.0",
+            "Identical resistance mutation profile → strong evidence same strain in both samples",
+        ],
+        ["median_jaccard_ras", "0", "No shared mutations → argues against shared strain; may be same subtype HCV"],
+        [
+            "n_contig_pairs",
+            "≥5 and n_above_hop ≥1",
+            "High concern — investigate sample origin, plate map, sample handling",
+        ],
+        [
+            "shared_mutations",
+            "treatment-selected RAS (e.g. NS5A:93H, NS3:168A)",
+            "Especially significant — resistance mutations are patient/treatment specific",
+        ],
     ],
     col_widths=[4.5, 3, 8.5],
 )
@@ -350,13 +374,16 @@ doc.add_paragraph()
 
 heading("4.2  Confirming or ruling out contamination", level=2)
 para("When a pair is flagged as concerning, the following steps are recommended:")
-for i, step in enumerate([
-    "Check the plate map / sample extraction layout — were the two samples processed adjacent to each other on the same plate or tip rack?",
-    "Check the clinical context — are the two patients epidemiologically linked (same household, clinic, or treatment group)?",
-    "Examine shared_mutations_union — are the shared mutations treatment-selected or known subtype-defining? Subtype-defining mutations (e.g. common 1b NS5A polymorphisms) are not informative.",
-    "Compare the full resistance reports for both patients — completely identical RAS profiles across NS3/NS5A/NS5B are highly suspicious.",
-    "If contamination is confirmed, the recipient sample result should be interpreted with caution and re-sequencing considered.",
-], 1):
+for i, step in enumerate(
+    [
+        "Check the plate map / sample extraction layout — were the two samples processed adjacent to each other on the same plate or tip rack?",
+        "Check the clinical context — are the two patients epidemiologically linked (same household, clinic, or treatment group)?",
+        "Examine shared_mutations_union — are the shared mutations treatment-selected or known subtype-defining? Subtype-defining mutations (e.g. common 1b NS5A polymorphisms) are not informative.",
+        "Compare the full resistance reports for both patients — completely identical RAS profiles across NS3/NS5A/NS5B are highly suspicious.",
+        "If contamination is confirmed, the recipient sample result should be interpreted with caution and re-sequencing considered.",
+    ],
+    1,
+):
     bullet(step)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -369,13 +396,13 @@ heading("5.1  NGS_SEQ-20260115-02  —  Clean run", level=2)
 add_table(
     ["Parameter", "Value"],
     [
-        ["Run date",             "2026-01-15"],
-        ["Number of samples",    "22"],
-        ["Total reads (post-QC)","136,137,882"],
-        ["Index-hop threshold",  "97.71×"],
-        ["Cross-sample pairs",   "2"],
-        ["Direction rows",       "2"],
-        ["GLUE files",           "14 of 22 samples"],
+        ["Run date", "2026-01-15"],
+        ["Number of samples", "22"],
+        ["Total reads (post-QC)", "136,137,882"],
+        ["Index-hop threshold", "97.71×"],
+        ["Cross-sample pairs", "2"],
+        ["Direction rows", "2"],
+        ["GLUE files", "14 of 22 samples"],
     ],
     col_widths=[6, 10],
 )
@@ -390,7 +417,7 @@ add_table(
     ["Source", "Recipient", "Pairs", "Above hop", "Cov ratio", "Jaccard", "Shared RAS"],
     [
         ["2659870-HCV", "2656696-HCV", "1", "0", "39,447×", "0", "none"],
-        ["2658896-HCV", "2654486-HCV", "1", "0", "1,160×",  "0", "none"],
+        ["2658896-HCV", "2654486-HCV", "1", "0", "1,160×", "0", "none"],
     ],
     col_widths=[3.5, 3.5, 2, 3, 3, 3, 3],
 )
@@ -414,13 +441,13 @@ heading("5.2  NGS_SEQ-20260210-01  —  High read depth, all index-hop noise", l
 add_table(
     ["Parameter", "Value"],
     [
-        ["Run date",             "2026-02-10"],
-        ["Number of samples",    "18"],
-        ["Total reads (post-QC)","61,028,326"],
-        ["Index-hop threshold",  "53.53×"],
-        ["Cross-sample pairs",   "333"],
-        ["Direction rows",       "134"],
-        ["GLUE files",           "16 of 18 samples"],
+        ["Run date", "2026-02-10"],
+        ["Number of samples", "18"],
+        ["Total reads (post-QC)", "61,028,326"],
+        ["Index-hop threshold", "53.53×"],
+        ["Cross-sample pairs", "333"],
+        ["Direction rows", "134"],
+        ["GLUE files", "16 of 18 samples"],
     ],
     col_widths=[6, 10],
 )
@@ -439,9 +466,9 @@ para("Top direction pairs:")
 add_table(
     ["Source", "Recipient", "Pairs", "Above hop", "Cov ratio", "Jaccard", "Shared RAS"],
     [
-        ["2681924-HCV", "2679090-HCV", "13", "0", "93.8×",    "0", "none"],
-        ["2686402-HCV", "2681924-HCV", "12", "0", "2,068×",   "0", "none"],
-        ["2681924-HCV", "2686402-HCV", "10", "0", "1,800×",   "0", "none"],
+        ["2681924-HCV", "2679090-HCV", "13", "0", "93.8×", "0", "none"],
+        ["2686402-HCV", "2681924-HCV", "12", "0", "2,068×", "0", "none"],
+        ["2681924-HCV", "2686402-HCV", "10", "0", "1,800×", "0", "none"],
     ],
     col_widths=[3.5, 3.5, 2, 3, 3, 3, 3],
 )
@@ -466,13 +493,13 @@ heading("5.3  NGS_SEQ-20251212-01  —  Confirmed contamination signals", level=
 add_table(
     ["Parameter", "Value"],
     [
-        ["Run date",             "2025-12-12"],
-        ["Number of samples",    "22"],
-        ["Total reads (post-QC)","121,012,304"],
-        ["Index-hop threshold",  "86.85×"],
-        ["Cross-sample pairs",   "394"],
-        ["Direction rows",       "121"],
-        ["GLUE files",           "21 of 22 samples"],
+        ["Run date", "2025-12-12"],
+        ["Number of samples", "22"],
+        ["Total reads (post-QC)", "121,012,304"],
+        ["Index-hop threshold", "86.85×"],
+        ["Cross-sample pairs", "394"],
+        ["Direction rows", "121"],
+        ["GLUE files", "21 of 22 samples"],
     ],
     col_widths=[6, 10],
 )
@@ -486,14 +513,30 @@ para(
 add_table(
     ["Source", "Recipient", "Pairs", "Above hop", "Cov ratio", "Jaccard", "Shared RAS mutations"],
     [
-        ["2619488-HCV", "2626415-HCV", "8",  "3", "2.1×",   "1.00", "NS3:56F; NS5A:30Q; NS5A:30Q+31M; NS5A:31M; NS5A:37L; NS5B:159F; NS5B:159F+316N; NS5B:316N"],
-        ["2634016-HCV", "2633901-HCV", "6",  "3", "1.3×",   "1.00", "NS3:122G"],
-        ["2626415-HCV", "2619488-HCV", "3",  "0", "6,565×", "1.00", "same 8 mutations"],
-        ["2622436-HCV", "2623163-HCV", "9",  "0", "6,650×", "0.50", "NS3:56Y+168Q+170I"],
-        ["2634392-HCV", "2623163-HCV", "5",  "0", "1,462×", "0.50", "NS3:56Y+168Q+170I"],
-        ["2634413-HCV", "2622044-HCV", "3",  "0", "154×",   "0.67", "NS3:56Y+168Q+170I; NS5B:150V; NS5B:150V+206E; NS5B:206E"],
-        ["2620976-HCV", "2626415-HCV", "3",  "0", "10,429×","0.18", "NS3:56F; NS5A:37L"],
-        ["2626415-HCV", "2619488-HCV", "3",  "0", "6,565×", "1.00", "NS3:56F; NS5A:30Q/31M/37L; NS5B:159F/316N"],
+        [
+            "2619488-HCV",
+            "2626415-HCV",
+            "8",
+            "3",
+            "2.1×",
+            "1.00",
+            "NS3:56F; NS5A:30Q; NS5A:30Q+31M; NS5A:31M; NS5A:37L; NS5B:159F; NS5B:159F+316N; NS5B:316N",
+        ],
+        ["2634016-HCV", "2633901-HCV", "6", "3", "1.3×", "1.00", "NS3:122G"],
+        ["2626415-HCV", "2619488-HCV", "3", "0", "6,565×", "1.00", "same 8 mutations"],
+        ["2622436-HCV", "2623163-HCV", "9", "0", "6,650×", "0.50", "NS3:56Y+168Q+170I"],
+        ["2634392-HCV", "2623163-HCV", "5", "0", "1,462×", "0.50", "NS3:56Y+168Q+170I"],
+        [
+            "2634413-HCV",
+            "2622044-HCV",
+            "3",
+            "0",
+            "154×",
+            "0.67",
+            "NS3:56Y+168Q+170I; NS5B:150V; NS5B:150V+206E; NS5B:206E",
+        ],
+        ["2620976-HCV", "2626415-HCV", "3", "0", "10,429×", "0.18", "NS3:56F; NS5A:37L"],
+        ["2626415-HCV", "2619488-HCV", "3", "0", "6,565×", "1.00", "NS3:56F; NS5A:30Q/31M/37L; NS5B:159F/316N"],
     ],
     col_widths=[3.2, 3.2, 2, 2.8, 2.8, 2.5, 5.5],
 )
@@ -508,7 +551,9 @@ para(
     "may originate from the same patient, OR that there was a physical liquid handling contamination "
     "event. Immediate investigation is warranted."
 )
-bullet("8 shared RAS mutations: NS3:56F, NS5A:30Q, NS5A:30Q+31M, NS5A:31M, NS5A:37L, NS5B:159F, NS5B:159F+316N, NS5B:316N")
+bullet(
+    "8 shared RAS mutations: NS3:56F, NS5A:30Q, NS5A:30Q+31M, NS5A:31M, NS5A:37L, NS5B:159F, NS5B:159F+316N, NS5B:316N"
+)
 bullet("3 contig pairs above 86.85× hop threshold in the 2619488→2626415 direction")
 bullet("Cov ratio 2.1× in that direction (uncertain direction at this ratio), but 6,565× in reverse")
 bullet("Action: Check plate map, verify these are not the same patient, consider re-extraction")
@@ -553,9 +598,9 @@ heading("6. Comparison Across Runs")
 add_table(
     ["Run", "Samples", "Total reads", "Hop threshold", "Total pairs", "Pairs above hop", "Max Jaccard", "Verdict"],
     [
-        ["NGS_SEQ-20260115-02", "22", "136.1M", "97.7×", "2",   "0", "0",   "Clean — index hop only"],
-        ["NGS_SEQ-20260210-01", "18", "61.0M",  "53.5×", "333", "0", "0",   "Index hop noise — clean"],
-        ["NGS_SEQ-20251212-01", "22", "121.0M", "86.9×", "394",  "≥15", "1.0","⚠️  Investigate pairs 1 & 2"],
+        ["NGS_SEQ-20260115-02", "22", "136.1M", "97.7×", "2", "0", "0", "Clean — index hop only"],
+        ["NGS_SEQ-20260210-01", "18", "61.0M", "53.5×", "333", "0", "0", "Index hop noise — clean"],
+        ["NGS_SEQ-20251212-01", "22", "121.0M", "86.9×", "394", "≥15", "1.0", "⚠️  Investigate pairs 1 & 2"],
     ],
     col_widths=[4, 2.5, 2.5, 3, 2.5, 3, 3, 4],
 )
@@ -577,11 +622,11 @@ heading("7. Pipeline Parameters")
 add_table(
     ["Parameter", "Default", "Description"],
     [
-        ["contamination_min_length", "1000 bp",  "Minimum contig length to include in BLAST comparison"],
-        ["contamination_min_id",     "95%",       "Minimum BLAST nucleotide identity to report a hit"],
-        ["contamination_hop_rate",   "0.001",     "Expected index-hopping rate (0.1%) — adjust for your sequencing platform"],
-        ["contamination_min_dir_ratio", "10.0",   "Minimum source/recipient cov ratio for direction plot"],
-        ["contamination_genome_size", "9500 bp",  "HCV reference genome size used for hop threshold calculation"],
+        ["contamination_min_length", "1000 bp", "Minimum contig length to include in BLAST comparison"],
+        ["contamination_min_id", "95%", "Minimum BLAST nucleotide identity to report a hit"],
+        ["contamination_hop_rate", "0.001", "Expected index-hopping rate (0.1%) — adjust for your sequencing platform"],
+        ["contamination_min_dir_ratio", "10.0", "Minimum source/recipient cov ratio for direction plot"],
+        ["contamination_genome_size", "9500 bp", "HCV reference genome size used for hop threshold calculation"],
     ],
     col_widths=[5.5, 3, 8],
 )
