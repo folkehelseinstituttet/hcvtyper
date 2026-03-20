@@ -8,13 +8,17 @@ process CONTAMINATION_REPORT {
         'community.wave.seqera.io/library/r-seqinr_r-tidyverse:5358395134867368' }"
 
     input:
-    path blast_txt // tabular BLAST output (outfmt 6 with custom columns)
+    path blast_txt                              // tabular BLAST output (outfmt 6 with custom columns)
+    path(fastp_jsons, stageAs: 'fastp/*')       // optional: per-sample *.fastp.json files
+    path(glue_jsons,  stageAs: 'glue/*')        // optional: per-sample *.major.major.*.nodup.json files
 
     output:
-    path "*.contamination_pairs.tsv" , emit: tsv
-    path "*.contamination_heatmap.png", emit: heatmap
-    path "*.contamination_mqc.json"  , emit: mqc
-    path "versions.yml"              , emit: versions
+    path "*.contamination_pairs.tsv"    , emit: tsv
+    path "*.contamination_direction.tsv" , emit: direction_tsv
+    path "*.contamination_heatmap.png"  , emit: heatmap
+    path "*.contamination_direction.png", emit: direction_png, optional: true
+    path "*.contamination_mqc.json"     , emit: mqc
+    path "versions.yml"                 , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -40,7 +44,9 @@ process CONTAMINATION_REPORT {
     def prefix = task.ext.prefix ?: "contamination"
     """
     touch ${prefix}.contamination_pairs.tsv
+    touch ${prefix}.contamination_direction.tsv
     touch ${prefix}.contamination_heatmap.png
+    touch ${prefix}.contamination_direction.png
     touch ${prefix}.contamination_mqc.json
 
     cat <<-END_VERSIONS > versions.yml

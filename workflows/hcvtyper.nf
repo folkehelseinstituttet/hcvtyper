@@ -306,7 +306,11 @@ workflow HCVTYPER {
             // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
             //
             if (!params.skip_contamination_check) {
-                CONTAMINATION_CHECK(SPADES.out.contigs)
+                CONTAMINATION_CHECK(
+                    SPADES.out.contigs,
+                    Channel.empty(),  // fastp JSONs — not wired in main pipeline
+                    Channel.empty()   // GLUE JSONs  — not wired in main pipeline
+                )
                 ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
             }
     }
