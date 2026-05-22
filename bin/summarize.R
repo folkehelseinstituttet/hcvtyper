@@ -28,6 +28,7 @@ path_7 <- "blast/"
 path_8 <- "glue/"
 path_9 <- "id/"
 path_10 <- "variation/"
+path_11 <- "consensus_distance/"
 
 
 
@@ -620,6 +621,83 @@ if (length(variation_plot_files) > 0) {
   }
 }
 
+# Consensus distance to reference -----------------------------------------
+# Read the TSV files produced by CONSENSUS_DISTANCE for both major and minor mappings.
+# Each file has columns: sample, reference, similarity_pct, n_differences, alignment_length, consensus_length
+
+distance_files <- list.files(path = path_11, pattern = "consensus_distance\\.tsv$", full.names = TRUE)
+
+df_consensus_distance <- tibble(
+  sampleName                    = character(),
+  first_major_minor             = character(),
+  consensus_similarity_pct      = numeric(),
+  consensus_n_differences       = integer(),
+  consensus_alignment_length    = integer(),
+  consensus_length              = integer()
+)
+
+if (length(distance_files) > 0) {
+  for (df_file in distance_files) {
+    # Parse the sample name and major/minor from the filename
+    # Expected pattern: <sampleName>.<major|minor>.consensus_distance.tsv
+    fname_parts <- str_split(basename(df_file), "\\.")[[1]]
+    sample_name <- fname_parts[1]
+    major_minor <- fname_parts[2]
+
+    dat <- tryCatch(
+      read_tsv(df_file, col_types = cols(
+        sample = col_character(),
+        reference = col_character(),
+        similarity_pct = col_double(),
+        n_differences = col_integer(),
+        alignment_length = col_integer(),
+        consensus_length = col_integer()
+      )),
+      error = function(e) NULL
+    )
+
+    if (!is.null(dat) && nrow(dat) > 0) {
+      sample_col <- dat$sample[1]
+      # Extract sampleName and major_minor from sample_col for validation
+      file_sample_name <- str_extract(sample_col, "(?<=Consensus_)[^\\.]+")
+      file_major_minor <- str_extract(sample_col, "major|minor")
+      if (!identical(sample_name, file_sample_name) || !identical(major_minor, file_major_minor)) {
+        warning(glue::glue(
+          "Consensus distance file {basename(df_file)}: filename sample/major_minor ({sample_name}, {major_minor}) does not match file content ({file_sample_name}, {file_major_minor})"
+        ))
+      }
+      df_consensus_distance <- bind_rows(
+        df_consensus_distance,
+        tibble(
+          sampleName                 = sample_name,
+          first_major_minor          = major_minor,
+          consensus_similarity_pct   = dat$similarity_pct[1],
+          consensus_n_differences    = dat$n_differences[1],
+          consensus_alignment_length = dat$alignment_length[1],
+          consensus_length           = dat$consensus_length[1]
+        )
+      )
+    }
+  }
+}
+
+# Pivot to wide format: separate columns for major and minor
+df_distance_wide <- df_consensus_distance %>%
+  mutate(
+    Major_consensus_similarity_pct   = case_when(first_major_minor == "major" ~ consensus_similarity_pct),
+    Major_consensus_n_differences    = case_when(first_major_minor == "major" ~ consensus_n_differences),
+    Minor_consensus_similarity_pct   = case_when(first_major_minor == "minor" ~ consensus_similarity_pct),
+    Minor_consensus_n_differences    = case_when(first_major_minor == "minor" ~ consensus_n_differences)
+  ) %>%
+  select(sampleName,
+         Major_consensus_similarity_pct, Major_consensus_n_differences,
+         Minor_consensus_similarity_pct, Minor_consensus_n_differences) %>%
+  group_by(sampleName) %>%
+  fill(everything(), .direction = "downup") %>%
+  slice(1) %>%
+  ungroup()
+
+
 # Join dataframes ---------------------------------------------------------
 
 # Start with the original input samplesheeet and extract only the sample names. This is to ensure that all samples are included in the final summary, even if they have no data.
@@ -638,7 +716,9 @@ final <- input_samplesheet %>%
   # Add mapped reads stats
   left_join(df_mapped_reads, join_by(sampleName)) %>%
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  # Add consensus distance to reference
+  left_join(df_distance_wide, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
@@ -758,12 +838,14 @@ final <- final %>%
          Major_cov_breadth_min_5,
          Major_cov_breadth_min_10,
          percent_mapped_reads_major_firstmapping,
+         any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences")),
          Reads_withdup_mapped_minor,
          Reads_nodup_mapped_minor,
          Percent_reads_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
          percent_mapped_reads_minor_firstmapping,
+         any_of(c("Minor_consensus_similarity_pct", "Minor_consensus_n_differences")),
          everything()) %>%
   distinct() %>% # Remove any duplicated rows from the different joins
   # If there are no minor genotype reports, then the identical_geno and identical_subgeno columns will not exist. Therefore use any_of in case they are not there

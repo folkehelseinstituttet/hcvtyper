@@ -14,6 +14,7 @@ include { SAMTOOLS_STATS as STATS_WITHDUP } from '../../../modules/nf-core/samto
 include { SAMTOOLS_STATS as STATS_MARKDUP } from '../../../modules/nf-core/samtools/stats/main'
 include { IVAR_CONSENSUS                  } from '../../../modules/nf-core/ivar/consensus/main'
 include { PLOT_BAMVARIATION               } from '../../../modules/local/bamvariation'
+include { CONSENSUS_DISTANCE              } from '../../../modules/local/consensus_distance/main'
 include { SAMTOOLS_SORMADUP               } from '../../../modules/nf-core/samtools/sormadup/main'
 
 workflow TARGETED_MAPPING {
@@ -140,12 +141,22 @@ workflow TARGETED_MAPPING {
     )
     ch_versions = ch_versions.mix(IVAR_CONSENSUS.out.versions.first())
 
+    //
+    // MODULE: Compare consensus to reference and compute distance
+    //
+    CONSENSUS_DISTANCE(
+        IVAR_CONSENSUS.out.fasta,   // tuple val(meta), path(consensus.fa)
+        ch_input.build              // tuple val(meta), path(reference.fa)
+    )
+    ch_versions = ch_versions.mix(CONSENSUS_DISTANCE.out.versions.first())
+
     emit:
     aligned = SAMTOOLS_SORMADUP.out.bam
     depth = SAMTOOLS_DEPTH.out.tsv
     stats_withdup = STATS_WITHDUP.out.stats
     stats_markdup = STATS_MARKDUP.out.stats
     consensus = IVAR_CONSENSUS.out.fasta
+    consensus_distance = CONSENSUS_DISTANCE.out.tsv
     variation = PLOT_BAMVARIATION.out.png
 
     versions = ch_versions                     // channel: [ versions.yml ]

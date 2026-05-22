@@ -28,6 +28,7 @@ process SUMMARIZE {
     path 'glue/'
     path 'id/'
     path 'variation/'
+    path 'consensus_distance/'
 
     output:
     path 'Summary.csv'      , emit: summary

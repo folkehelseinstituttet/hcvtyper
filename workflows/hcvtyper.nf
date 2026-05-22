@@ -519,6 +519,7 @@ workflow HCVTYPER {
         ch_glue = file("dummy_file")
     }
     ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
+    ch_consensus_distance = MAJOR_MAPPING.out.consensus_distance.collect({it[1]}).mix(MINOR_MAPPING.out.consensus_distance.collect({it[1]}))
 
     SUMMARIZE (
         workflow.manifest.version,
@@ -536,6 +537,7 @@ workflow HCVTYPER {
         ch_glue,
         ch_sequence_id.collect(),
         ch_variation.collect(),
+        ch_consensus_distance.collect(),
     )
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 
