@@ -73,7 +73,17 @@ cross <- blast %>%
 write_tsv(cross, paste0(prefix, ".contamination_pairs.tsv"))
 
 # ── Heatmap ────────────────────────────────────────────────────────────────────
-all_samples <- sort(unique(c(blast$q_sample, blast$s_sample)))
+
+all_samples_full <- sort(unique(c(blast$q_sample, blast$s_sample)))
+
+max_samples <- 30
+truncated <- length(all_samples_full) > max_samples
+
+if (truncated) {
+    all_samples <- all_samples_full[1:max_samples]
+} else {
+    all_samples <- all_samples_full
+}
 
 if (nrow(cross) > 0) {
     # Count shared contig pairs per sample-pair (symmetric)
@@ -81,12 +91,16 @@ if (nrow(cross) > 0) {
         cross %>% select(sample1, sample2),
         cross %>% select(sample1 = sample2, sample2 = sample1)
     ) %>%
+        filter(
+            sample1 %in% all_samples,
+            sample2 %in% all_samples
+        ) %>%
         count(sample1, sample2, name = "n_pairs")
 } else {
     heatmap_counts <- tibble(
-        sample1  = character(),
-        sample2  = character(),
-        n_pairs  = integer()
+        sample1 = character(),
+        sample2 = character(),
+        n_pairs = integer()
     )
 }
 
@@ -98,6 +112,21 @@ grid <- expand_grid(sample1 = all_samples, sample2 = all_samples) %>%
         # Diagonal cells (same sample) shown as NA to distinguish from 0
         n_pairs = if_else(sample1 == sample2, NA_integer_, n_pairs)
     )
+
+subtitle_text <- paste0(
+    "Contigs ≥ 1000 bp, filtered by BLAST local alignment",
+    if (truncated) {
+        paste0(
+            " (showing first ",
+            max_samples,
+            " of ",
+            length(all_samples_full),
+            " samples)"
+        )
+    } else {
+        ""
+    }
+)
 
 p <- ggplot(grid, aes(x = sample2, y = sample1, fill = n_pairs)) +
     geom_tile(color = "grey70", linewidth = 0.4) +
@@ -115,15 +144,14 @@ p <- ggplot(grid, aes(x = sample2, y = sample1, fill = n_pairs)) +
     ) +
     labs(
         title    = "Cross-sample contig sharing (potential contamination)",
-        subtitle = paste0(
-            "Contigs \u2265 1000 bp, filtered by BLAST local alignment"
-        ),
-        x = "Sample", y = "Sample"
+        subtitle = subtitle_text,
+        x        = "Sample",
+        y        = "Sample"
     ) +
     theme_bw() +
     theme(
-        axis.text.x  = element_text(angle = 45, hjust = 1),
-        panel.grid   = element_blank()
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid  = element_blank()
     )
 
 ggsave(
