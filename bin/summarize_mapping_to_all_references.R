@@ -3,6 +3,12 @@
 library(tidyverse)
 library(seqinr)
 
+# Source the canonical 2k1b-aware genotype-from-subtype helper.
+# Relative path: the file is staged into the task workdir as a declared
+# `path(genotype_utils)` process input (PARSEFIRSTMAPPING). Do NOT use an
+# absolute or projectDir path — that would break container portability.
+source("genotype_utils.R")
+
 args = commandArgs(trailingOnly=TRUE)
 if (length(args) < 4) {
   stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name> <references>", call.=FALSE)
@@ -33,8 +39,8 @@ df <- read_table(idxstats, col_names = FALSE) %>%
   # Discard the unmapped reads marked by an * (more precisely these are unmapped reads without coordinates)
   filter(X1 != "*") %>%
   # Separate the genotype from the subtype.
-  # For 2k1b we use the whole name for genotype also
-  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1))) #%>%
+  # For 2k1b we use the whole name for genotype also (see bin/genotype_utils.R).
+  mutate(Genotype = genotype_from_subtype(Subtype)) #%>%
   # Rename Genotype 2k1b to 1 as a preparation for detecting minor genotypes
   #mutate(Genotype = str_replace(Genotype, "2k1b", "1"))
 
@@ -141,6 +147,6 @@ write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
 # Read the reference fasta file
 fasta <- read.fasta(file = references)
 write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
-if (length(minor_ref > 0)) {
+if (length(minor_ref) > 0) {
 write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
 }

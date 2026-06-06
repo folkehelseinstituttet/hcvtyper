@@ -16,6 +16,7 @@ nextflow_process {
         // Input signature:
         // tuple val(meta), path(idxstats), path(depth)
         // path(references)
+        // path(genotype_utils)
 
         input[0] = [
           [ id: 'Test_2' ],
@@ -23,6 +24,7 @@ nextflow_process {
           file("${projectDir}/modules/local/parsefirstmapping/tests/Test_2.tsv", checkIfExists: true)
         ]
         input[1] = file("${projectDir}/modules/local/parsefirstmapping/tests/references.fa", checkIfExists: true)
+        input[2] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
         """
       }
     }
@@ -51,6 +53,7 @@ nextflow_process {
           file("${projectDir}/modules/local/parsefirstmapping/tests/Test_2.tsv", checkIfExists: true)
         ]
         input[1] = file("${projectDir}/modules/local/parsefirstmapping/tests/references.fa", checkIfExists: true)
+        input[2] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
         """
       }
     }

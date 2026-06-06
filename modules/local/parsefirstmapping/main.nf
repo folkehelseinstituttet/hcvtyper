@@ -14,6 +14,7 @@ process PARSEFIRSTMAPPING {
     input:
     tuple val(meta), path(idxstats), path(depth)
     path(references)
+    path(genotype_utils)
 
     output:
     tuple val(meta), path("*.csv"), path("*major.fa"), emit: major_mapping, optional: true
