@@ -155,7 +155,7 @@
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.mapping_summary.csv:md5,d4a863b19ab6607a0b2e2b2f5e6eb908"
+                        "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93"
                     ]
                 ],
                 "major_mapping": [
@@ -163,7 +163,7 @@
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.mapping_summary.csv:md5,d4a863b19ab6607a0b2e2b2f5e6eb908",
+                        "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93",
                         "Test_2.major.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
@@ -172,12 +172,12 @@
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.mapping_summary.csv:md5,d4a863b19ab6607a0b2e2b2f5e6eb908",
+                        "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93",
                         "Test_2.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
                 "versions": [
-                    "versions.yml:md5,095949397f5779b287fd74d3aa01f318"
+                    "versions.yml:md5,ba502aca4ed40b40cd5e255d2f908fc5"
                 ]
             }
         ],
