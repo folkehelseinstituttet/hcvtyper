@@ -69,4 +69,71 @@ nextflow_process {
       )
     }
   }
+
+  // GATE-03: a dominant 2k1b subtype must keep its whole name as the genotype
+  // (the helper returns "2k1b", NOT "2"). The selected major FASTA is the 2k1b
+  // reference. Single dominant reference => no valid minor.
+  test("parsefirstmapping: 2k1b major keeps whole-name genotype (GATE-03)") {
+    options "--profile docker"
+    when {
+      process {
+        """
+        input[0] = [
+          [ id: '2k1b_test' ],
+          file("${projectDir}/modules/local/parsefirstmapping/tests/2k1b.firstmapping.withdup.idxstats", checkIfExists: true),
+          file("${projectDir}/modules/local/parsefirstmapping/tests/2k1b.tsv", checkIfExists: true)
+        ]
+        input[1] = file("${projectDir}/modules/local/parsefirstmapping/tests/references.fa", checkIfExists: true)
+        input[2] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
+        """
+      }
+    }
+    then {
+      assertAll(
+        { assert process.success },
+        // The selected major is the 2k1b reference (helper kept the whole name).
+        { assert process.out.major_mapping.get(0).get(2).toString().contains("2k1b_AB031663_major.fa") },
+        // No valid minor for a single dominant subtype.
+        { assert process.out.minor_mapping.size() == 0 },
+        { assert snapshot([
+            csv          : process.out.csv,
+            major_mapping: process.out.major_mapping,
+            minor_mapping: process.out.minor_mapping,
+            versions     : process.out.versions
+          ]).match() }
+      )
+    }
+  }
+
+  // GATE-04: when there is no valid minor (single dominant subtype), the
+  // length(minor_ref) > 0 guard must prevent any *_minor.fa from being written.
+  test("parsefirstmapping: no minor FASTA when no valid minor (GATE-04)") {
+    options "--profile docker"
+    when {
+      process {
+        """
+        input[0] = [
+          [ id: 'no_minor_test' ],
+          file("${projectDir}/modules/local/parsefirstmapping/tests/no_minor.firstmapping.withdup.idxstats", checkIfExists: true),
+          file("${projectDir}/modules/local/parsefirstmapping/tests/no_minor.tsv", checkIfExists: true)
+        ]
+        input[1] = file("${projectDir}/modules/local/parsefirstmapping/tests/references.fa", checkIfExists: true)
+        input[2] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
+        """
+      }
+    }
+    then {
+      assertAll(
+        { assert process.success },
+        // No *_minor.fa emitted => minor_mapping channel is empty.
+        { assert process.out.minor_mapping.size() == 0 },
+        { assert snapshot([
+            csv          : process.out.csv,
+            major_mapping: process.out.major_mapping,
+            minor_mapping: process.out.minor_mapping,
+            versions     : process.out.versions
+          ]).match() }
+      )
+    }
+  }
 }

@@ -1,4 +1,72 @@
 {
+    "parsefirstmapping: 2k1b major keeps whole-name genotype (GATE-03)": {
+        "content": [
+            {
+                "csv": [
+                    [
+                        {
+                            "id": "2k1b_test"
+                        },
+                        "2k1b_test.parsefirstmapping.csv:md5,2450e837265136e0d3b62f9b30469c2a"
+                    ]
+                ],
+                "major_mapping": [
+                    [
+                        {
+                            "id": "2k1b_test"
+                        },
+                        "2k1b_test.parsefirstmapping.csv:md5,2450e837265136e0d3b62f9b30469c2a",
+                        "2k1b_test.2k1b_AB031663_major.fa:md5,bce1fc9df8925bae4b060661b053ce2e"
+                    ]
+                ],
+                "minor_mapping": [
+                    
+                ],
+                "versions": [
+                    "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "24.10.5"
+        },
+        "timestamp": "2026-06-06T10:40:45.887753217"
+    },
+    "parsefirstmapping: no minor FASTA when no valid minor (GATE-04)": {
+        "content": [
+            {
+                "csv": [
+                    [
+                        {
+                            "id": "no_minor_test"
+                        },
+                        "no_minor_test.parsefirstmapping.csv:md5,7ce9ceaf20ef160dc4dd08e442b260ff"
+                    ]
+                ],
+                "major_mapping": [
+                    [
+                        {
+                            "id": "no_minor_test"
+                        },
+                        "no_minor_test.parsefirstmapping.csv:md5,7ce9ceaf20ef160dc4dd08e442b260ff",
+                        "no_minor_test.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
+                    ]
+                ],
+                "minor_mapping": [
+                    
+                ],
+                "versions": [
+                    "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "24.10.5"
+        },
+        "timestamp": "2026-06-06T10:41:00.756505141"
+    },
     "parsefirstmapping: idxstats + depth + references": {
         "content": [
             {

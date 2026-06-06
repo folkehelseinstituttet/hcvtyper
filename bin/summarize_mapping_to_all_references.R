@@ -116,14 +116,24 @@ is_valid_minor <- function(minor_row) {
     return(major_genotype != minor_genotype)
   }
 
-# Apply rule to find best valid minor
-  tmp <- df %>%
-    filter(X1 != major_ref) %>%
-    rowwise() %>%
-    filter(is_valid_minor(cur_data())) %>%
-    ungroup() %>%
-    arrange(desc(percent_gt_4)) %>%
-    slice(1)
+# Apply rule to find best valid minor.
+# Build the candidate set first. When no reference other than the major mapped,
+# the candidate set is empty; in that case we must NOT invoke is_valid_minor on a
+# zero-row rowwise frame (its `if (...)` conditions receive length-zero vectors and
+# error). Guard the rowwise filter so the no-minor path yields an empty tmp instead.
+  candidates <- df %>%
+    filter(X1 != major_ref)
+
+  if (nrow(candidates) > 0) {
+    tmp <- candidates %>%
+      rowwise() %>%
+      filter(is_valid_minor(cur_data())) %>%
+      ungroup() %>%
+      arrange(desc(percent_gt_4)) %>%
+      slice(1)
+  } else {
+    tmp <- candidates %>% slice(0)
+  }
 
   minor_ref <- tmp %>% pull(X1)
   minor_subtype <- tmp %>% pull(Subtype)
