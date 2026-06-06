@@ -384,7 +384,8 @@ workflow HCVTYPER {
     PARSEFIRSTMAPPING (
         // Join idxstats and depth on the meta map
         ch_parsefirstmapping,
-        file(params.references)
+        file(params.references),
+        file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
     )
 
     //
@@ -438,13 +439,10 @@ workflow HCVTYPER {
         tuple(new_meta, minor_fasta, _reads)
         }
 
-    // Then filter on read nr and coverage. This info is from the csv elements
-    // This will result in a channel with values that meet the read nr and coverage criteria
-    .filter { entry ->
-        def mappedReads = entry[0]['minor_reads'].toInteger()
-        def minorCov = entry[0]['minor_cov'].toInteger()
-        mappedReads > params.minRead && minorCov > params.minCov
-    }
+    // Then route on the gate decision emitted by the selection script.
+    // minor_call == 'yes' only when the major passes both thresholds AND the minor passes its own (GATE-01).
+    // The R script already applied the read-nr/coverage comparison, so no .toInteger() re-derivation here (avoids NA.toInteger() crash).
+    .filter { entry -> entry[0]['minor_call'] == 'yes' }
 
     MINOR_MAPPING (
         ch_minor_mapping // val(meta), path(fasta), path(reads)
