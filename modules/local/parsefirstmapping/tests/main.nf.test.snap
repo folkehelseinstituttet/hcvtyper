@@ -7,7 +7,7 @@
                         {
                             "id": "2k1b_test"
                         },
-                        "2k1b_test.parsefirstmapping.csv:md5,2450e837265136e0d3b62f9b30469c2a"
+                        "2k1b_test.parsefirstmapping.csv:md5,5c42a3496ae2de35cb812517c0742879"
                     ]
                 ],
                 "major_mapping": [
@@ -15,7 +15,7 @@
                         {
                             "id": "2k1b_test"
                         },
-                        "2k1b_test.parsefirstmapping.csv:md5,2450e837265136e0d3b62f9b30469c2a",
+                        "2k1b_test.parsefirstmapping.csv:md5,5c42a3496ae2de35cb812517c0742879",
                         "2k1b_test.2k1b_AB031663_major.fa:md5,bce1fc9df8925bae4b060661b053ce2e"
                     ]
                 ],
@@ -31,7 +31,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T10:40:45.887753217"
+        "timestamp": "2026-06-06T13:54:34.958681917"
     },
     "parsefirstmapping: no minor FASTA when no valid minor (GATE-04)": {
         "content": [
@@ -41,7 +41,7 @@
                         {
                             "id": "no_minor_test"
                         },
-                        "no_minor_test.parsefirstmapping.csv:md5,7ce9ceaf20ef160dc4dd08e442b260ff"
+                        "no_minor_test.parsefirstmapping.csv:md5,39bc7d5446861bba36c44f1bd78e1146"
                     ]
                 ],
                 "major_mapping": [
@@ -49,7 +49,7 @@
                         {
                             "id": "no_minor_test"
                         },
-                        "no_minor_test.parsefirstmapping.csv:md5,7ce9ceaf20ef160dc4dd08e442b260ff",
+                        "no_minor_test.parsefirstmapping.csv:md5,39bc7d5446861bba36c44f1bd78e1146",
                         "no_minor_test.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
                     ]
                 ],
@@ -65,7 +65,47 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T10:41:00.756505141"
+        "timestamp": "2026-06-06T13:54:46.870975782"
+    },
+    "parsefirstmapping: failing-major reports stats, no minor call (GATE-02)": {
+        "content": [
+            {
+                "csv": [
+                    [
+                        {
+                            "id": "ERR1810469_test"
+                        },
+                        "ERR1810469_test.parsefirstmapping.csv:md5,10fed8cf50f5833cbfc28a9c62a4e14c"
+                    ]
+                ],
+                "major_mapping": [
+                    [
+                        {
+                            "id": "ERR1810469_test"
+                        },
+                        "ERR1810469_test.parsefirstmapping.csv:md5,10fed8cf50f5833cbfc28a9c62a4e14c",
+                        "ERR1810469_test.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
+                    ]
+                ],
+                "minor_mapping": [
+                    [
+                        {
+                            "id": "ERR1810469_test"
+                        },
+                        "ERR1810469_test.parsefirstmapping.csv:md5,10fed8cf50f5833cbfc28a9c62a4e14c",
+                        "ERR1810469_test.1a_H77_minor.fa:md5,6ae0ea0027c61e64ed288468aa0c3623"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.3",
+            "nextflow": "24.10.5"
+        },
+        "timestamp": "2026-06-06T13:53:26.152829414"
     },
     "parsefirstmapping: idxstats + depth + references": {
         "content": [
@@ -75,7 +115,7 @@
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.parsefirstmapping.csv:md5,157308ac0d693c416c525a07ef6da263"
+                        "Test_2.parsefirstmapping.csv:md5,9e0b388177fb247c47086437dcce0a3e"
                     ]
                 ],
                 "major_mapping": [
@@ -83,7 +123,7 @@
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.parsefirstmapping.csv:md5,157308ac0d693c416c525a07ef6da263",
+                        "Test_2.parsefirstmapping.csv:md5,9e0b388177fb247c47086437dcce0a3e",
                         "Test_2.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
                     ]
                 ],
@@ -92,7 +132,7 @@
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.parsefirstmapping.csv:md5,157308ac0d693c416c525a07ef6da263",
+                        "Test_2.parsefirstmapping.csv:md5,9e0b388177fb247c47086437dcce0a3e",
                         "Test_2.4k_EU392173_minor.fa:md5,379bba7235f582f5ee3d83bc4fa9a4ca"
                     ]
                 ],
@@ -105,7 +145,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T10:35:20.871701826"
+        "timestamp": "2026-06-06T13:54:12.193815953"
     },
     "parsefirstmapping: stub": {
         "content": [
