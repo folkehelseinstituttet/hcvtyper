@@ -150,10 +150,6 @@
         "config_profile_url": {
             "type": "string"
         },
-        "strategy": {
-            "type": "string",
-            "default": "mapping"
-        },
         "mapper": {
             "type": "string",
             "default": "bowtie2"
