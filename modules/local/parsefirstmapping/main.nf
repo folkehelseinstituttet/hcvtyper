@@ -35,6 +35,8 @@ process PARSEFIRSTMAPPING {
         ${depth} \\
         ${prefix} \\
         ${references} \\
+        ${params.minRead} \\
+        ${params.minCov} \\
         $args
 
     cat <<-END_VERSIONS > versions.yml

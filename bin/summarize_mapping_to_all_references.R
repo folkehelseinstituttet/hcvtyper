@@ -10,14 +10,20 @@ library(seqinr)
 source("genotype_utils.R")
 
 args = commandArgs(trailingOnly=TRUE)
-if (length(args) < 4) {
-  stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name> <references>", call.=FALSE)
+if (length(args) < 6) {
+  stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name> <references> <minRead> <minCov>", call.=FALSE)
 }
 
 idxstats   <- args[1]
 depth      <- args[2]
 sampleName <- args[3]
 references <- args[4]
+# V5 input validation: as.numeric coerces; a non-numeric arg yields NA, which
+# fails the `>` gate comparisons safely (no crash, no minor_call='yes') rather
+# than producing a NumberFormatException. Values originate from tracked config
+# (conf/modules_hcv.config minRead/minCov), not external input.
+minRead    <- as.numeric(args[5])
+minCov     <- as.numeric(args[6])
 
 # First calculate coverage for all references
 # Read the depth file from the first mapping.
@@ -48,11 +54,17 @@ df <- read_table(idxstats, col_names = FALSE) %>%
 df <- left_join(df, cov, by = c("X1" = "X1"))
 
 # Create empty final dataframe to populate
-df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
-colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
+df_final <- as.data.frame(matrix(nrow = 1, ncol = 10))
+colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov", "minor_call", "gate_flag")
 
 # Add sample name
 df_final$sample[1] <- sampleName
+
+# Gate-decision defaults. These always carry a value so a row is never emitted
+# with an unexplained empty gate state (D-07). The empty-df / no-major branch
+# leaves these defaults in place; the populated branch overwrites them below.
+df_final$minor_call[1] <- "no"
+df_final$gate_flag[1]  <- "no_mapping"
 
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
@@ -148,6 +160,21 @@ is_valid_minor <- function(minor_row) {
     df_final$minor_reads[1] <- minor_reads
     df_final$minor_cov[1] <- df %>% filter(X1 == minor_ref) %>% pull(percent_gt_4_int)
   }
+
+  # ---- Gate decision (GATE-01/GATE-02; D-04/D-05/D-07) ---------------------
+  # The major must pass BOTH thresholds before any minor can be reported.
+  # This reproduces the EXACT `>` comparison the Nextflow minor filter used to
+  # do (hcvtyper.nf), so non-gated samples are byte-identical except for the
+  # two new columns. We never blank minor_ref/minor_reads/minor_cov — the
+  # candidate stays visible for QC; gating happens via minor_call only.
+  major_pass <- (df_final$major_reads[1] > minRead) && (df_final$major_cov[1] > minCov)
+  minor_pass <- length(minor_ref) > 0 &&
+                !is.na(df_final$minor_reads[1]) &&
+                (df_final$minor_reads[1] > minRead) &&
+                (df_final$minor_cov[1] > minCov)
+
+  df_final$minor_call[1] <- if (isTRUE(major_pass) && isTRUE(minor_pass)) "yes" else "no"
+  df_final$gate_flag[1]  <- if (!isTRUE(major_pass)) "major_below_threshold" else "ok"
 }
 
 # Write results
