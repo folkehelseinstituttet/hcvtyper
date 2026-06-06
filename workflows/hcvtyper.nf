@@ -481,15 +481,16 @@ workflow HCVTYPER {
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
     ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
     ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
-    if (!params.skip_assembly) {
-        ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
-    } else {
-        ch_blast = file("dummy_file")
-    }
+    // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
+    // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
+    // staged channel. BLASTPARSE runs only inside if (!params.skip_assembly), so a
+    // skip-assembly run leaves the channel unpopulated -> .ifEmpty([]) yields [] ->
+    // empty denovo/ staging dir -> NA de novo columns (the PLUMB-02 path).
+    ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).ifEmpty([])
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
-        ch_glue = file("dummy_file")
+        ch_glue = []
     }
     ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
     ch_consensus_distance = MAJOR_MAPPING.out.consensus_distance.collect({it[1]}).mix(MINOR_MAPPING.out.consensus_distance.collect({it[1]}))
@@ -506,7 +507,7 @@ workflow HCVTYPER {
         ch_stats_withdup.collect(),
         ch_stats_markdup.collect(),
         ch_depth.collect(),
-        ch_blast,
+        ch_denovo,
         ch_glue,
         ch_sequence_id.collect(),
         ch_variation.collect(),
