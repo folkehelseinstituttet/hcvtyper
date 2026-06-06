@@ -30,10 +30,10 @@ nextflow_process {
       assertAll(
         { assert process.success },
         { assert snapshot([
-            csv        : process.out.csv,
-            major_fasta: process.out.major_fasta,
-            minor_fasta: process.out.minor_fasta,
-            versions   : process.out.versions
+            csv          : process.out.csv,
+            major_mapping: process.out.major_mapping,
+            minor_mapping: process.out.minor_mapping,
+            versions     : process.out.versions
           ]).match() }
       )
     }
@@ -58,10 +58,10 @@ nextflow_process {
       assertAll(
         { assert process.success },
         { assert snapshot([
-            csv        : process.out.csv,
-            major_fasta: process.out.major_fasta,
-            minor_fasta: process.out.minor_fasta,
-            versions   : process.out.versions
+            csv          : process.out.csv,
+            major_mapping: process.out.major_mapping,
+            minor_mapping: process.out.minor_mapping,
+            versions     : process.out.versions
           ]).match() }
       )
     }
