@@ -65,12 +65,13 @@ process PARSEFIRSTMAPPING {
     : > ${prefix}.major.fa
     : > ${prefix}.minor.fa
 
-    # Stable versions file (static stub values; delimiter matches the opener)
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-      r-base: stub
-      tidyverse: stub
-      seqinr: stub
-    END_VERSIONS
+    # Stable versions file. Plain echo lines (no heredoc) so the output is
+    # immune to Groovy script-indent stripping vs bash <<- tab-stripping — the
+    # mismatch that left a literal END_VERSIONS and stray indentation in the
+    # stub versions.yml. Deterministic, byte-stable across runs.
+    echo '"${task.process}":' > versions.yml
+    echo '  r-base: stub' >> versions.yml
+    echo '  tidyverse: stub' >> versions.yml
+    echo '  seqinr: stub' >> versions.yml
     """
 }
