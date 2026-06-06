@@ -136,4 +136,54 @@ nextflow_process {
       )
     }
   }
+
+  // GATE-02: an ERR1810469-class sample — a true 3a major whose coverage (9%)
+  // fails minCov=29 even though its read count passes minRead=499 — must report
+  // first-mapping stats (major_ref/major_reads/major_cov populated) but issue NO
+  // minor call. The candidate 1a minor fields stay populated for QC (never blanked),
+  // minor_call='no', and gate_flag='major_below_threshold'. These assertions read
+  // the parsefirstmapping CSV directly so the gate decision is verified explicitly,
+  // not only via the snapshot md5.
+  test("parsefirstmapping: failing-major reports stats, no minor call (GATE-02)") {
+    options "--profile docker"
+    when {
+      process {
+        """
+        input[0] = [
+          [ id: 'ERR1810469_test' ],
+          file("${projectDir}/modules/local/parsefirstmapping/tests/ERR1810469.firstmapping.withdup.idxstats", checkIfExists: true),
+          file("${projectDir}/modules/local/parsefirstmapping/tests/ERR1810469.tsv", checkIfExists: true)
+        ]
+        input[1] = file("${projectDir}/modules/local/parsefirstmapping/tests/references.fa", checkIfExists: true)
+        input[2] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
+        """
+      }
+    }
+    then {
+      def csvLines = path(process.out.csv.get(0).get(1)).readLines()
+      def header   = csvLines[0].split(',', -1) as List
+      def row      = csvLines[1].split(',', -1) as List
+      def cell     = { name -> row[header.indexOf(name)] }
+      assertAll(
+        { assert process.success },
+        // Failing-major reason set; no minor call.
+        { assert cell('gate_flag')  == 'major_below_threshold' },
+        { assert cell('minor_call') == 'no' },
+        // First-mapping stats reported for the (failing) major.
+        { assert cell('major_ref')   == '3a_D17763' },
+        { assert cell('major_reads') == '8079' },
+        { assert cell('major_cov')   == '9' },
+        // Candidate minor fields populated (never blanked) for QC.
+        { assert cell('minor_ref')   == '1a_H77' },
+        { assert cell('minor_reads') == '600' },
+        { assert cell('minor_cov')   == '60' },
+        { assert snapshot([
+            csv          : process.out.csv,
+            major_mapping: process.out.major_mapping,
+            minor_mapping: process.out.minor_mapping,
+            versions     : process.out.versions
+          ]).match() }
+      )
+    }
+  }
 }
