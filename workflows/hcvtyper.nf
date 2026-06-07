@@ -521,6 +521,7 @@ workflow HCVTYPER {
         ch_consensus_distance.collect(),
         file("${projectDir}/bin/genotype_utils.R"),
         file("${projectDir}/bin/denovo_confirm.R"),
+        file("${projectDir}/bin/denovo_layer.R"),
     )
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 

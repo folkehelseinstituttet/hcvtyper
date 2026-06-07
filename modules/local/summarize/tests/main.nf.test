@@ -16,7 +16,7 @@ nextflow_process {
                 // [0] version, [1] name, [2] samplesheet, [3] stringency_1, [4] stringency_2,
                 // [5] trimmed/, [6] kraken_classified/, [7] parsefirst_mapping/, [8] stats_withdup/,
                 // [9] stats_markdup/, [10] depth/, [11] denovo/, [12] glue/, [13] id/, [14] variation/,
-                // [15] consensus_distance/, [16] genotype_utils.R, [17] denovo_confirm.R
+                // [15] consensus_distance/, [16] genotype_utils.R, [17] denovo_confirm.R, [18] denovo_layer.R
                 input[0] = "test"   // version
                 input[1] = "hcvtyper"   // name
                 input[2] = file("${projectDir}/modules/local/summarize/tests/data/samplesheet.csv", checkIfExists: true)
@@ -37,6 +37,7 @@ nextflow_process {
                 input[15] = file("${projectDir}/modules/local/summarize/tests/data/consensus_distance/*", checkIfExists: true)
                 input[16] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
                 input[17] = file("${projectDir}/bin/denovo_confirm.R", checkIfExists: true)
+                input[18] = file("${projectDir}/bin/denovo_layer.R", checkIfExists: true)
                 """
             }
         }
@@ -76,6 +77,7 @@ nextflow_process {
                 input[15] = file("${projectDir}/modules/local/summarize/tests/data/consensus_distance/*", checkIfExists: true)
                 input[16] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
                 input[17] = file("${projectDir}/bin/denovo_confirm.R", checkIfExists: true)
+                input[18] = file("${projectDir}/bin/denovo_layer.R", checkIfExists: true)
                 """
             }
         }

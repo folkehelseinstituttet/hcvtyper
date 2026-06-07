@@ -31,6 +31,7 @@ process SUMMARIZE {
     path 'consensus_distance/'
     path(genotype_utils)
     path(denovo_confirm)
+    path(denovo_layer)
 
     output:
     path 'Summary.csv'      , emit: summary
