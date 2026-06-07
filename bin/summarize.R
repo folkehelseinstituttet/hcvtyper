@@ -9,6 +9,7 @@ library(tidyverse)
 # before denovo_confirm.R / the confirmation layer use it.
 source("genotype_utils.R")
 source("denovo_confirm.R")
+source("denovo_layer.R")
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -775,35 +776,15 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
 # (`<subtype>_<acc>` → leading subtype token → genotype_from_subtype()), so the
 # layer is robust to GLUE absence (does NOT depend on Major_subtype/Minor_subtype).
 # minor_denovo_status is ALWAYS present afterwards (D-12), on both branches.
-if (isTRUE(denovo_confirm_minor)) {
-  final <- final %>%
-    rowwise() %>%
-    mutate(minor_denovo_status = {
-      if (is.na(Minor_reference)) {
-        NA_character_                                   # no minor candidate (D-12)
-      } else {
-        bo <- df_blast_out %>% filter(sampleName == .data$sampleName)
-        classify_minor_denovo(
-          bo,
-          genotype_from_subtype(str_extract(Major_reference, "^[^_]+")),
-          genotype_from_subtype(str_extract(Minor_reference, "^[^_]+")),
-          denovo_min_contig_length, denovo_min_kmer_cov,
-          denovo_min_blast_identity, denovo_match_level
-        )
-      }
-    }) %>%
-    ungroup() %>%
-    # Downgrade-only (D-13): refute flips minor_typable YES→NO; Minor_* columns
-    # stay populated (D-10 — never null a Minor_* field on refute).
-    mutate(minor_typable = if_else(
-      !is.na(minor_denovo_status) & minor_denovo_status == "refuted", "NO", minor_typable
-    ))
-} else {
-  # Flag OFF (CONF-07 / D-16): bypass the layer entirely. minor_typable keeps its
-  # pure legacy value; status = not_evaluated when a candidate exists, NA otherwise.
-  final <- final %>%
-    mutate(minor_denovo_status = if_else(is.na(Minor_reference), NA_character_, "not_evaluated"))
-}
+# The downgrade layer is extracted into bin/denovo_layer.R (D-02) as a sourceable
+# apply_denovo_layer() so the unit test exercises the REAL function instead of an
+# inline re-implementation. This call is behaviour-preserving and at the SAME
+# pipeline point as the former inline block.
+final <- apply_denovo_layer(
+  final, df_blast_out, denovo_confirm_minor,
+  denovo_min_contig_length, denovo_min_kmer_cov,
+  denovo_min_blast_identity, denovo_match_level
+)
 
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
