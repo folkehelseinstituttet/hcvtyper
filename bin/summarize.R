@@ -450,6 +450,32 @@ if (length(blastparse_files) > 0) {
   )
 }
 
+# Per-contig de novo BLAST table (Phase 3 confirmation, CONF-01/02/03). Read ALL
+# denovo/*_blast_out.csv ONCE into a long frame keyed by sampleName (basename
+# prefix before "_blast_out.csv"); the per-sample confirmation scan filters this
+# by sampleName at the chokepoint. Schema mirrors blast_parse.R (qseqid, subtype,
+# pident, evalue, bitscore, sc_length, kmer_cov). Guarded with length(...) > 0 so
+# a skip-assembly / no-de-novo run yields a typed-empty tibble and NEVER aborts
+# (T-03-01 DoS guard); a sample absent from this frame classifies as "unconfirmed",
+# never "refuted". This is read-only staging — NOT joined into `final` here.
+blast_out_files <- list.files(path = path_denovo, pattern = "_blast_out.csv$", full.names = TRUE)
+
+if (length(blast_out_files) > 0) {
+  df_blast_out <- map_dfr(blast_out_files, ~ read_csv(.x, show_col_types = FALSE) %>%
+    mutate(sampleName = str_remove(basename(.x), "_blast_out.csv$")))
+} else {
+  df_blast_out <- tibble(
+    sampleName = character(),
+    qseqid     = character(),
+    subtype    = character(),
+    pident     = double(),
+    evalue     = double(),
+    bitscore   = double(),
+    sc_length  = double(),
+    kmer_cov   = double()
+  )
+}
+
 # GLUE --------------------------------------------------------------------
 
 glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
