@@ -12,22 +12,31 @@ nextflow_process {
         when {
             process {
                 """
-                // Process inputs - using file() instead of directory paths to properly stage contents
-                input[0] = file("${projectDir}/modules/local/summarize/tests/data/samplesheet.csv", checkIfExists: true)
-                input[1] = 80    // stringency_1
-                input[2] = 95    // stringency_2
+                // Module input order (16 declared + 2 helpers):
+                // [0] version, [1] name, [2] samplesheet, [3] stringency_1, [4] stringency_2,
+                // [5] trimmed/, [6] kraken_classified/, [7] parsefirst_mapping/, [8] stats_withdup/,
+                // [9] stats_markdup/, [10] depth/, [11] denovo/, [12] glue/, [13] id/, [14] variation/,
+                // [15] consensus_distance/, [16] genotype_utils.R, [17] denovo_confirm.R
+                input[0] = "test"   // version
+                input[1] = "hcvtyper"   // name
+                input[2] = file("${projectDir}/modules/local/summarize/tests/data/samplesheet.csv", checkIfExists: true)
+                input[3] = 80      // stringency_1
+                input[4] = 95      // stringency_2
 
                 // Stage directory contents using file() with glob patterns
-                input[3] = file("${projectDir}/modules/local/summarize/tests/data/trimmed/*", checkIfExists: true)
-                input[4] = file("${projectDir}/modules/local/summarize/tests/data/kraken_classified/*", checkIfExists: true)
-                input[5] = file("${projectDir}/modules/local/summarize/tests/data/parsefirst_mapping/*", checkIfExists: true)
-                input[6] = file("${projectDir}/modules/local/summarize/tests/data/stats_withdup/*", checkIfExists: true)
-                input[7] = file("${projectDir}/modules/local/summarize/tests/data/stats_markdup/*", checkIfExists: true)
-                input[8] = file("${projectDir}/modules/local/summarize/tests/data/depth/*", checkIfExists: true)
-                input[9] = file("${projectDir}/modules/local/summarize/tests/data/blast/*", checkIfExists: true)
-                input[10] = file("${projectDir}/modules/local/summarize/tests/data/glue/*", checkIfExists: true)
-                input[11] = file("${projectDir}/modules/local/summarize/tests/data/id/*", checkIfExists: true)
-                input[12] = file("${projectDir}/modules/local/summarize/tests/data/variation/*", checkIfExists: true)
+                input[5] = file("${projectDir}/modules/local/summarize/tests/data/trimmed/*", checkIfExists: true)
+                input[6] = file("${projectDir}/modules/local/summarize/tests/data/kraken_classified/*", checkIfExists: true)
+                input[7] = file("${projectDir}/modules/local/summarize/tests/data/parsefirst_mapping/*", checkIfExists: true)
+                input[8] = file("${projectDir}/modules/local/summarize/tests/data/stats_withdup/*", checkIfExists: true)
+                input[9] = file("${projectDir}/modules/local/summarize/tests/data/stats_markdup/*", checkIfExists: true)
+                input[10] = file("${projectDir}/modules/local/summarize/tests/data/depth/*", checkIfExists: true)
+                input[11] = file("${projectDir}/modules/local/summarize/tests/data/blast/*", checkIfExists: true)
+                input[12] = file("${projectDir}/modules/local/summarize/tests/data/glue/*", checkIfExists: true)
+                input[13] = file("${projectDir}/modules/local/summarize/tests/data/id/*", checkIfExists: true)
+                input[14] = file("${projectDir}/modules/local/summarize/tests/data/variation/*", checkIfExists: true)
+                input[15] = file("${projectDir}/modules/local/summarize/tests/data/consensus_distance/*", checkIfExists: true)
+                input[16] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
+                input[17] = file("${projectDir}/bin/denovo_confirm.R", checkIfExists: true)
                 """
             }
         }
@@ -49,19 +58,24 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/modules/local/summarize/tests/data/samplesheet.csv", checkIfExists: true)
-                input[1] = 80
-                input[2] = 95
-                input[3] = file("${projectDir}/modules/local/summarize/tests/data/trimmed/*", checkIfExists: true)
-                input[4] = file("${projectDir}/modules/local/summarize/tests/data/kraken_classified/*", checkIfExists: true)
-                input[5] = file("${projectDir}/modules/local/summarize/tests/data/parsefirst_mapping/*", checkIfExists: true)
-                input[6] = file("${projectDir}/modules/local/summarize/tests/data/stats_withdup/*", checkIfExists: true)
-                input[7] = file("${projectDir}/modules/local/summarize/tests/data/stats_markdup/*", checkIfExists: true)
-                input[8] = file("${projectDir}/modules/local/summarize/tests/data/depth/*", checkIfExists: true)
-                input[9] = file("${projectDir}/modules/local/summarize/tests/data/blast/*", checkIfExists: true)
-                input[10] = file("${projectDir}/modules/local/summarize/tests/data/glue/*", checkIfExists: true)
-                input[11] = file("${projectDir}/modules/local/summarize/tests/data/id/*", checkIfExists: true)
-                input[12] = file("${projectDir}/modules/local/summarize/tests/data/variation/*", checkIfExists: true)
+                input[0] = "test"   // version
+                input[1] = "hcvtyper"   // name
+                input[2] = file("${projectDir}/modules/local/summarize/tests/data/samplesheet.csv", checkIfExists: true)
+                input[3] = 80
+                input[4] = 95
+                input[5] = file("${projectDir}/modules/local/summarize/tests/data/trimmed/*", checkIfExists: true)
+                input[6] = file("${projectDir}/modules/local/summarize/tests/data/kraken_classified/*", checkIfExists: true)
+                input[7] = file("${projectDir}/modules/local/summarize/tests/data/parsefirst_mapping/*", checkIfExists: true)
+                input[8] = file("${projectDir}/modules/local/summarize/tests/data/stats_withdup/*", checkIfExists: true)
+                input[9] = file("${projectDir}/modules/local/summarize/tests/data/stats_markdup/*", checkIfExists: true)
+                input[10] = file("${projectDir}/modules/local/summarize/tests/data/depth/*", checkIfExists: true)
+                input[11] = file("${projectDir}/modules/local/summarize/tests/data/blast/*", checkIfExists: true)
+                input[12] = file("${projectDir}/modules/local/summarize/tests/data/glue/*", checkIfExists: true)
+                input[13] = file("${projectDir}/modules/local/summarize/tests/data/id/*", checkIfExists: true)
+                input[14] = file("${projectDir}/modules/local/summarize/tests/data/variation/*", checkIfExists: true)
+                input[15] = file("${projectDir}/modules/local/summarize/tests/data/consensus_distance/*", checkIfExists: true)
+                input[16] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
+                input[17] = file("${projectDir}/bin/denovo_confirm.R", checkIfExists: true)
                 """
             }
         }
