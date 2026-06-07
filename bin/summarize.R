@@ -435,7 +435,19 @@ if (length(blastparse_files) > 0) {
       denovo_minor_contig_length = minor_contig_length
     )
 } else {
-  df_denovo <- tibble(sampleName = character())
+  # PLUMB-02: a skip-assembly / no-de-novo run must still yield the four denovo_*
+  # columns NA-filled (never drop them). An empty tibble carrying ONLY sampleName
+  # contributes no columns to the left_join, so the denovo_* columns would vanish
+  # from Summary.csv on skip-assembly. Declare all four columns with their
+  # blast_parse.R types (ref = character, contig_length = integer) so the join
+  # always emits them; with zero rows here every existing sample row NA-fills.
+  df_denovo <- tibble(
+    sampleName                 = character(),
+    denovo_major_ref           = character(),
+    denovo_major_contig_length = integer(),
+    denovo_minor_ref           = character(),
+    denovo_minor_contig_length = integer()
+  )
 }
 
 # GLUE --------------------------------------------------------------------

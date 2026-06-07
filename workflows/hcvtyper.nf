@@ -483,10 +483,17 @@ workflow HCVTYPER {
     ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
     // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
     // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
-    // staged channel. BLASTPARSE runs only inside if (!params.skip_assembly), so a
-    // skip-assembly run leaves the channel unpopulated -> .ifEmpty([]) yields [] ->
-    // empty denovo/ staging dir -> NA de novo columns (the PLUMB-02 path).
-    ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).ifEmpty([])
+    // staged channel. BLASTPARSE is invoked only inside if (!params.skip_assembly),
+    // so its .out attribute is undefined on a skip-assembly run -- referencing it
+    // unconditionally is a hard Nextflow error (process not invoked), which .ifEmpty
+    // cannot rescue. Guard the channel construction with the same condition (mirroring
+    // the ch_glue if/else below): skip-assembly yields [] -> empty denovo/ staging dir
+    // -> NA de novo columns + no dropped rows (the PLUMB-02 path).
+    if (!params.skip_assembly) {
+        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).ifEmpty([])
+    } else {
+        ch_denovo = []
+    }
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
