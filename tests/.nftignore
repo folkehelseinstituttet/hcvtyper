@@ -22,6 +22,11 @@ QC/insert_size/*.{pdf,txt}
 spades/*.spades.log
 spades/*.warnings.log
 spades/versions.yml
+# samtools/versions.yml is non-deterministic: SAMTOOLS_IDXSTATS runs multiple times
+# (markdup/withdup x major/minor) and each writes versions.yml keyed by its full process
+# path to the same samtools/ publishDir. Last-writer-wins picks a different process-name key
+# each run -> different md5 despite an identical samtools version. Same class as CR-01.
+samtools/versions.yml
 # Pipeline info with timestamps and variable content
 pipeline_info/*.{html,json,txt,yml}
 # HCV-specific outputs that may have variable content

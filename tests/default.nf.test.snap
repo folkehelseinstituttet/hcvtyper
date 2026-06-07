@@ -1,7 +1,7 @@
 {
     "-profile test": {
         "content": [
-            76,
+            75,
             null,
             [
                 "QC",
@@ -581,7 +581,6 @@
                 "Test_2.firstmapping.nodup.stats:md5,3daacc283eb19c1943aa953f7052a250",
                 "Test_2.firstmapping.withdup.sorted.tsv:md5,4ccb2f0558f9506a1d397ce561f09bf7",
                 "Test_2.firstmapping.withdup.stats:md5,48e5bf826689bd3a7eeccc190188e62d",
-                "versions.yml:md5,b553a27c101251d4e2196227a2f34b59",
                 "Test_1.assembly.gfa.gz:md5,e1250b2e49368a1b2449bbc2e0fc3a51",
                 "Test_1.contigs.fa.gz:md5,3d823acd845de33f4ee187bb55ef6de1",
                 "Test_1.scaffolds.fa.gz:md5,3d823acd845de33f4ee187bb55ef6de1",
@@ -595,6 +594,6 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-07T05:41:24.728782355"
+        "timestamp": "2026-06-07T06:41:26.056956753"
     }
 }
