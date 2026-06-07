@@ -490,7 +490,7 @@ workflow HCVTYPER {
     // the ch_glue if/else below): skip-assembly yields [] -> empty denovo/ staging dir
     // -> NA de novo columns + no dropped rows (the PLUMB-02 path).
     if (!params.skip_assembly) {
-        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).ifEmpty([])
+        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).collect().ifEmpty([])
     } else {
         ch_denovo = []
     }
