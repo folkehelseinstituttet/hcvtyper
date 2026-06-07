@@ -1,26 +1,25 @@
 #!/usr/bin/env Rscript
 
 # test_summarize_denovo.R -------------------------------------------------
-# Self-contained fixture tests for the de novo confirmation integration in
-# bin/summarize.R (plan 03-02). summarize.R is a monolithic commandArgs
-# entrypoint, so rather than running the whole pipeline these tests assert two
-# things directly:
+# Fixture tests for the de novo confirmation downgrade layer used by
+# bin/summarize.R. As of plan 04-01 the layer lives in bin/denovo_layer.R as a
+# sourceable apply_denovo_layer(), so these tests exercise the REAL function
+# rather than an inline re-implementation. This kills the test-drift weakness:
+# if summarize.R's downgrade behaviour changes, it changes here (same code path).
 #
-#   1. The SOURCE of summarize.R contains the required structural elements
-#      (the *_blast_out.csv read into df_blast_out with a length() guard, the
-#      helper source()s, the classify_minor_denovo() call, the downgrade-only
-#      if_else, and the always-present minor_denovo_status column). These are
-#      the grep-level acceptance criteria from the plan.
+# The test asserts three things:
 #
-#   2. The BEHAVIOUR of the two extracted logic units works on fixtures:
-#        - read_blast_out_frame(): keyed long frame from per-contig CSVs, with a
-#          typed-empty fallback that never aborts on a no-de-novo run.
-#        - the per-sample downgrade layer: confirmed/refuted/unconfirmed/
-#          not_evaluated/NA sentinels + downgrade-only minor_typable flip.
+#   1. summarize.R still parses (a single smoke check — the brittle source-text
+#      greps were removed in 04-01 now that the real function is under test).
 #
-# The behavioural units are defined inline here to mirror EXACTLY the logic that
-# must live in summarize.R; if summarize.R drifts from this contract the
-# structural grep assertions (block 1) fail.
+#   2. read_blast_out_frame() behaviour: keyed long frame from per-contig CSVs,
+#      with a typed-empty fallback that never aborts on a no-de-novo run.
+#
+#   3. apply_denovo_layer() behaviour on fixtures: confirmed/refuted/unconfirmed/
+#      not_evaluated/NA sentinels + downgrade-only minor_typable flip, PLUS a
+#      flag-OFF legacy-reproduction differential against a committed golden CSV
+#      (D-05/D-06) — comparing the pre-existing column subset, EXCLUDING the
+#      additive minor_denovo_status column.
 # -------------------------------------------------------------------------
 
 suppressPackageStartupMessages(library(tidyverse))
@@ -33,14 +32,13 @@ bin_dir  <- normalizePath(file.path(this_dir, ".."))
 
 source(file.path(bin_dir, "genotype_utils.R"))
 source(file.path(bin_dir, "denovo_confirm.R"))
+source(file.path(bin_dir, "denovo_layer.R"))
 
 fail <- function(msg) {
   cat("FAIL:", msg, "\n")
   quit(status = 1)
 }
 ok <- function(msg) cat("PASS:", msg, "\n")
-
-# --- Reference logic units (must mirror summarize.R) ----------------------
 
 # Read all denovo/*_blast_out.csv into a long frame keyed by sampleName, with a
 # typed-empty fallback (mirrors summarize.R Task 1).
@@ -63,47 +61,20 @@ read_blast_out_frame <- function(path_denovo) {
   }
 }
 
-# --- Block 1: structural grep assertions over summarize.R -----------------
-
-src <- readLines(file.path(bin_dir, "summarize.R"))
-has <- function(pat) any(grepl(pat, src, fixed = FALSE))
-
-if (!has("_blast_out.csv\\$")) fail("summarize.R missing _blast_out.csv$ read pattern")
-ok("summarize.R contains _blast_out.csv$ read pattern")
-
-if (!has("df_blast_out")) fail("summarize.R missing df_blast_out frame")
-ok("summarize.R contains df_blast_out")
-
-if (!has("source\\(\"denovo_confirm.R\"\\)")) fail("summarize.R missing source(denovo_confirm.R)")
-if (!has("source\\(\"genotype_utils.R\"\\)")) fail("summarize.R missing source(genotype_utils.R)")
-ok("summarize.R sources both helpers")
-
-if (!has("classify_minor_denovo\\(")) fail("summarize.R missing classify_minor_denovo() call")
-ok("summarize.R calls classify_minor_denovo()")
-
-if (!has("minor_denovo_status")) fail("summarize.R missing minor_denovo_status column")
-if (!has("not_evaluated")) fail("summarize.R missing not_evaluated sentinel")
-ok("summarize.R emits minor_denovo_status + not_evaluated sentinel")
-
-# downgrade-only: "refuted" -> "NO" against minor_typable on one edit
-refuted_lines <- grep("refuted", src, value = TRUE)
-if (!any(grepl("minor_typable", refuted_lines) | grepl("if_else", refuted_lines))) {
-  # downgrade may span; require both tokens present overall plus a guarded if_else
-  if (!(has("refuted") && has("minor_typable") && has("if_else"))) {
-    fail("summarize.R missing downgrade-only if_else(refuted -> NO, minor_typable)")
-  }
-}
-ok("summarize.R contains downgrade-only refute logic")
-
-# must NOT null Minor_reference on refute
-if (has("Minor_reference = NA")) fail("summarize.R nulls Minor_reference (D-10 violation)")
-ok("summarize.R keeps Minor_* populated on refute")
-
-# parses cleanly
+# --- Block 1: summarize.R smoke check -------------------------------------
+# The downgrade logic is now exercised through the REAL apply_denovo_layer()
+# below, so the brittle source-text greps were dropped (04-01). We keep only a
+# parse() smoke check to catch a syntactically broken script.
 parse(file.path(bin_dir, "summarize.R"))
 ok("summarize.R parses")
 
-# --- Block 2: behavioural fixtures ----------------------------------------
+# Sanity: summarize.R sources and calls the extracted layer (key_links contract).
+src <- readLines(file.path(bin_dir, "summarize.R"))
+if (!any(grepl("source\\(\"denovo_layer.R\"\\)", src))) fail("summarize.R missing source(denovo_layer.R)")
+if (!any(grepl("apply_denovo_layer\\(", src))) fail("summarize.R missing apply_denovo_layer() call")
+ok("summarize.R sources + calls apply_denovo_layer()")
+
+# --- Block 2: read_blast_out_frame() fixtures -----------------------------
 
 tmp <- tempfile("denovo_test_"); dir.create(tmp)
 denovo_dir <- file.path(tmp, "denovo"); dir.create(denovo_dir)
@@ -125,7 +96,7 @@ write_csv(mk_blast("S2", "1a", 5000, 10, 99), file.path(denovo_dir, "S2_blast_ou
 df <- read_blast_out_frame(denovo_dir)
 if (!"sampleName" %in% names(df)) fail("read_blast_out_frame missing sampleName key")
 if (!setequal(unique(df$sampleName), c("S1", "S2"))) fail("read_blast_out_frame wrong sample keys")
-ok("Task1 Test1: keyed long frame with sampleName")
+ok("Test1: keyed long frame with sampleName")
 
 # Test 2: empty guard -> typed-empty tibble, never abort
 empty_dir <- file.path(tmp, "denovo_empty"); dir.create(empty_dir)
@@ -134,83 +105,102 @@ if (nrow(df_e) != 0) fail("empty read should yield zero rows")
 if (!all(c("sampleName", "subtype", "sc_length", "kmer_cov", "pident") %in% names(df_e))) {
   fail("empty read missing typed columns")
 }
-ok("Task1 Test2: empty guard yields typed-empty tibble")
+ok("Test2: empty guard yields typed-empty tibble")
 
-# --- Downgrade layer behaviour (mirrors summarize.R Task 2) ---------------
-# Build a tiny `final` and apply the same logic the script must apply.
-apply_layer <- function(final, df_blast_out, flag,
-                        min_len = 1000, min_kmer = 2.0, min_pid = 90, match_level = "genotype") {
-  if (isTRUE(flag)) {
-    final %>%
-      rowwise() %>%
-      mutate(minor_denovo_status = {
-        if (is.na(Minor_reference)) {
-          NA_character_
-        } else {
-          bo <- df_blast_out %>% filter(sampleName == .data$sampleName)
-          classify_minor_denovo(
-            bo,
-            genotype_from_subtype(str_extract(Major_reference, "^[^_]+")),
-            genotype_from_subtype(str_extract(Minor_reference, "^[^_]+")),
-            min_len, min_kmer, min_pid, match_level
-          )
-        }
-      }) %>%
-      ungroup() %>%
-      mutate(minor_typable = if_else(
-        !is.na(minor_denovo_status) & minor_denovo_status == "refuted", "NO", minor_typable
-      ))
-  } else {
-    final %>%
-      mutate(minor_denovo_status = if_else(is.na(Minor_reference), NA_character_, "not_evaluated"))
-  }
-}
+# --- Block 3: apply_denovo_layer() behaviour (the REAL function) ----------
 
 # Test 3 (confirmed): substantial minor contig -> confirmed, minor_typable unchanged
 final3 <- tibble(sampleName = "S1", Major_reference = "1a_ACC",
                  Minor_reference = "2b_ACC", minor_typable = "YES")
 bo3 <- bind_rows(mk_blast("S1", "1a", 5000, 10, 99), mk_blast("S1", "2b", 2949, 5, 99)) %>%
   mutate(sampleName = "S1")
-r3 <- apply_layer(final3, bo3, TRUE)
+r3 <- apply_denovo_layer(final3, bo3, TRUE)
 if (r3$minor_denovo_status != "confirmed_by_denovo") fail("Test3 expected confirmed_by_denovo")
 if (r3$minor_typable != "YES") fail("Test3 minor_typable must stay YES")
-ok("Task2 Test3 (CONF-01): confirmed, minor_typable unchanged")
+ok("Test3 (CONF-01): confirmed, minor_typable unchanged")
 
 # Test 4 (refuted, downgrade): substantial major, no substantial minor
 final4 <- tibble(sampleName = "S1", Major_reference = "1a_ACC",
                  Minor_reference = "2b_ACC", minor_typable = "YES")
 bo4 <- mk_blast("S1", "1a", 5000, 10, 99) %>% mutate(sampleName = "S1")
-r4 <- apply_layer(final4, bo4, TRUE)
+r4 <- apply_denovo_layer(final4, bo4, TRUE)
 if (r4$minor_denovo_status != "refuted") fail("Test4 expected refuted")
 if (r4$minor_typable != "NO") fail("Test4 minor_typable must flip to NO")
 if (is.na(r4$Minor_reference) || r4$Minor_reference != "2b_ACC") fail("Test4 Minor_reference must stay populated")
-ok("Task2 Test4 (CONF-02): refuted downgrades minor_typable, Minor_* intact")
+ok("Test4 (CONF-02): refuted downgrades minor_typable, Minor_* intact")
 
 # Test 5 (unconfirmed): no substantial contig at all
 final5 <- tibble(sampleName = "S1", Major_reference = "1a_ACC",
                  Minor_reference = "2b_ACC", minor_typable = "YES")
 bo5 <- mk_blast("S1", "1a", 300, 1, 99) %>% mutate(sampleName = "S1")  # tiny noise contig
-r5 <- apply_layer(final5, bo5, TRUE)
+r5 <- apply_denovo_layer(final5, bo5, TRUE)
 if (r5$minor_denovo_status != "unconfirmed") fail("Test5 expected unconfirmed")
 if (r5$minor_typable != "YES") fail("Test5 minor_typable must stay YES (not suppressed)")
-ok("Task2 Test5 (CONF-03): unconfirmed, minor not suppressed")
+ok("Test5 (CONF-03): unconfirmed, minor not suppressed")
 
 # Test 6 (flag OFF): not_evaluated when candidate, NA when none; minor_typable legacy
 final6 <- tibble(sampleName = c("S1", "S2"),
                  Major_reference = c("1a_ACC", "1a_ACC"),
                  Minor_reference = c("2b_ACC", NA_character_),
                  minor_typable = c("YES", "NO"))
-r6 <- apply_layer(final6, bo4, FALSE)
+r6 <- apply_denovo_layer(final6, bo4, FALSE)
 if (r6$minor_denovo_status[1] != "not_evaluated") fail("Test6 candidate must be not_evaluated when flag OFF")
 if (!is.na(r6$minor_denovo_status[2])) fail("Test6 no-candidate must be NA when flag OFF")
 if (!identical(r6$minor_typable, c("YES", "NO"))) fail("Test6 minor_typable must be untouched when flag OFF")
-ok("Task2 Test6 (CONF-07/D-16): flag OFF bypasses layer")
+ok("Test6 (CONF-07/D-16): flag OFF bypasses layer")
 
 # Test 7 (no candidate, flag ON): NA status regardless
 final7 <- tibble(sampleName = "S1", Major_reference = "1a_ACC",
                  Minor_reference = NA_character_, minor_typable = "NO")
-r7 <- apply_layer(final7, bo4, TRUE)
+r7 <- apply_denovo_layer(final7, bo4, TRUE)
 if (!is.na(r7$minor_denovo_status)) fail("Test7 no candidate must be NA status (D-12)")
-ok("Task2 Test7 (D-12): no minor candidate -> NA status")
+ok("Test7 (D-12): no minor candidate -> NA status")
+
+# --- Block 4: flag-OFF legacy-reproduction differential (D-05/D-06) -------
+# Run the layer with flag OFF on a small fixture (one candidate-minor row, one
+# no-candidate row), select the PRE-EXISTING (legacy) columns ONLY — i.e. every
+# column EXCEPT the additive minor_denovo_status — and assert byte-equality to a
+# committed golden baseline. This proves OFF reproduces legacy output on the
+# legacy column subset; the additive status column never breaks the differential.
+golden_path <- file.path(bin_dir, "tests", "fixtures", "flagoff_golden.csv")
+
+final_off <- tibble(
+  sampleName      = c("S1", "S2"),
+  Major_reference = c("1a_ACC", "3a_ACC"),
+  Minor_reference = c("2b_ACC", NA_character_),
+  major_typable   = c("YES", "YES"),
+  minor_typable   = c("YES", "NO")
+)
+r_off <- apply_denovo_layer(final_off, bo4, FALSE)
+
+# Legacy column subset = all columns except the additive minor_denovo_status.
+legacy_cols <- setdiff(names(r_off), "minor_denovo_status")
+r_off_legacy <- r_off %>% select(all_of(legacy_cols))
+
+# minor_typable must retain its pure legacy value under flag-OFF.
+if (!identical(r_off_legacy$minor_typable, c("YES", "NO"))) {
+  fail("flag-OFF minor_typable must equal pure legacy value")
+}
+
+if (!file.exists(golden_path)) {
+  # First-run bootstrap: write the golden baseline once for the reviewer to
+  # inspect and commit (D-06). Subsequent runs assert against it.
+  dir.create(dirname(golden_path), recursive = TRUE, showWarnings = FALSE)
+  write_csv(r_off_legacy, golden_path)
+  fail(paste0("golden baseline written to ", golden_path,
+              " — inspect and commit, then re-run (D-06 bootstrap)"))
+}
+
+golden <- read_csv(golden_path, show_col_types = FALSE)
+# Compare the legacy subset on both sides, EXCLUDING minor_denovo_status by
+# construction (it is not in legacy_cols and not written to the golden file).
+golden_legacy <- golden %>% select(any_of(legacy_cols))
+if (!isTRUE(all.equal(as.data.frame(r_off_legacy), as.data.frame(golden_legacy)))) {
+  fail("flag-OFF legacy-column output diverged from committed golden baseline")
+}
+if ("minor_denovo_status" %in% names(golden)) {
+  fail("golden baseline must NOT contain minor_denovo_status (additive column excluded)")
+}
+ok("Block4 (D-05/D-06): flag-OFF reproduces committed legacy golden baseline")
 
 cat("\nALL PASS\n")
