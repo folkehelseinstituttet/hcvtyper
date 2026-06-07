@@ -2,6 +2,14 @@
 
 library(tidyverse)
 
+# De novo confirmation helpers (Phase 3). Sourced from the task workdir, where
+# they are staged as declared `path` process inputs (plan 03-03), mirroring how
+# summarize_mapping_to_all_references.R sources genotype_utils.R relatively.
+# genotype_utils.R MUST be sourced first so genotype_from_subtype() is in scope
+# before denovo_confirm.R / the confirmation layer use it.
+source("genotype_utils.R")
+source("denovo_confirm.R")
+
 args = commandArgs(trailingOnly=TRUE)
 
 # Define variables --------------------------------------------------------
@@ -757,6 +765,46 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
     ))
 }
 
+# De novo confirmation of the reported minor (Change 2, D-13: DOWNGRADE-ONLY).
+# This is the authoritative chokepoint: it runs IMMEDIATELY after the
+# minor_typable case_when so it can only ever flip a YES→NO (refute), never
+# resurrect a suppressed minor (CONF-06, by construction). The 1a/1b allowance
+# above and the upstream 2k1b suppression are untouched.
+#
+# Genotypes are derived UNCONDITIONALLY from the mapping reference names
+# (`<subtype>_<acc>` → leading subtype token → genotype_from_subtype()), so the
+# layer is robust to GLUE absence (does NOT depend on Major_subtype/Minor_subtype).
+# minor_denovo_status is ALWAYS present afterwards (D-12), on both branches.
+if (isTRUE(denovo_confirm_minor)) {
+  final <- final %>%
+    rowwise() %>%
+    mutate(minor_denovo_status = {
+      if (is.na(Minor_reference)) {
+        NA_character_                                   # no minor candidate (D-12)
+      } else {
+        bo <- df_blast_out %>% filter(sampleName == .data$sampleName)
+        classify_minor_denovo(
+          bo,
+          genotype_from_subtype(str_extract(Major_reference, "^[^_]+")),
+          genotype_from_subtype(str_extract(Minor_reference, "^[^_]+")),
+          denovo_min_contig_length, denovo_min_kmer_cov,
+          denovo_min_blast_identity, denovo_match_level
+        )
+      }
+    }) %>%
+    ungroup() %>%
+    # Downgrade-only (D-13): refute flips minor_typable YES→NO; Minor_* columns
+    # stay populated (D-10 — never null a Minor_* field on refute).
+    mutate(minor_typable = if_else(
+      !is.na(minor_denovo_status) & minor_denovo_status == "refuted", "NO", minor_typable
+    ))
+} else {
+  # Flag OFF (CONF-07 / D-16): bypass the layer entirely. minor_typable keeps its
+  # pure legacy value; status = not_evaluated when a candidate exists, NA otherwise.
+  final <- final %>%
+    mutate(minor_denovo_status = if_else(is.na(Minor_reference), NA_character_, "not_evaluated"))
+}
+
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
   final <- final %>%
@@ -825,6 +873,7 @@ final <- final %>%
          Minor_reference,
          major_typable,
          minor_typable,
+         minor_denovo_status,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
