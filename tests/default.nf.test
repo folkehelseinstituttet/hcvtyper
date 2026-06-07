@@ -32,4 +32,53 @@ nextflow_pipeline {
             )
         }
     }
+
+    test("-profile test --skip_assembly") {
+
+        // PLUMB-02: a no-de-novo run yields NA de novo fields and drops no rows.
+        // BLASTPARSE never runs when assembly is skipped, so the four denovo_* columns
+        // must be NA-filled (via the .ifEmpty([]) collected channel) and the Summary.csv
+        // must still carry one samplesheet-anchored row per sample (no dropped rows).
+        // Uses explicit content assertions (NOT a shared snapshot key) so this case does
+        // not collide with the default case's snapshot.
+
+        when {
+            params {
+                outdir = "$outputDir"
+                skip_assembly = true
+            }
+        }
+
+        then {
+            def summaryFile = new File("$outputDir/summary/Summary.csv")
+            def lines = summaryFile.readLines().findAll { it.trim() }
+            def header = lines[0].split(',', -1) as List
+            def dataRows = lines.drop(1)
+
+            // The four additive de novo columns, by name.
+            def denovoCols = [
+                'denovo_major_ref',
+                'denovo_major_contig_length',
+                'denovo_minor_ref',
+                'denovo_minor_contig_length'
+            ]
+
+            assertAll(
+                { assert workflow.success },
+                // (a) Summary.csv was published.
+                { assert summaryFile.exists() },
+                // (b) All four de novo columns are present in the header.
+                { assert denovoCols.every { header.contains(it) } : "Missing de novo column(s); header was: ${header}" },
+                // (c) No dropped rows: one data row per sample in the test samplesheet.
+                //     The minimal test samplesheet has 3 samples (Test_1, Test_2, Neg),
+                //     all samplesheet-anchored so even read-empty samples get a row.
+                { assert dataRows.size() == 3 : "Expected 3 data rows (no dropped rows), got ${dataRows.size()}" },
+                // (d) The four de novo columns are NA on every data row (no assembly ran).
+                { assert dataRows.every { row ->
+                        def cells = row.split(',', -1) as List
+                        denovoCols.every { col -> cells[header.indexOf(col)] == 'NA' }
+                    } : "Expected all de novo columns NA on every row; rows were: ${dataRows}" }
+            )
+        }
+    }
 }
