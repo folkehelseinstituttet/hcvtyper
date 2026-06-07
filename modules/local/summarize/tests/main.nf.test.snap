@@ -3,10 +3,10 @@
         "content": [
             {
                 "summary": [
-                    "Summary.csv:md5,5788053a8f5bf730235d9b5732713d97"
+                    "Summary.csv:md5,0b5b575a299b4a9483a0a1b61fd3ee67"
                 ],
                 "mqc": [
-                    "summary_mqc.csv:md5,5788053a8f5bf730235d9b5732713d97"
+                    "summary_mqc.csv:md5,0b5b575a299b4a9483a0a1b61fd3ee67"
                 ],
                 "png": [
                     "Variation_plot_major.png:md5,e19d8e3b61bdcb781ebb43e0328a6af4"
@@ -18,18 +18,18 @@
         ],
         "meta": {
             "nf-test": "0.9.3",
-            "nextflow": "25.04.2"
+            "nextflow": "24.10.5"
         },
-        "timestamp": "2025-10-08T12:13:25.270423308"
+        "timestamp": "2026-06-07T11:08:14.413644238"
     },
     "summarize: stub": {
         "content": [
             {
                 "summary": [
-                    "Summary.csv:md5,093506819671498252da3ee2a6d3513a"
+                    "Summary.csv:md5,b4b7208afe480a8a299dd0badecf0213"
                 ],
                 "mqc": [
-                    "summary_mqc.csv:md5,093506819671498252da3ee2a6d3513a"
+                    "summary_mqc.csv:md5,b4b7208afe480a8a299dd0badecf0213"
                 ],
                 "png": [
                     "summary_plot.png:md5,d41d8cd98f00b204e9800998ecf8427e"
@@ -41,8 +41,8 @@
         ],
         "meta": {
             "nf-test": "0.9.3",
-            "nextflow": "25.04.2"
+            "nextflow": "24.10.5"
         },
-        "timestamp": "2025-10-08T12:02:42.30178343"
+        "timestamp": "2026-06-07T11:08:25.601370719"
     }
 }
