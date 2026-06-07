@@ -1,1 +1,2 @@
-/home/jon.brate/hcv_illumina/work/7c/76a17c35d086fde504209315a980f9/Test_2.parsefirstmapping.csv
+sample,total_mapped_reads,major_ref,major_reads,major_cov,minor_ref,minor_reads,minor_cov
+Test_2,17691,3a_D17763,17099,85,4k_EU392173,42,5

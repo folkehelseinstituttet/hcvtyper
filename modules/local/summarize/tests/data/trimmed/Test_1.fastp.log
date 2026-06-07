@@ -1,1 +1,53 @@
-/home/jon.brate/hcv_illumina/work/96/56a4993d0e8470f7f067f473460ffa/Test_1.fastp.log
+Detecting adapter sequence for read1...
+>Illumina TruSeq Adapter Read 1
+AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+Detecting adapter sequence for read2...
+>Nextera_LMP_Read2_External_Adapter
+GATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+
+Read1 before filtering:
+total reads: 20000
+total bases: 6007782
+Q20 bases: 5820675(96.8856%)
+Q30 bases: 5820675(96.8856%)
+Q40 bases: 0(0%)
+
+Read2 before filtering:
+total reads: 20000
+total bases: 6006964
+Q20 bases: 5285741(87.9936%)
+Q30 bases: 5285741(87.9936%)
+Q40 bases: 0(0%)
+
+Read1 after filtering:
+total reads: 17223
+total bases: 5168713
+Q20 bases: 5168713(100%)
+Q30 bases: 5168713(100%)
+Q40 bases: 0(0%)
+
+Read2 after filtering:
+total reads: 17223
+total bases: 5167945
+Q20 bases: 5167945(100%)
+Q30 bases: 5167945(100%)
+Q40 bases: 0(0%)
+
+Filtering result:
+reads passed filter: 34446
+reads failed due to low quality: 5544
+reads failed due to too many N: 0
+reads failed due to too short: 10
+reads with adapter trimmed: 539
+bases trimmed due to adapters: 40790
+
+Duplication rate: 5.075%
+
+Insert size peak (evaluated by paired-end reads): 359
+
+JSON report: Test_1.fastp.json
+HTML report: Test_1.fastp.html
+
+fastp --in1 Test_1_1.fastq.gz --in2 Test_1_2.fastq.gz --out1 Test_1_1.fastp.fastq.gz --out2 Test_1_2.fastp.fastq.gz --json Test_1.fastp.json --html Test_1.fastp.html --thread 2 --detect_adapter_for_pe 
+fastp v1.0.1, time used: 7 seconds

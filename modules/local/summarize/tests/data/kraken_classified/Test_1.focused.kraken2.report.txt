@@ -1,1 +1,22 @@
-/home/jon.brate/hcv_illumina/work/1e/ad65bfe8fc3c2e7c5ed5299987e6b8/Test_1.focused.kraken2.report.txt
+  8.60	1482	1482	U	0	unclassified
+ 91.40	15741	0	R	1	root
+ 91.40	15741	0	D	10239	  Viruses
+ 91.40	15741	0	D1	2559587	    Riboviria
+ 91.40	15741	0	K	2732396	      Orthornavirae
+ 91.40	15741	0	P	2732406	        Kitrinoviricota
+ 91.40	15741	0	C	2732462	          Flasuviricetes
+ 91.40	15741	0	O	2732545	            Amarillovirales
+ 91.40	15741	0	F	11050	              Flaviviridae
+ 91.40	15741	0	G	11102	                Hepacivirus
+ 91.40	15741	2	S	11103	                  Hepacivirus C
+ 87.37	15047	0	S1	40271	                    Hepatitis C virus genotype 2
+ 87.36	15046	0	S2	31649	                      Hepatitis C virus subtype 2a
+ 87.36	15046	15046	S3	356411	                        Hepatitis C virus JFH-1
+  0.01	1	1	S2	1094901	                      Hepatitis C virus subtype 2m
+  3.91	674	0	S1	41856	                    Hepatitis C virus genotype 1
+  3.91	674	674	S2	31647	                      Hepatitis C virus subtype 1b
+  0.04	7	2	S1	356426	                    Hepatitis C virus subtype 3a
+  0.03	5	5	S2	356416	                      Hepatitis C virus (isolate HCV-K3a/650)
+  0.03	6	0	S1	33745	                    Hepatitis C virus genotype 4
+  0.03	6	6	S2	128819	                      Hepatitis C virus subtype 4d
+  0.03	5	5	S1	2847144	                    hepatitis C virus genotype 1a
