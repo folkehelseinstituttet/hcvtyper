@@ -43,7 +43,12 @@ apply_denovo_layer <- function(final, df_blast_out, denovo_confirm_minor,
         if (is.na(Minor_reference)) {
           NA_character_                                   # no minor candidate (D-12)
         } else {
-          bo <- df_blast_out %>% filter(sampleName == .data$sampleName)
+          # BUG-FIX: capture the current row's sampleName before entering the
+          # filter pipe. Inside filter(), .data refers to df_blast_out itself,
+          # not the outer rowwise row, so filter(sampleName == .data$sampleName)
+          # was a no-op that left bo = all 93 samples combined.
+          .cur_sn <- sampleName
+          bo <- df_blast_out %>% filter(sampleName == .cur_sn)
           classify_minor_denovo(
             bo,
             genotype_from_subtype(str_extract(Major_reference, "^[^_]+")),
