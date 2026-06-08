@@ -1,21 +1,18 @@
 process HCVGLUE {
 
-    tag "$meta.id"
     label 'process_low'
 
-    // Single hermetic all-in-one image (MySQL 5.7 + GLUE engine). One task per BAM.
-    // The HCV project data is NOT baked in — it is staged at runtime via params.hcvglue_db
-    // and loaded by run-glue.sh (baked into the image at /usr/local/bin).
-    // SECURITY: pin this image by tag+digest once published to GHCR (RESEARCH Open Q1 / T-05-02).
+    // Environment with Docker created using the podman package from conda-forge. Created using seqera containers.
+    // Singularity image: https://wave.seqera.io/view/builds/bd-e170c468aba99710_1?_gl=1*j1kzwl*_gcl_au*MTM5MTA4NDk2NS4xNzUzNjg2MzUxLjY0MTQxNDc2Ni4xNzU2MzA2NTExLjE3NTYzMDY1MjU.
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://ghcr.io/folkehelseinstituttet/hcvglue-allinone:1.1.114':
-        'ghcr.io/folkehelseinstituttet/hcvglue-allinone:1.1.114' }"
+        'oras://community.wave.seqera.io/library/podman:5.6.2--e170c468aba99710':
+        'docker.io/ubuntu:22.04' }"
 
-    stageInMode 'copy' // Can't mount symlinked files into docker containers; dump is ~59 MB so copy is cheap
+    stageInMode 'copy' // Can't mount symlinked files into docker containers
 
     input:
-    tuple val(meta), path(bam), path(hcvglue_db)
+    path '*'
     val hcvglue_threshold
 
     output:
@@ -27,13 +24,11 @@ process HCVGLUE {
     task.ext.when == null || task.ext.when
 
     script:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     #!/bin/bash
 
-    # Hermetic per-BAM HCV-GLUE: init task-local MySQL, load staged dump, run GLUE, exit.
-    run-glue.sh ${hcvglue_db} ${hcvglue_threshold} ${bam}
+    # Run HCV-GLUE analysis using external script
+    run_hcvglue.sh ${hcvglue_threshold}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -44,15 +39,13 @@ process HCVGLUE {
     """
 
     stub:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
     #!/bin/bash
 
-    # Create dummy outputs for stub run (named to match the live BAM-derived outputs)
+    # Create dummy outputs for stub run
     echo "Creating dummy outputs for stub run"
 
-    cat > ${prefix}.major.nodup.json << 'EOF'
+    cat > sample.json << 'EOF'
     {
         "projectVersion": "0.1.63",
         "engineVersion": "1.1.113",
@@ -63,7 +56,7 @@ process HCVGLUE {
     }
     EOF
 
-    cat > ${prefix}.major.nodup.html << 'EOF'
+    cat > sample.html << 'EOF'
     <!DOCTYPE html>
     <html>
     <head><title>HCV-GLUE Report</title></head>

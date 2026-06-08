@@ -127,17 +127,6 @@ workflow HCVTYPER {
         }
 
     //
-    // Prepare HCV-GLUE project SQL dump (single .sql.gz, NOT a tarball — no UNTAR).
-    // Stage once and broadcast as a value channel so the same staged path is paired
-    // with every per-BAM HCVGLUE task via .combine() (a fromPath() queue channel would
-    // break the fan-out). Nextflow auto-downloads the remote HTTPS URL into the work dir.
-    //
-    ch_hcvglue_db = Channel.empty()
-    if (!params.skip_hcvglue && params.hcvglue_db) {
-        ch_hcvglue_db = Channel.value(file(params.hcvglue_db))
-    }
-
-    //
     // MODULE: Identify the instrument ID
     //
     INSTRUMENTID (
@@ -450,17 +439,11 @@ workflow HCVTYPER {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
-        // Per-BAM fan-out: one isolated HCVGLUE task per BAM (own workdir + own MySQL datadir).
-        // .mix() interleaves major/minor tuple(meta, bam); .combine(ch_hcvglue_db) pairs each
-        // emission with the single broadcast dump -> tuple(meta, bam, hcvglue_db).
-        ch_glue_bams = MAJOR_MAPPING.out.aligned.mix(MINOR_MAPPING.out.aligned).combine(ch_hcvglue_db)
         HCVGLUE (
-            ch_glue_bams,
+            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect(), // Collect all files. Can only have one GLUE process running
             params.hcvglue_threshold
         )
-        // .first() takes one representative versions.yml (all tasks report identical versions),
-        // avoiding the N-arity snapshot flake from per-BAM fan-out.
-        ch_versions = ch_versions.mix(HCVGLUE.out.versions.first())
+        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
 
         // Collect all glue reports and parse them
         HCV_GLUE_PARSER (
