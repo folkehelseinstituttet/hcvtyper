@@ -9,13 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Fixed`
 
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.2.0 - 2026.06.08
+
+De novo-informed strain selection: de novo/BLAST evidence and a major-gate now drive minor-strain reporting, behind `--denovo_confirm_minor` (default ON; setting it `false` reproduces pre-v1.2.0 output).
+
+### `Added`
+
+- **Major-gate (Change 1):** a candidate minor strain is only evaluated/reported when its major passes both `minRead` and `minCov`. A failed major reports first-mapping stats plus a `gate_flag` reason, with no minor call and no major genotype call. Fixes the ERR1810469-class case (minor reported on top of a failed major).
+- **De novo confirmation of the candidate minor (Change 2):** after first-mapping selection, the candidate minor is cross-checked against de novo/BLAST evidence and classified `confirmed_by_denovo` / `refuted` / `unconfirmed`, using a calibrated substantial-contig test (length + k-mer-coverage + BLAST identity) and genotype-level (not subtype) matching with an asymmetric refute rule. A refuted minor is downgraded to single-infection while its `Minor_*` columns are preserved for QC.
+- **`minor_denovo_status` column** in `Summary.csv` and `summary_mqc.csv`, surfacing the basis for each minor call.
+- **New parameters:** `--denovo_confirm_minor` (default `true`), `--denovo_min_contig_length`, `--denovo_min_kmer_cov`, `--denovo_min_blast_identity`, `--denovo_match_level` (default `genotype`).
+- **R regression guard** (`bin/tests/run_all.sh`) covering the major-gate, the confirm/refute/fall-back branches, genotype-level matching, flag-OFF legacy reproduction (against a committed golden baseline), and non-suppression of genuine co-infections — wired into CI as the `r-regression` job.
+
+### `Changed`
+
+- Single-sourced the 2k1b-aware genotype helper into `bin/genotype_utils.R` (`genotype_from_subtype()`), staged as a process input and used by both the selection and confirmation sides.
+- BLASTPARSE per-contig CSVs (`*.blastparse.csv`, `*_blast_out.csv`) are now consumed by `SUMMARIZE` via `left_join` on `sampleName` (NA-fill on missing samples, no row loss).
+
+### `Fixed`
+
+- Fixed the always-truthy `length(minor_ref > 0)` predicate in `summarize_mapping_to_all_references.R` (was `length(minor_ref) > 0`).
+- Moved the minor-gate decision into the R layer (`minor_call` / `gate_flag` columns), eliminating the `NA.toInteger()` crash class in the Nextflow minor branch.
+- Fixed two latent `--skip_assembly` plumbing bugs (undefined `BLASTPARSE.out`; de novo columns vanishing instead of NA-filling).
 - Fixed sample mix-up risk in `TARGETED_MAPPING` subworkflow: the `reference` key is now added to the meta map before the `multiMap` split, ensuring all branches (`build`, `fasta`, `reads`) share the same meta key throughout the subworkflow. Previously the enrichment happened inside the `BOWTIE2_ALIGN` input map after the split, causing `ch_aligned` to carry a different meta key than `ch_input.build` / `ch_input.fasta`, which could silently pair the wrong reference with the wrong sample in `SAMTOOLS_SORMADUP`, `STATS_WITHDUP`, `STATS_MARKDUP`, and `IVAR_CONSENSUS` during parallel multi-sample runs.
 - Fixed the `reads` branch of the `multiMap` in `TARGETED_MAPPING` to emit `[meta, reads]` instead of `[meta, fasta, reads]`. The extra `fasta` element was silently bundled into the reads input of `TANOTI_ALIGN` (which expects a 2-element tuple), potentially causing alignment failures or wrong reference use in the tanoti mapper path.
 - Fixed potential index/sample mismatch in `TARGETED_MAPPING` (bowtie2 path): `BOWTIE2_ALIGN` now receives reads, index, and fasta joined by meta key rather than positionally. Previously, `BOWTIE2_BUILD.out.index` was passed as a separate positional channel; since build tasks complete in non-deterministic order under parallel execution, sample A's reads could be aligned against sample B's index. The fix joins all three channels by meta key before calling `BOWTIE2_ALIGN`.
 
-### `Dependencies`
+### `Removed`
 
-### `Deprecated`
+- Removed the dead, non-functional `strategy == "denovo"` reference-selection branch and the undeclared `params.minDenovoLength`; the `strategy` parameter is removed from `nextflow_schema.json` and all config profiles. Reference selection now runs a single mapping-based path.
 
 ## v1.1.6 - 2026.02.25
 
