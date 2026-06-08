@@ -450,11 +450,17 @@ workflow HCVTYPER {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
+        // Per-BAM fan-out: one isolated HCVGLUE task per BAM (own workdir + own MySQL datadir).
+        // .mix() interleaves major/minor tuple(meta, bam); .combine(ch_hcvglue_db) pairs each
+        // emission with the single broadcast dump -> tuple(meta, bam, hcvglue_db).
+        ch_glue_bams = MAJOR_MAPPING.out.aligned.mix(MINOR_MAPPING.out.aligned).combine(ch_hcvglue_db)
         HCVGLUE (
-            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect(), // Collect all files. Can only have one GLUE process running
+            ch_glue_bams,
             params.hcvglue_threshold
         )
-        ch_versions = ch_versions.mix(HCVGLUE.out.versions)
+        // .first() takes one representative versions.yml (all tasks report identical versions),
+        // avoiding the N-arity snapshot flake from per-BAM fan-out.
+        ch_versions = ch_versions.mix(HCVGLUE.out.versions.first())
 
         // Collect all glue reports and parse them
         HCV_GLUE_PARSER (
