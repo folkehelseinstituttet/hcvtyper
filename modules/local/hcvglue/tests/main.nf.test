@@ -9,13 +9,23 @@ nextflow_process {
     tag "modules"
     tag "hcvglue"
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used
+    // Live end-to-end test: requires the published hcvglue-allinone image AND the
+    // real ~59 MB ncbi_hcv_glue.sql.gz dump to produce a genotype call. The
+    // placeholder tests/dump.sql.gz is empty, so this is gated to the heavier
+    // integration job (Plan 03) — exclude from the fast PR run with
+    // `--without-tag live_dump`. RESEARCH Open Question 3.
     test("hcv - bam") {
+
+        tag "live_dump"
 
         when {
             process {
                 """
-                input[0] = file('${moduleDir}/tests/Test_2.3a_D17763_major.major.nodup.bam', checkIfExists: true)
+                input[0] = [
+                    [ id: 'Test_2.3a_D17763' ],
+                    file("${moduleDir}/tests/Test_2.3a_D17763_major.major.nodup.bam", checkIfExists: true),
+                    file(params.hcvglue_db, checkIfExists: true)
+                ]
                 input[1] = 15.0  // hcvglue_threshold
                 """
             }
@@ -34,7 +44,6 @@ nextflow_process {
 
     }
 
-    // TODO nf-core: Change the test name preferably indicating the test-data and file-format used but keep the " - stub" suffix.
     test("hcv - bam - stub") {
 
         options "-stub"
@@ -42,7 +51,11 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file('${moduleDir}/tests/Test_2.3a_D17763_major.major.nodup.bam', checkIfExists: true)
+                input[0] = [
+                    [ id: 'Test_2.3a_D17763' ],
+                    file("${moduleDir}/tests/Test_2.3a_D17763_major.major.nodup.bam", checkIfExists: true),
+                    file("${moduleDir}/tests/dump.sql.gz", checkIfExists: true)
+                ]
                 input[1] = 15.0  // hcvglue_threshold
                 """
             }
