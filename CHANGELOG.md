@@ -5,27 +5,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### `Removed`
+De novo-informed strain selection: de novo/BLAST evidence and a major-gate now drive minor-strain reporting, behind `--denovo_confirm_minor` (default ON; setting it `false` reproduces pre-v1.1.7 output).
 
-- **Breaking:** Removed the TANOTI mapper and the `--mapper` / `tanoti_stringency_1` / `tanoti_stringency_2` parameters entirely. `bowtie2` is now the only supported mapper; the mapper-selection branch and the bespoke `docker.io/jonbra/viral_haplo:1.3` image are gone. Configurations that set `--mapper tanoti` (or the stringency parameters) will no longer work. This is a non-backwards-compatible change and warrants a major-version bump.
-
-### `Added`
-
-### `Fixed`
-
-- Fixed `ggsave()` crash in `contamination_report.R` when running cohorts with more than ~53 samples. Plot cell size now scales down proportionally for large N so dimensions stay within ggplot2's 50-inch limit.
-
-### `Dependencies`
-
-### `Deprecated`
-
-## v1.2.0 - 2026.06.08
-
-De novo-informed strain selection: de novo/BLAST evidence and a major-gate now drive minor-strain reporting, behind `--denovo_confirm_minor` (default ON; setting it `false` reproduces pre-v1.2.0 output).
+> **Note:** v1.2.0 was tagged on 2026-06-08 but has been retracted. It contained two bugs (per-sample BLAST filter no-op; secondary major-gate using first-mapping stats) that caused incorrect `minor_typable` and `minor_denovo_status` values. The fixes below supersede that release. The next release will incorporate all changes listed here.
 
 ### `Added`
 
-- **Major-gate (Change 1):** a candidate minor strain is only evaluated/reported when its major passes both `minRead` and `minCov`. A failed major reports first-mapping stats plus a `gate_flag` reason, with no minor call and no major genotype call. Fixes the ERR1810469-class case (minor reported on top of a failed major).
+- **Major-gate (Change 1):** a candidate minor strain is only evaluated/reported when its major passes both `minRead` and `minCov`. A failed major reports first-mapping stats plus a `gate_flag` reason, with no minor call and no major genotype call.
 - **De novo confirmation of the candidate minor (Change 2):** after first-mapping selection, the candidate minor is cross-checked against de novo/BLAST evidence and classified `confirmed_by_denovo` / `refuted` / `unconfirmed`, using a calibrated substantial-contig test (length + k-mer-coverage + BLAST identity) and genotype-level (not subtype) matching with an asymmetric refute rule. A refuted minor is downgraded to single-infection while its `Minor_*` columns are preserved for QC.
 - **`minor_denovo_status` column** in `Summary.csv` and `summary_mqc.csv`, surfacing the basis for each minor call.
 - **New parameters:** `--denovo_confirm_minor` (default `true`), `--denovo_min_contig_length`, `--denovo_min_kmer_cov`, `--denovo_min_blast_identity`, `--denovo_match_level` (default `genotype`).
@@ -38,16 +24,23 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 
 ### `Fixed`
 
+- **Fixed per-sample BLAST filter no-op in `denovo_layer.R`:** `filter(sampleName == .data$sampleName)` inside `rowwise()` was comparing the column to itself (`.data` refers to the data frame, not the current row). The filter was a no-op, causing `classify_minor_denovo()` to receive pooled BLAST data from all samples. Replaced with a local variable captured before the pipe. This caused incorrect `minor_denovo_status` values — e.g. `sim11asingle` (1a single-infection with a 4g minor candidate) was falsely reported `confirmed_by_denovo` because other samples in the cohort had substantial 4g contigs.
+- **Fixed secondary major-gate using first-mapping stats:** `summarize_mapping_to_all_references.R` gates on first-mapping idxstats which can be inflated by cross-mapping reads (e.g. ERR1810469: 1a reads cross-map to 3a, giving >499 first-mapping reads and >29% coverage, while targeted 3a mapping yields only 248 deduplicated reads / 24% coverage). Added a secondary gate in `summarize.R` that re-checks `Reads_nodup_mapped_major` and `Major_cov_breadth_min_5` from targeted mapping against the same `minRead`/`minCov` thresholds.
 - Fixed the always-truthy `length(minor_ref > 0)` predicate in `summarize_mapping_to_all_references.R` (was `length(minor_ref) > 0`).
 - Moved the minor-gate decision into the R layer (`minor_call` / `gate_flag` columns), eliminating the `NA.toInteger()` crash class in the Nextflow minor branch.
 - Fixed two latent `--skip_assembly` plumbing bugs (undefined `BLASTPARSE.out`; de novo columns vanishing instead of NA-filling).
-- Fixed sample mix-up risk in `TARGETED_MAPPING` subworkflow: the `reference` key is now added to the meta map before the `multiMap` split, ensuring all branches (`build`, `fasta`, `reads`) share the same meta key throughout the subworkflow. Previously the enrichment happened inside the `BOWTIE2_ALIGN` input map after the split, causing `ch_aligned` to carry a different meta key than `ch_input.build` / `ch_input.fasta`, which could silently pair the wrong reference with the wrong sample in `SAMTOOLS_SORMADUP`, `STATS_WITHDUP`, `STATS_MARKDUP`, and `IVAR_CONSENSUS` during parallel multi-sample runs.
-- Fixed the `reads` branch of the `multiMap` in `TARGETED_MAPPING` to emit `[meta, reads]` instead of `[meta, fasta, reads]`. The extra `fasta` element was silently bundled into the reads input of `TANOTI_ALIGN` (which expects a 2-element tuple), potentially causing alignment failures or wrong reference use in the tanoti mapper path.
-- Fixed potential index/sample mismatch in `TARGETED_MAPPING` (bowtie2 path): `BOWTIE2_ALIGN` now receives reads, index, and fasta joined by meta key rather than positionally. Previously, `BOWTIE2_BUILD.out.index` was passed as a separate positional channel; since build tasks complete in non-deterministic order under parallel execution, sample A's reads could be aligned against sample B's index. The fix joins all three channels by meta key before calling `BOWTIE2_ALIGN`.
+- Fixed sample mix-up risk in `TARGETED_MAPPING` subworkflow: the `reference` key is now added to the meta map before the `multiMap` split, ensuring all branches (`build`, `fasta`, `reads`) share the same meta key throughout the subworkflow.
+- Fixed potential index/sample mismatch in `TARGETED_MAPPING` (bowtie2 path): `BOWTIE2_ALIGN` now receives reads, index, and fasta joined by meta key rather than positionally.
+- Fixed `ggsave()` crash in `contamination_report.R` when running cohorts with more than ~53 samples. Plot cell size now scales down proportionally for large N so dimensions stay within ggplot2's 50-inch limit.
 
 ### `Removed`
 
 - Removed the dead, non-functional `strategy == "denovo"` reference-selection branch and the undeclared `params.minDenovoLength`; the `strategy` parameter is removed from `nextflow_schema.json` and all config profiles. Reference selection now runs a single mapping-based path.
+- **Breaking:** Removed the TANOTI mapper and the `--mapper` / `tanoti_stringency_1` / `tanoti_stringency_2` parameters entirely. `bowtie2` is now the only supported mapper; the mapper-selection branch and the bespoke `docker.io/jonbra/viral_haplo:1.3` image are gone. Configurations that set `--mapper tanoti` (or the stringency parameters) will no longer work. This is a non-backwards-compatible change and warrants a major-version bump.
+
+### `Dependencies`
+
+### `Deprecated`
 
 ## v1.1.6 - 2026.02.25
 
