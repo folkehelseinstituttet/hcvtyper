@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Fixed`
 
+- Fixed `ggsave()` crash in `contamination_report.R` when running cohorts with more than ~53 samples. Plot cell size now scales down proportionally for large N so dimensions stay within ggplot2's 50-inch limit.
+
 ### `Dependencies`
 
 ### `Deprecated`
