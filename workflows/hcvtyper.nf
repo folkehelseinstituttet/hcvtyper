@@ -493,8 +493,6 @@ workflow HCVTYPER {
         workflow.manifest.version,
         workflow.manifest.name,
         file(params.input),
-        params.tanoti_stringency_1,
-        params.tanoti_stringency_2,
         ch_trimmed_reads.collect(),
         ch_classified_reads.collect(),
         ch_summarize_first_mapping,

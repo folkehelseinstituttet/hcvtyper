@@ -16,8 +16,6 @@ process SUMMARIZE {
     val version
     val name
     path samplesheet
-    val stringency_1
-    val stringency_2
     path 'trimmed/'
     path 'kraken_classified/'
     path 'parsefirst_mapping/'
@@ -48,8 +46,6 @@ process SUMMARIZE {
     """
     summarize.R \\
         $samplesheet \\
-        $stringency_1 \\
-        $stringency_2 \\
         $version \\
         $name \\
         $args

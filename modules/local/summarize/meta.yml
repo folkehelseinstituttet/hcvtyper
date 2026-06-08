@@ -14,15 +14,6 @@ tools:
       licence: null
       identifier: null
 
-input:
-  - stringency_1:
-      type: value
-      description: If the Tanoti mapper is chosen. The mapping stringency for the mapping against all HCV references
-      pattern: "*.{bam,cram,sam}"
-      ontologies:
-        - edam: http://edamontology.org/format_2572 # BAM
-        - edam: http://edamontology.org/format_2573 # CRAM
-        - edam: http://edamontology.org/format_3462 # SAM
 output:
   bam:
     - "*.bam":

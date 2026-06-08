@@ -16,19 +16,17 @@ args = commandArgs(trailingOnly=TRUE)
 # Define variables --------------------------------------------------------
 
 samplesheet      <- args[1]
-stringency_1     <- args[2]
-stringency_2     <- args[3]
-pipeline_version <- args[4]
-pipeline_name    <- args[5]
+pipeline_version <- args[2]
+pipeline_name    <- args[3]
 
 # De novo confirmation params (D-05): parsed-but-unused in Phase 2. Read defensively
 # (cf. contamination_report.R optional-arg pattern). These are NEVER branched on this
 # phase; Phase 3 consumes them. Defaults mirror plan 01's nextflow.config defaults.
-denovo_min_contig_length  <- if (length(args) >= 6 && nchar(args[6]) > 0) as.numeric(args[6]) else 1000
-denovo_min_kmer_cov       <- if (length(args) >= 7 && nchar(args[7]) > 0) as.numeric(args[7]) else 2.0
-denovo_min_blast_identity <- if (length(args) >= 8 && nchar(args[8]) > 0) as.numeric(args[8]) else 90
-denovo_match_level        <- if (length(args) >= 9 && nchar(args[9]) > 0) args[9] else "genotype"
-denovo_confirm_minor      <- if (length(args) >= 10 && nchar(args[10]) > 0) as.logical(args[10]) else TRUE
+denovo_min_contig_length  <- if (length(args) >= 4 && nchar(args[4]) > 0) as.numeric(args[4]) else 1000
+denovo_min_kmer_cov       <- if (length(args) >= 5 && nchar(args[5]) > 0) as.numeric(args[5]) else 2.0
+denovo_min_blast_identity <- if (length(args) >= 6 && nchar(args[6]) > 0) as.numeric(args[6]) else 90
+denovo_match_level        <- if (length(args) >= 7 && nchar(args[7]) > 0) args[7] else "genotype"
+denovo_confirm_minor      <- if (length(args) >= 8 && nchar(args[8]) > 0) as.logical(args[8]) else TRUE
 
 script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
