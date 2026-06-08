@@ -384,12 +384,15 @@ if (nrow(dir_plot) > 0) {
 
     n_src <- length(unique(dir_plot$source_sample))
     n_rec <- length(unique(dir_plot$recipient_sample))
+    cell_w <- min(0.9, 45 / max(n_src, 1))
+    cell_h <- min(0.9, 45 / max(n_rec, 1))
     ggsave(
         paste0(prefix, ".contamination_direction.png"),
-        plot   = p_dir,
-        width  = max(6, n_src * 0.9 + 3),
-        height = max(5, n_rec * 0.9 + 3),
-        dpi    = 150
+        plot      = p_dir,
+        width     = max(6, n_src * cell_w + 3),
+        height    = max(5, n_rec * cell_h + 3),
+        dpi       = 150,
+        limitsize = FALSE
     )
 }
 
@@ -435,12 +438,15 @@ p_heatmap <- ggplot(grid, aes(x = sample2, y = sample1, fill = n_pairs)) +
         panel.grid  = element_blank()
     )
 
+n_all <- length(all_samples)
+cell_size <- min(0.9, 45 / max(n_all, 1))
 ggsave(
     paste0(prefix, ".contamination_heatmap.png"),
-    plot   = p_heatmap,
-    width  = max(6, length(all_samples) * 0.9 + 2),
-    height = max(5, length(all_samples) * 0.9 + 1.5),
-    dpi    = 150
+    plot      = p_heatmap,
+    width     = max(6, n_all * cell_size + 2),
+    height    = max(5, n_all * cell_size + 1.5),
+    dpi       = 150,
+    limitsize = FALSE
 )
 
 # ── MultiQC custom content ─────────────────────────────────────────────────────
