@@ -5,7 +5,6 @@
 include { BOWTIE2_BUILD                   } from '../../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN                   } from '../../../modules/nf-core/bowtie2/align/main'
 include { PLOTCOVERAGE                    } from '../../../modules/local/plotcoverage/main'
-include { TANOTI_ALIGN                    } from '../../../modules/local/tanoti.nf'
 include { SAMTOOLS_INDEX as INDEX_WITHDUP } from '../../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_INDEX as INDEX_MARKDUP } from '../../../modules/nf-core/samtools/index/main'
 include { SAMTOOLS_IDXSTATS               } from '../../../modules/nf-core/samtools/idxstats/main'
@@ -38,40 +37,28 @@ workflow TARGETED_MAPPING {
             reads: [ meta, reads ]
         }
 
-    if (params.mapper == "bowtie2") {
-        BOWTIE2_BUILD (
-            ch_input.build // val(meta), path(fasta)
-        )
+    BOWTIE2_BUILD (
+        ch_input.build // val(meta), path(fasta)
+    )
 
-        // Join reads, index, and fasta by meta key before calling BOWTIE2_ALIGN.
-        // BOWTIE2_BUILD emits index items in completion order (not submission order),
-        // so a positional join would pair the wrong index with the wrong sample when
-        // multiple samples are processed in parallel. Joining by meta key guarantees
-        // that each BOWTIE2_ALIGN task always receives the correct matched triple.
-        ch_aligned_input = ch_input.reads       // meta, reads
-            .join( BOWTIE2_BUILD.out.index )   // meta, reads, index
-            .join( ch_input.build )            // meta, reads, index, fasta
+    // Join reads, index, and fasta by meta key before calling BOWTIE2_ALIGN.
+    // BOWTIE2_BUILD emits index items in completion order (not submission order),
+    // so a positional join would pair the wrong index with the wrong sample when
+    // multiple samples are processed in parallel. Joining by meta key guarantees
+    // that each BOWTIE2_ALIGN task always receives the correct matched triple.
+    ch_aligned_input = ch_input.reads       // meta, reads
+        .join( BOWTIE2_BUILD.out.index )   // meta, reads, index
+        .join( ch_input.build )            // meta, reads, index, fasta
 
-        BOWTIE2_ALIGN (
-            ch_aligned_input.map { meta, reads, _index, _fasta -> [ meta, reads ] },
-            ch_aligned_input.map { meta, _reads, index, _fasta -> [ meta, index ] },
-            ch_aligned_input.map { meta, _reads, _index, fasta -> [ meta, fasta ] },
-            false, // Do not save unmapped reads
-            true   // Sort bam file
-        )
-        ch_aligned = BOWTIE2_ALIGN.out.bam
-        ch_versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
-    }
-    else if (params.mapper == "tanoti") {
-        TANOTI_ALIGN (
-            ch_input.reads, // tuple val(meta), path(reads) — fasta is no longer bundled in here
-            ch_input.build,
-            true, // Sort bam file
-            params.tanoti_stringency_2
-        )
-        ch_aligned = TANOTI_ALIGN.out.aligned
-        ch_versions = TANOTI_ALIGN.out.versions // channel: [ versions.yml ]
-    }
+    BOWTIE2_ALIGN (
+        ch_aligned_input.map { meta, reads, _index, _fasta -> [ meta, reads ] },
+        ch_aligned_input.map { meta, _reads, index, _fasta -> [ meta, index ] },
+        ch_aligned_input.map { meta, _reads, _index, fasta -> [ meta, fasta ] },
+        false, // Do not save unmapped reads
+        true   // Sort bam file
+    )
+    ch_aligned = BOWTIE2_ALIGN.out.bam
+    ch_versions = BOWTIE2_ALIGN.out.versions // channel: [ versions.yml ]
 
     // Generate stats file with duplicates included
     INDEX_WITHDUP (

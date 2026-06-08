@@ -62,7 +62,6 @@ include { UNTAR as UNTAR_KRAKEN_FOCUSED      } from '../modules/nf-core/untar/ma
 //
 include { INSTRUMENTID                       } from '../modules/local/instrumentid/main'
 include { BLASTPARSE                         } from '../modules/local/blastparse/main'
-include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { HCVGLUE                            } from '../modules/local/hcvglue/main'
@@ -318,27 +317,15 @@ workflow HCVTYPER {
     //
     // MODULE: Map classified reads against all references
     //
-    if (params.mapper == "bowtie2") {
-        BOWTIE2_ALIGN (
-            KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            BOWTIE2_BUILD.out.index,
-            [ [], file(params.references) ], // Add empty meta map and reference fasta for CRAM support
-            false, // Do not save unmapped reads
-            true // Sort bam file
-        )
-        ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
-        ch_aligned = BOWTIE2_ALIGN.out.bam
-    }
-    else if (params.mapper == "tanoti") {
-        TANOTI_ALIGN (
-            KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            [ [], file(params.references) ], // Add empty meta map before the reference file path
-            true, // Sort bam file
-            params.tanoti_stringency_1
-        )
-        ch_versions = ch_versions.mix(TANOTI_ALIGN.out.versions.first())
-        ch_aligned = TANOTI_ALIGN.out.aligned
-    }
+    BOWTIE2_ALIGN (
+        KRAKEN2_FOCUSED.out.classified_reads_fastq,
+        BOWTIE2_BUILD.out.index,
+        [ [], file(params.references) ], // Add empty meta map and reference fasta for CRAM support
+        false, // Do not save unmapped reads
+        true // Sort bam file
+    )
+    ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+    ch_aligned = BOWTIE2_ALIGN.out.bam
 
     //
     // SUBWORKFLOW: Get mapping statistics with duplicates included
