@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### `Removed`
+
+- **Breaking:** Removed the TANOTI mapper and the `--mapper` / `tanoti_stringency_1` / `tanoti_stringency_2` parameters entirely. `bowtie2` is now the only supported mapper; the mapper-selection branch and the bespoke `docker.io/jonbra/viral_haplo:1.3` image are gone. Configurations that set `--mapper tanoti` (or the stringency parameters) will no longer work. This is a non-backwards-compatible change and warrants a major-version bump.
+
 ### `Added`
 
 ### `Fixed`

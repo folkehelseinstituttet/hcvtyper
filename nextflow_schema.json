@@ -150,10 +150,6 @@
         "config_profile_url": {
             "type": "string"
         },
-        "mapper": {
-            "type": "string",
-            "default": "bowtie2"
-        },
         "kraken_all": {
             "type": "boolean",
             "default": true
@@ -169,14 +165,6 @@
         "references": {
             "type": "string",
             "default": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/test-datasets/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
-        },
-        "tanoti_stringency_1": {
-            "type": "integer",
-            "default": 85
-        },
-        "tanoti_stringency_2": {
-            "type": "integer",
-            "default": 95
         },
         "minRead": {
             "type": "integer",
