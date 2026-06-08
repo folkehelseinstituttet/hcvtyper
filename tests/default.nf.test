@@ -81,4 +81,72 @@ nextflow_pipeline {
             )
         }
     }
+
+    test("-profile test Summary.csv GLUE column structure (GLUE-04 output-compatibility)") {
+
+        // GLUE-04: the per-BAM HCVGLUE refactor (Phase 05) must keep Summary.csv structurally
+        // identical to the pre-refactor output. The refactor changed only HOW the per-BAM
+        // *.major.nodup.json / *.minor.nodup.json files are produced (one hermetic container
+        // per BAM); bin/GLUE_json_parser.R (scans `<major|minor>.nodup.json$`) and the
+        // SUMMARIZE column layout are byte-unchanged (D-11). This case asserts the published
+        // Summary.csv still carries the full, ordered GLUE drug-resistance + de novo column
+        // block — i.e. the downstream contract the parser feeds is preserved.
+        //
+        // NOTE ON HARNESS SCOPE: conf/test.config sets skip_hcvglue=true, so the live HCVGLUE
+        // container is intentionally not run here (it needs the real 59 MB GLUE SQL dump). The
+        // per-BAM JSON/HTML fan-out is asserted at the MODULE level in
+        // modules/local/hcvglue/tests/main.nf.test, and the genuine end-to-end live run
+        // (Docker + Singularity, real dump -> JSON -> parser -> Summary.csv) is the
+        // human-verified Task 2 of plan 05-03. Even with GLUE skipped, the Summary.csv GLUE
+        // column STRUCTURE is emitted by SUMMARIZE and is the stable GLUE-04 contract checked
+        // here. Explicit content assertions (NOT the shared snapshot key) so this does not
+        // collide with the default case's snapshot.
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            def summaryFile = new File("$outputDir/summary/Summary.csv")
+            def header = summaryFile.exists() ? (summaryFile.readLines().findAll { it.trim() }[0].split(',', -1) as List) : []
+
+            // The exact GLUE block (genotype/subtype + per-drug + per-class + GLUE versions)
+            // that HCV_GLUE_PARSER populates and SUMMARIZE joins — must all survive the refactor.
+            // Column names taken from the live -profile test Summary.csv header (note: the
+            // pipeline emits `daclasvir` — a long-standing in-pipeline spelling — not `daclatasvir`;
+            // this assertion intentionally matches the emitted name, not the drug's textbook name).
+            def glueCols = [
+                'GLUE_genotype', 'GLUE_subtype',
+                'glecaprevir', 'grazoprevir', 'paritaprevir', 'voxilaprevir', 'NS34A',
+                'daclasvir', 'elbasvir', 'ledipasvir', 'ombitasvir', 'pibrentasvir', 'velpatasvir', 'NS5A',
+                'dasabuvir', 'sofosbuvir', 'NS5B',
+                'HCV project version', 'GLUE engine version', 'PHE drug resistance extension version'
+            ]
+            // The Phase 02/04 de novo block must also remain present. In the emitted Summary.csv
+            // the de novo block sits BEFORE the GLUE block (denovo_* near col ~38, GLUE block after).
+            def denovoCols = ['denovo_major_ref', 'denovo_minor_ref', 'minor_denovo_status']
+
+            assertAll(
+                { assert workflow.success },
+                // (a) Summary.csv is published.
+                { assert summaryFile.exists() : "Summary.csv missing" },
+                // (b) The full GLUE drug-resistance column block is present (parser contract intact).
+                { assert glueCols.every { header.contains(it) } :
+                        "Summary.csv missing GLUE column(s) ${glueCols.findAll { !header.contains(it) }}; header was: ${header}" },
+                // (c) GLUE_genotype precedes the per-drug columns, preserving GLUE block ordering.
+                { assert header.indexOf('GLUE_genotype') < header.indexOf('glecaprevir') :
+                        "GLUE column ordering changed; header was: ${header}" },
+                // (d) ...and GLUE versions close the GLUE block after the per-drug columns.
+                { assert header.indexOf('PHE drug resistance extension version') > header.indexOf('NS5B') :
+                        "GLUE version columns no longer trail the drug block; header was: ${header}" },
+                // (e) The de novo block is still present and precedes the GLUE block (structure preserved).
+                { assert denovoCols.every { header.contains(it) } :
+                        "Summary.csv missing de novo column(s); header was: ${header}" },
+                { assert header.indexOf('denovo_major_ref') < header.indexOf('GLUE_genotype') :
+                        "De novo block no longer precedes GLUE block; header was: ${header}" }
+            )
+        }
+    }
 }
