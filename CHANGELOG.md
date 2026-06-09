@@ -5,9 +5,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-De novo-informed strain selection: de novo/BLAST evidence and a major-gate now drive minor-strain reporting, behind `--denovo_confirm_minor` (default ON; setting it `false` reproduces pre-v1.1.7 output).
+### `Added`
 
-> **Note:** v1.2.0 was tagged on 2026-06-08 but has been retracted. It contained two bugs (per-sample BLAST filter no-op; secondary major-gate using first-mapping stats) that caused incorrect `minor_typable` and `minor_denovo_status` values. The fixes below supersede that release. The next release will incorporate all changes listed here.
+### `Fixed`
+
+### `Changed`
+
+### `Removed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.2.0 - 2026.06.09
+
+De novo-informed strain selection: de novo/BLAST evidence and a major-gate now drive minor-strain reporting, behind `--denovo_confirm_minor` (default ON; setting it `false` reproduces pre-v1.1.7 output).
 
 ### `Added`
 
