@@ -8,3 +8,7 @@ minimal_test/
 full_test/
 .nf-test/
 .nf-test*
+.claude/
+
+# GSD planning docs (local-only)
+.planning/
