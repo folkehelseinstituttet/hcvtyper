@@ -34,11 +34,26 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 - Fixed sample mix-up risk in `TARGETED_MAPPING` subworkflow: the `reference` key is now added to the meta map before the `multiMap` split, ensuring all branches (`build`, `fasta`, `reads`) share the same meta key throughout the subworkflow.
 - Fixed potential index/sample mismatch in `TARGETED_MAPPING` (bowtie2 path): `BOWTIE2_ALIGN` now receives reads, index, and fasta joined by meta key rather than positionally.
 - Fixed `ggsave()` crash in `contamination_report.R` when running cohorts with more than ~53 samples. Plot cell size now scales down proportionally for large N so dimensions stay within ggplot2's 50-inch limit.
+- Contamination check heatmap limited to 30 samples.
 
 ### `Removed`
 
 - Removed the dead, non-functional `strategy == "denovo"` reference-selection branch and the undeclared `params.minDenovoLength`; the `strategy` parameter is removed from `nextflow_schema.json` and all config profiles. Reference selection now runs a single mapping-based path.
 - **Breaking:** Removed the TANOTI mapper and the `--mapper` / `tanoti_stringency_1` / `tanoti_stringency_2` parameters entirely. `bowtie2` is now the only supported mapper; the mapper-selection branch and the bespoke `docker.io/jonbra/viral_haplo:1.3` image are gone. Configurations that set `--mapper tanoti` (or the stringency parameters) will no longer work. This is a non-backwards-compatible change and warrants a major-version bump.
+
+### `Dependencies`
+
+### `Deprecated`
+
+## v1.1.7 - 2026.06.01
+
+### `Added`
+- Added contamination check reporting with a TSV of cross-sample contig pairs, a heatmap PNG, and a MultiQC-compatible JSON table.
+
+### `Fixed`
+- Fixed sample mix-up risk in `TARGETED_MAPPING` subworkflow: the `reference` key is now added to the meta map before the `multiMap` split, ensuring all branches (`build`, `fasta`, `reads`) share the same meta key throughout the subworkflow. Previously the enrichment happened inside the `BOWTIE2_ALIGN` input map after the split, causing `ch_aligned` to carry a different meta key than `ch_input.build` / `ch_input.fasta`, which could silently pair the wrong reference with the wrong sample in `SAMTOOLS_SORMADUP`, `STATS_WITHDUP`, `STATS_MARKDUP`, and `IVAR_CONSENSUS` during parallel multi-sample runs.
+- Fixed the `reads` branch of the `multiMap` in `TARGETED_MAPPING` to emit `[meta, reads]` instead of `[meta, fasta, reads]`. The extra `fasta` element was silently bundled into the reads input of `TANOTI_ALIGN` (which expects a 2-element tuple), potentially causing alignment failures or wrong reference use in the tanoti mapper path.
+- Fixed potential index/sample mismatch in `TARGETED_MAPPING` (bowtie2 path): `BOWTIE2_ALIGN` now receives reads, index, and fasta joined by meta key rather than positionally. Previously, `BOWTIE2_BUILD.out.index` was passed as a separate positional channel; since build tasks complete in non-deterministic order under parallel execution, sample A's reads could be aligned against sample B's index. The fix joins all three channels by meta key before calling `BOWTIE2_ALIGN`.
 
 ### `Dependencies`
 
