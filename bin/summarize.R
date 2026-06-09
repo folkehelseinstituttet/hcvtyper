@@ -810,6 +810,16 @@ final <- apply_denovo_layer(
   denovo_min_blast_identity, denovo_match_level
 )
 
+# Flag ambiguous cases: gate suppressed the minor call but de novo still confirms
+# the minor genotype. These samples warrant manual review of QC plots and assembly
+# contigs.
+final <- final %>%
+  mutate(coinfection_flag = if_else(
+    minor_typable == "NO" & !is.na(minor_denovo_status) & minor_denovo_status == "confirmed_by_denovo",
+    "possible_multiple_strains",
+    NA_character_
+  ))
+
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
   final <- final %>%
@@ -879,6 +889,7 @@ final <- final %>%
          major_typable,
          minor_typable,
          minor_denovo_status,
+         coinfection_flag,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
