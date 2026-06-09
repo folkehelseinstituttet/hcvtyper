@@ -65,3 +65,15 @@ custom_data:
     file_format: "csv"
     plot_type: "table"
     section_name: "Results summary"
+    pconfig:
+      id: "results_summary_table"
+      # Colour the review_flag column orange whenever it is non-NA so analysts
+      # can quickly spot samples that need manual inspection. MultiQC maps the
+      # "warn" class to an orange/amber background in its default CSS.
+      cond_formatting_rules:
+        review_flag:
+          - warn:
+              - s_contains: "mismatch"
+              - s_contains: "coinfection"
+              - s_contains: "refuted"
+              - s_contains: "gate_failed"

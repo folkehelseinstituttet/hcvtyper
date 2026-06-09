@@ -159,7 +159,8 @@ parsefirstmapping_df <- tibble(
   major_mapped_reads = rep(NA_real_, length(first_mapping_files)),
   minor_mapped_reads = rep(NA_real_, length(first_mapping_files)),
   major_cov_firstmapping = rep(NA_real_, length(first_mapping_files)),
-  major_ref_firstmapping = rep(NA_character_, length(first_mapping_files))
+  major_ref_firstmapping = rep(NA_character_, length(first_mapping_files)),
+  gate_flag = rep(NA_character_, length(first_mapping_files))
 )
 
 # If the length of parsefirstmapping_files is non-zero
@@ -181,12 +182,15 @@ if (length(first_mapping_files) > 0) {
     # Get the number of mapped reads against all minor references belonging to the minor subtype
     parsefirstmapping_df$minor_mapped_reads[i] <- sample_parsefirstmapping %>% pull(minor_reads)
 
-    # If present, capture coverage and reference from the first-mapping report
+    # If present, capture coverage, reference and gate_flag from the first-mapping report
     if ("major_cov" %in% colnames(sample_parsefirstmapping)) {
       parsefirstmapping_df$major_cov_firstmapping[i] <- sample_parsefirstmapping %>% pull(major_cov)
     }
     if ("major_ref" %in% colnames(sample_parsefirstmapping)) {
       parsefirstmapping_df$major_ref_firstmapping[i] <- sample_parsefirstmapping %>% pull(major_ref)
+    }
+    if ("gate_flag" %in% colnames(sample_parsefirstmapping)) {
+      parsefirstmapping_df$gate_flag[i] <- sample_parsefirstmapping %>% pull(gate_flag)
     }
   }
 }
@@ -200,7 +204,7 @@ parsefirstmapping_df <- as_tibble(parsefirstmapping_df) %>%
     percent_mapped_reads_major_firstmapping = round(major_mapped_reads / total_mapped_reads * 100, digits = 2),
     percent_mapped_reads_minor_firstmapping = round(minor_mapped_reads / total_mapped_reads * 100, digits = 2)
   ) %>%
-  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping, major_cov_firstmapping, major_ref_firstmapping)
+  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping, major_cov_firstmapping, major_ref_firstmapping, gate_flag)
 
 # Second mapping, reads mapped with duplicates ----------------------------
 # List files
@@ -910,6 +914,41 @@ if (!"denovo_major_subtype" %in% colnames(final)) {
     )
 }
 
+# Review flag (REVIEW-01). Semicolon-separated list of reason codes for samples
+# that warrant human inspection. NA when no reasons fire. Reasons:
+#   major_subtype_mismatch  — de novo BLAST disagrees with mapping major subtype
+#   minor_subtype_mismatch  — de novo BLAST disagrees with mapping minor subtype
+#   possible_coinfection    — gate suppressed minor but de novo still confirms it
+#   minor_refuted           — de novo refuted the minor call
+#   major_gate_failed       — parsefirstmapping gate fired (major below threshold)
+#
+# MultiQC orange-highlight note: in assets/multiqc_config.yml the results_summary
+# custom_data block includes a cond_formatting_rules entry for this column that
+# colours any non-NA value orange (warn class). See the pconfig.cond_formatting_rules
+# key added there. If that config is absent (older deployments), MultiQC falls back
+# to plain text — the column is still useful as a text summary.
+final <- final %>%
+  mutate(review_flag = {
+    pmap_chr(
+      list(
+        denovo_major_subtype_match,
+        denovo_minor_subtype_match,
+        coinfection_flag,
+        minor_denovo_status,
+        gate_flag
+      ),
+      function(maj_match, min_match, coinf, denovo_stat, gflag) {
+        reasons <- character(0)
+        if (!is.na(maj_match)    && maj_match    == "NO")                        reasons <- c(reasons, "major_subtype_mismatch")
+        if (!is.na(min_match)    && min_match    == "NO")                        reasons <- c(reasons, "minor_subtype_mismatch")
+        if (!is.na(coinf)        && coinf        == "possible_multiple_strains") reasons <- c(reasons, "possible_coinfection")
+        if (!is.na(denovo_stat)  && denovo_stat  == "refuted")                   reasons <- c(reasons, "minor_refuted")
+        if (!is.na(gflag)        && gflag        != "ok")                        reasons <- c(reasons, "major_gate_failed")
+        if (length(reasons) == 0) NA_character_ else paste(reasons, collapse = ";")
+      }
+    )
+  })
+
 # Reorder columns
 final <- final %>%
   select(sampleName,
@@ -930,6 +969,7 @@ final <- final %>%
          denovo_minor_subtype,
          denovo_major_subtype_match,
          denovo_minor_subtype_match,
+         review_flag,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
