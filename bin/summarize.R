@@ -820,6 +820,27 @@ final <- final %>%
     NA_character_
   ))
 
+# De novo subtype comparison columns (ODH-01). Extract the leading subtype token
+# from both the mapping reference names (Major_reference / Minor_reference) and the
+# de novo BLAST top-hit reference names (denovo_major_ref / denovo_minor_ref), then
+# cross-compare them. All four columns are additive; existing columns are unchanged.
+# str_extract returns NA for NA/NULL inputs (safe; see T-odh-01 in threat model).
+final <- final %>%
+  mutate(
+    denovo_major_subtype = str_extract(denovo_major_ref, "^[^_]+"),
+    denovo_minor_subtype = str_extract(denovo_minor_ref, "^[^_]+"),
+    denovo_major_subtype_match = case_when(
+      is.na(denovo_major_subtype) | is.na(Major_reference) ~ NA_character_,
+      str_extract(Major_reference, "^[^_]+") == denovo_major_subtype ~ "YES",
+      .default = "NO"
+    ),
+    denovo_minor_subtype_match = case_when(
+      is.na(denovo_minor_subtype) | is.na(Minor_reference) ~ NA_character_,
+      str_extract(Minor_reference, "^[^_]+") == denovo_minor_subtype ~ "YES",
+      .default = "NO"
+    )
+  )
+
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
   final <- final %>%
@@ -874,6 +895,21 @@ if (!"GLUE_genotype" %in% colnames(final)) {
                )
 }
 
+# Ensure de novo subtype comparison columns are always present in the schema,
+# even when GLUE is absent and the above add_column() block runs but does not
+# include them. Since the columns are derived unconditionally above, they already
+# exist at this point; this guard is a no-op in normal execution and exists only
+# as a safety net for any future refactor that moves the derivation block.
+if (!"denovo_major_subtype" %in% colnames(final)) {
+  final <- final %>%
+    add_column(
+      "denovo_major_subtype"       = NA_character_,
+      "denovo_minor_subtype"       = NA_character_,
+      "denovo_major_subtype_match" = NA_character_,
+      "denovo_minor_subtype_match" = NA_character_
+    )
+}
+
 # Reorder columns
 final <- final %>%
   select(sampleName,
@@ -890,6 +926,10 @@ final <- final %>%
          minor_typable,
          minor_denovo_status,
          coinfection_flag,
+         denovo_major_subtype,
+         denovo_minor_subtype,
+         denovo_major_subtype_match,
+         denovo_minor_subtype_match,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
