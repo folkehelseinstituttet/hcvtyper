@@ -215,7 +215,7 @@ The MultiQC report provides an interactive overview of all samples and is the re
 - `fastp/` or `cutadapt/` - Read trimming logs and statistics
 - `kraken2/` - Taxonomic classification reports
 - `samtools/` - BAM file statistics and mapping metrics
-- `bowtie2/` or `tanoti/` - Alignment files and indices
+- `bowtie2/` - Alignment files and indices
 - `spades/` - De novo assembly results (if enabled)
 - `blast/` - BLAST results against reference database
 - `hcvglue/` - HCV-GLUE genotyping and resistance reports (for HCV samples)

@@ -17,6 +17,8 @@ workflow CONTAMINATION_CHECK {
 
     take:
     ch_contigs // channel: [ val(meta), path(contigs) ]  — gzipped FASTA from SPADES
+    ch_fastp   // channel: path(*.fastp.json)               — optional, pass [] if unavailable
+    ch_glue    // channel: path(*.major.major.*.nodup.json) — optional, pass [] if unavailable
 
     main:
 
@@ -68,13 +70,17 @@ workflow CONTAMINATION_CHECK {
     // MODULE: Parse BLAST output — produce TSV, heatmap, and MultiQC JSON
     //
     CONTAMINATION_REPORT(
-        BLAST_BLASTN_CONTIGS.out.txt.map { _meta, txt -> txt }
+        BLAST_BLASTN_CONTIGS.out.txt.map { _meta, txt -> txt },
+        ch_fastp.collect().ifEmpty([]),
+        ch_glue.collect().ifEmpty([])
     )
     ch_versions = ch_versions.mix(CONTAMINATION_REPORT.out.versions)
 
     emit:
-    tsv      = CONTAMINATION_REPORT.out.tsv      // path: contamination_pairs.tsv
-    heatmap  = CONTAMINATION_REPORT.out.heatmap  // path: contamination_heatmap.png
-    mqc      = CONTAMINATION_REPORT.out.mqc      // path: contamination_mqc.json
-    versions = ch_versions                       // channel: versions.yml
+    tsv           = CONTAMINATION_REPORT.out.tsv           // path: contamination_pairs.tsv
+    direction_tsv = CONTAMINATION_REPORT.out.direction_tsv // path: contamination_direction.tsv
+    heatmap       = CONTAMINATION_REPORT.out.heatmap       // path: contamination_heatmap.png
+    direction_png = CONTAMINATION_REPORT.out.direction_png // path: contamination_direction.png
+    mqc           = CONTAMINATION_REPORT.out.mqc           // path: contamination_mqc.json
+    versions      = ch_versions                            // channel: versions.yml
 }

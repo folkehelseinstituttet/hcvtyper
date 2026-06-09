@@ -150,14 +150,6 @@
         "config_profile_url": {
             "type": "string"
         },
-        "strategy": {
-            "type": "string",
-            "default": "mapping"
-        },
-        "mapper": {
-            "type": "string",
-            "default": "bowtie2"
-        },
         "kraken_all": {
             "type": "boolean",
             "default": true
@@ -173,14 +165,6 @@
         "references": {
             "type": "string",
             "default": "https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/test-datasets/blast_db/HCVgenosubtypes_8.5.19_clean.fa"
-        },
-        "tanoti_stringency_1": {
-            "type": "integer",
-            "default": 85
-        },
-        "tanoti_stringency_2": {
-            "type": "integer",
-            "default": 95
         },
         "minRead": {
             "type": "integer",
@@ -203,6 +187,32 @@
             "type": "integer",
             "default": 95,
             "description": "Minimum BLAST percent identity to flag a cross-sample contamination hit."
+        },
+        "denovo_min_contig_length": {
+            "type": "integer",
+            "default": 1000,
+            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+        },
+        "denovo_min_kmer_cov": {
+            "type": "number",
+            "default": 2.0,
+            "description": "Minimum SPAdes k-mer coverage for a contig to count as de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+        },
+        "denovo_min_blast_identity": {
+            "type": "number",
+            "default": 90,
+            "description": "Minimum BLAST percent identity for a contig hit to confirm a minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+        },
+        "denovo_match_level": {
+            "type": "string",
+            "default": "genotype",
+            "enum": ["genotype", "subtype"],
+            "description": "Level at which de novo evidence must match a candidate minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+        },
+        "denovo_confirm_minor": {
+            "type": "boolean",
+            "default": true,
+            "description": "Require orthogonal de novo/BLAST evidence before reporting a minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
         }
     }
 }

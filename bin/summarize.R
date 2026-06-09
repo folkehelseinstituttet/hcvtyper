@@ -2,15 +2,35 @@
 
 library(tidyverse)
 
+# De novo confirmation helpers (Phase 3). Sourced from the task workdir, where
+# they are staged as declared `path` process inputs (plan 03-03), mirroring how
+# summarize_mapping_to_all_references.R sources genotype_utils.R relatively.
+# genotype_utils.R MUST be sourced first so genotype_from_subtype() is in scope
+# before denovo_confirm.R / the confirmation layer use it.
+source("genotype_utils.R")
+source("denovo_confirm.R")
+source("denovo_layer.R")
+
 args = commandArgs(trailingOnly=TRUE)
 
 # Define variables --------------------------------------------------------
 
 samplesheet      <- args[1]
-stringency_1     <- args[2]
-stringency_2     <- args[3]
-pipeline_version <- args[4]
-pipeline_name    <- args[5]
+pipeline_version <- args[2]
+pipeline_name    <- args[3]
+
+# De novo confirmation params (D-05): parsed-but-unused in Phase 2. Read defensively
+# (cf. contamination_report.R optional-arg pattern). These are NEVER branched on this
+# phase; Phase 3 consumes them. Defaults mirror plan 01's nextflow.config defaults.
+denovo_min_contig_length  <- if (length(args) >= 4 && nchar(args[4]) > 0) as.numeric(args[4]) else 1000
+denovo_min_kmer_cov       <- if (length(args) >= 5 && nchar(args[5]) > 0) as.numeric(args[5]) else 2.0
+denovo_min_blast_identity <- if (length(args) >= 6 && nchar(args[6]) > 0) as.numeric(args[6]) else 90
+denovo_match_level        <- if (length(args) >= 7 && nchar(args[7]) > 0) args[7] else "genotype"
+denovo_confirm_minor      <- if (length(args) >= 8 && nchar(args[8]) > 0) as.logical(args[8]) else TRUE
+# Secondary targeted-mapping gate thresholds (GATE-03). Mirror parsefirstmapping
+# minRead/minCov so both gates use the same configured values.
+min_targeted_read <- if (length(args) >= 9  && nchar(args[9])  > 0) as.numeric(args[9])  else NA_real_
+min_targeted_cov  <- if (length(args) >= 10 && nchar(args[10]) > 0) as.numeric(args[10]) else NA_real_
 
 script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
@@ -24,10 +44,11 @@ path_3 <- "parsefirst_mapping/"
 path_4 <- "stats_withdup/"
 path_5 <- "stats_markdup/"
 path_6 <- "depth/"
-path_7 <- "blast/"
+path_denovo <- "denovo/"
 path_8 <- "glue/"
 path_9 <- "id/"
 path_10 <- "variation/"
+path_11 <- "consensus_distance/"
 
 
 
@@ -404,93 +425,79 @@ df_coverage <- tmp_df %>%
   slice(1)
 
 
-# Length of contigs -------------------------------------------------------
+# De novo evidence --------------------------------------------------------
 
-# Print the length of the longest scaffold matching the given reference
-blast_files <- list.files(path = path_7, pattern = "txt$", full.names = TRUE)
+# Read the parsed de novo / BLAST evidence emitted by BLASTPARSE (*.blastparse.csv).
+# Columns (cf. blast_parse.R summary CSV): sample, major_ref, major_contig_length,
+# minor_ref, minor_contig_length. The `sample` column == prefix == meta.id; trust it
+# as the join key (renamed to sampleName). Guarded on length(...) > 0 so a
+# skip-assembly / no-de-novo run yields a typed empty tibble -> NA fields, never abort
+# (T-02-02). The *_blast_out.csv per-contig table is plumbed THROUGH the denovo/
+# staging dir for Phase 3 only (Open Q2 / D-05) and is NOT read or aggregated here.
+blastparse_files <- list.files(path = path_denovo, pattern = "blastparse.csv$", full.names = TRUE)
 
-# Start with an empty tibble having correct column types
-df_contigs <- tibble(
-  scaffold_length = numeric(),
-  reference       = character(),
-  sampleName      = character()
-)
-
-if (length(blast_files) == 0) {
-  message("No BLAST files found in: ", path_7)
-} else {
-  for (bf in blast_files) {
-    sampleName <- str_split(basename(bf), "\\.")[[1]][1]
-
-    # If the file is missing or zero-length, record a row with NA values
-    if (!file.exists(bf) || file.size(bf) == 0) {
-      df_contigs <- bind_rows(
-        df_contigs,
-        tibble(scaffold_length = NA_real_, reference = NA_character_, sampleName = sampleName)
-      )
-      next
-    }
-
-    # Try to read the file; read everything as character to avoid parsing errors
-    dat <- tryCatch(
-      read_tsv(bf, col_names = FALSE, col_types = cols(.default = col_character()), progress = FALSE),
-      error = function(e) {
-        warning("Failed to read '", bf, "': ", conditionMessage(e))
-        NULL
-      }
+if (length(blastparse_files) > 0) {
+  df_denovo <- map_dfr(blastparse_files, read_csv) %>%
+    rename(
+      sampleName                 = sample,
+      denovo_major_ref           = major_ref,
+      denovo_major_contig_length = major_contig_length,
+      denovo_minor_ref           = minor_ref,
+      denovo_minor_contig_length = minor_contig_length
     )
+} else {
+  # PLUMB-02: a skip-assembly / no-de-novo run must still yield the four denovo_*
+  # columns NA-filled (never drop them). An empty tibble carrying ONLY sampleName
+  # contributes no columns to the left_join, so the denovo_* columns would vanish
+  # from Summary.csv on skip-assembly. Declare all four columns with their
+  # blast_parse.R types (ref = character, contig_length = integer) so the join
+  # always emits them; with zero rows here every existing sample row NA-fills.
+  df_denovo <- tibble(
+    sampleName                 = character(),
+    denovo_major_ref           = character(),
+    denovo_major_contig_length = integer(),
+    denovo_minor_ref           = character(),
+    denovo_minor_contig_length = integer()
+  )
+}
 
-    # If read failed or produced no rows, add NA row and continue
-    if (is.null(dat) || nrow(dat) == 0) {
-      df_contigs <- bind_rows(
-        df_contigs,
-        tibble(scaffold_length = NA_real_, reference = NA_character_, sampleName = sampleName)
-      )
-      next
-    }
+# Per-contig de novo BLAST table (Phase 3 confirmation, CONF-01/02/03). Read ALL
+# denovo/*_blast_out.csv ONCE into a long frame keyed by sampleName (basename
+# prefix before "_blast_out.csv"); the per-sample confirmation scan filters this
+# by sampleName at the chokepoint. Schema mirrors blast_parse.R (qseqid, subtype,
+# pident, evalue, bitscore, sc_length, kmer_cov). Guarded with length(...) > 0 so
+# a skip-assembly / no-de-novo run yields a typed-empty tibble and NEVER aborts
+# (T-03-01 DoS guard); a sample absent from this frame classifies as "unconfirmed",
+# never "refuted". This is read-only staging — NOT joined into `final` here.
+blast_out_files <- list.files(path = path_denovo, pattern = "_blast_out.csv$", full.names = TRUE)
 
-    # Ensure expected columns exist (X1 = query header, X2 = subject header)
-    if (!"X1" %in% names(dat)) dat$X1 <- NA_character_
-    if (!"X2" %in% names(dat)) dat$X2 <- NA_character_
-
-    # Extract genotype (text before first underscore) and scaffold_length using regex
-    processed <- dat %>%
-      mutate(
-        genotype = str_extract(X2, "^[^_]+"),
-        scaffold_length = as.numeric(str_extract(X1, "(?<=_length_)[0-9]+"))
-      ) %>%
-      # prefer rows with largest scaffold_length per genotype (NA scaffold_length sorts last)
-      arrange(desc(scaffold_length)) %>%
-      group_by(genotype) %>%
-      # Select the row with the longest scaffold lengths for each genotype/blast hit
-      slice_head(n = 1) %>%
-      ungroup() %>%
-      # remove duplicate queries (same X1) keeping the first
-      # Sometimes the same contigs has two or more hits
-      distinct(X1, .keep_all = TRUE) %>%
-      select(scaffold_length, reference = X2) %>%
-      mutate(sampleName = sampleName)
-
-    # If processing resulted in zero rows, add NA row; otherwise append results
-    if (nrow(processed) == 0) {
-      df_contigs <- bind_rows(
-        df_contigs,
-        tibble(scaffold_length = NA_real_, reference = NA_character_, sampleName = sampleName)
-      )
-    } else {
-      df_contigs <- bind_rows(df_contigs, processed)
-    }
-  }
+if (length(blast_out_files) > 0) {
+  df_blast_out <- map_dfr(blast_out_files, ~ read_csv(.x, show_col_types = FALSE) %>%
+    mutate(sampleName = str_remove(basename(.x), "_blast_out.csv$")))
+} else {
+  df_blast_out <- tibble(
+    sampleName = character(),
+    qseqid     = character(),
+    subtype    = character(),
+    pident     = double(),
+    evalue     = double(),
+    bitscore   = double(),
+    sc_length  = double(),
+    kmer_cov   = double()
+  )
 }
 
 # GLUE --------------------------------------------------------------------
 
 glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
-glue_report <- read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character()))
+# Guard the read so an empty glue/ dir (ch_glue -> [], D-07 caveat) does not abort.
+# nrow(tibble()) == 0 reproduces the GLUE-absent branch exactly, leaving the existing
+# `if (nrow(glue_report) > 0)` guards inert when GLUE is present (PLUMB-04, T-02-03).
+glue_report <- if (length(glue_file) > 0) read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) else tibble()
 
 # Collect also the minor GLUE report
 glue_file_minor <- list.files(path = path_8, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
-glue_report_minor <- read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character()))
+glue_report_minor <- if (length(glue_file_minor) > 0) read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character())) else tibble()
 
 # Extract the GLUE genotypes and subtypes for major and minor and compare them
 
@@ -620,6 +627,83 @@ if (length(variation_plot_files) > 0) {
   }
 }
 
+# Consensus distance to reference -----------------------------------------
+# Read the TSV files produced by CONSENSUS_DISTANCE for both major and minor mappings.
+# Each file has columns: sample, reference, similarity_pct, n_differences, alignment_length, consensus_length
+
+distance_files <- list.files(path = path_11, pattern = "consensus_distance\\.tsv$", full.names = TRUE)
+
+df_consensus_distance <- tibble(
+  sampleName                    = character(),
+  first_major_minor             = character(),
+  consensus_similarity_pct      = numeric(),
+  consensus_n_differences       = integer(),
+  consensus_alignment_length    = integer(),
+  consensus_length              = integer()
+)
+
+if (length(distance_files) > 0) {
+  for (df_file in distance_files) {
+    # Parse the sample name and major/minor from the filename
+    # Expected pattern: <sampleName>.<major|minor>.consensus_distance.tsv
+    fname_parts <- str_split(basename(df_file), "\\.")[[1]]
+    sample_name <- fname_parts[1]
+    major_minor <- fname_parts[2]
+
+    dat <- tryCatch(
+      read_tsv(df_file, col_types = cols(
+        sample = col_character(),
+        reference = col_character(),
+        similarity_pct = col_double(),
+        n_differences = col_integer(),
+        alignment_length = col_integer(),
+        consensus_length = col_integer()
+      )),
+      error = function(e) NULL
+    )
+
+    if (!is.null(dat) && nrow(dat) > 0) {
+      sample_col <- dat$sample[1]
+      # Extract sampleName and major_minor from sample_col for validation
+      file_sample_name <- str_extract(sample_col, "(?<=Consensus_)[^\\.]+")
+      file_major_minor <- str_extract(sample_col, "major|minor")
+      if (!identical(sample_name, file_sample_name) || !identical(major_minor, file_major_minor)) {
+        warning(glue::glue(
+          "Consensus distance file {basename(df_file)}: filename sample/major_minor ({sample_name}, {major_minor}) does not match file content ({file_sample_name}, {file_major_minor})"
+        ))
+      }
+      df_consensus_distance <- bind_rows(
+        df_consensus_distance,
+        tibble(
+          sampleName                 = sample_name,
+          first_major_minor          = major_minor,
+          consensus_similarity_pct   = dat$similarity_pct[1],
+          consensus_n_differences    = dat$n_differences[1],
+          consensus_alignment_length = dat$alignment_length[1],
+          consensus_length           = dat$consensus_length[1]
+        )
+      )
+    }
+  }
+}
+
+# Pivot to wide format: separate columns for major and minor
+df_distance_wide <- df_consensus_distance %>%
+  mutate(
+    Major_consensus_similarity_pct   = case_when(first_major_minor == "major" ~ consensus_similarity_pct),
+    Major_consensus_n_differences    = case_when(first_major_minor == "major" ~ consensus_n_differences),
+    Minor_consensus_similarity_pct   = case_when(first_major_minor == "minor" ~ consensus_similarity_pct),
+    Minor_consensus_n_differences    = case_when(first_major_minor == "minor" ~ consensus_n_differences)
+  ) %>%
+  select(sampleName,
+         Major_consensus_similarity_pct, Major_consensus_n_differences,
+         Minor_consensus_similarity_pct, Minor_consensus_n_differences) %>%
+  group_by(sampleName) %>%
+  fill(everything(), .direction = "downup") %>%
+  slice(1) %>%
+  ungroup()
+
+
 # Join dataframes ---------------------------------------------------------
 
 # Start with the original input samplesheeet and extract only the sample names. This is to ensure that all samples are included in the final summary, even if they have no data.
@@ -638,7 +722,13 @@ final <- input_samplesheet %>%
   # Add mapped reads stats
   left_join(df_mapped_reads, join_by(sampleName)) %>%
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
+  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  # Add consensus distance to reference
+  left_join(df_distance_wide, join_by(sampleName)) %>%
+  # Add de novo / BLAST evidence (PLUMB-01). Samplesheet anchors the left side so a
+  # sample with no de novo output keeps its row with NA de novo fields (PLUMB-02).
+  # The downstream select(..., everything()) carries the four denovo_ columns through.
+  left_join(df_denovo, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
@@ -678,11 +768,57 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
     ))
 }
 
-  # Add scaffold length info - for the moment not included
-  # left_join(df_contigs, join_by(sampleName)) %>%
-  # mutate(test = case_when(Majority_reference == reference ~ "OK",
-  #                         Minority_reference == reference ~ "OK")) %>%
-  # filter(test == "OK") %>%
+# Secondary targeted-mapping gate (GATE-03): re-check major quality against
+# per-sample targeted-mapping stats. The first-mapping gate in
+# parsefirstmapping.R uses raw read counts from the initial alignment to ALL
+# references; cross-mapping can inflate these for the true minor genome (e.g.
+# ERR1810469 where 1a reads cross-map to 3a, inflating 3a first-mapping counts
+# even though targeted 3a mapping yields only 248 deduplicated reads / 24% cov).
+# If Reads_nodup_mapped_major <= min_targeted_read OR Major_cov_breadth_min_5 <=
+# min_targeted_cov the major is considered below threshold and the minor is
+# suppressed, matching the same thresholds used at the parsefirstmapping gate.
+# NA major stats are treated as passing (never gate on missing data).
+if (!is.na(min_targeted_read) && !is.na(min_targeted_cov)) {
+  final <- final %>%
+    mutate(minor_typable = if_else(
+      minor_typable == "YES" & (
+        (!is.na(Reads_nodup_mapped_major) & Reads_nodup_mapped_major <= min_targeted_read) |
+        (!is.na(Major_cov_breadth_min_5)  & Major_cov_breadth_min_5  <= min_targeted_cov)
+      ),
+      "NO",
+      minor_typable
+    ))
+}
+
+# De novo confirmation of the reported minor (Change 2, D-13: DOWNGRADE-ONLY).
+# This is the authoritative chokepoint: it runs IMMEDIATELY after the
+# minor_typable case_when so it can only ever flip a YES→NO (refute), never
+# resurrect a suppressed minor (CONF-06, by construction). The 1a/1b allowance
+# above and the upstream 2k1b suppression are untouched.
+#
+# Genotypes are derived UNCONDITIONALLY from the mapping reference names
+# (`<subtype>_<acc>` → leading subtype token → genotype_from_subtype()), so the
+# layer is robust to GLUE absence (does NOT depend on Major_subtype/Minor_subtype).
+# minor_denovo_status is ALWAYS present afterwards (D-12), on both branches.
+# The downgrade layer is extracted into bin/denovo_layer.R (D-02) as a sourceable
+# apply_denovo_layer() so the unit test exercises the REAL function instead of an
+# inline re-implementation. This call is behaviour-preserving and at the SAME
+# pipeline point as the former inline block.
+final <- apply_denovo_layer(
+  final, df_blast_out, denovo_confirm_minor,
+  denovo_min_contig_length, denovo_min_kmer_cov,
+  denovo_min_blast_identity, denovo_match_level
+)
+
+# Flag ambiguous cases: gate suppressed the minor call but de novo still confirms
+# the minor genotype. These samples warrant manual review of QC plots and assembly
+# contigs.
+final <- final %>%
+  mutate(coinfection_flag = if_else(
+    minor_typable == "NO" & !is.na(minor_denovo_status) & minor_denovo_status == "confirmed_by_denovo",
+    "possible_multiple_strains",
+    NA_character_
+  ))
 
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
@@ -752,18 +888,22 @@ final <- final %>%
          Minor_reference,
          major_typable,
          minor_typable,
+         minor_denovo_status,
+         coinfection_flag,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
          Major_cov_breadth_min_5,
          Major_cov_breadth_min_10,
          percent_mapped_reads_major_firstmapping,
+         any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences")),
          Reads_withdup_mapped_minor,
          Reads_nodup_mapped_minor,
          Percent_reads_mapped_of_trimmed_with_dups_minor,
          Minor_cov_breadth_min_5,
          Minor_cov_breadth_min_10,
          percent_mapped_reads_minor_firstmapping,
+         any_of(c("Minor_consensus_similarity_pct", "Minor_consensus_n_differences")),
          everything()) %>%
   distinct() %>% # Remove any duplicated rows from the different joins
   # If there are no minor genotype reports, then the identical_geno and identical_subgeno columns will not exist. Therefore use any_of in case they are not there

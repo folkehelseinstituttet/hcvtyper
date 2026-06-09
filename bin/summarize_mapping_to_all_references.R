@@ -3,15 +3,27 @@
 library(tidyverse)
 library(seqinr)
 
+# Source the canonical 2k1b-aware genotype-from-subtype helper.
+# Relative path: the file is staged into the task workdir as a declared
+# `path(genotype_utils)` process input (PARSEFIRSTMAPPING). Do NOT use an
+# absolute or projectDir path — that would break container portability.
+source("genotype_utils.R")
+
 args = commandArgs(trailingOnly=TRUE)
-if (length(args) < 4) {
-  stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name> <references>", call.=FALSE)
+if (length(args) < 6) {
+  stop("Usage: summarize_mapping_to_all_references.R <idxstats file> <depth file> <sample name> <references> <minRead> <minCov>", call.=FALSE)
 }
 
 idxstats   <- args[1]
 depth      <- args[2]
 sampleName <- args[3]
 references <- args[4]
+# V5 input validation: as.numeric coerces; a non-numeric arg yields NA, which
+# fails the `>` gate comparisons safely (no crash, no minor_call='yes') rather
+# than producing a NumberFormatException. Values originate from tracked config
+# (conf/modules_hcv.config minRead/minCov), not external input.
+minRead    <- as.numeric(args[5])
+minCov     <- as.numeric(args[6])
 
 # First calculate coverage for all references
 # Read the depth file from the first mapping.
@@ -33,8 +45,8 @@ df <- read_table(idxstats, col_names = FALSE) %>%
   # Discard the unmapped reads marked by an * (more precisely these are unmapped reads without coordinates)
   filter(X1 != "*") %>%
   # Separate the genotype from the subtype.
-  # For 2k1b we use the whole name for genotype also
-  mutate(Genotype = if_else(Subtype == "2k1b", Subtype, substr(Subtype, 1, 1))) #%>%
+  # For 2k1b we use the whole name for genotype also (see bin/genotype_utils.R).
+  mutate(Genotype = genotype_from_subtype(Subtype)) #%>%
   # Rename Genotype 2k1b to 1 as a preparation for detecting minor genotypes
   #mutate(Genotype = str_replace(Genotype, "2k1b", "1"))
 
@@ -42,11 +54,17 @@ df <- read_table(idxstats, col_names = FALSE) %>%
 df <- left_join(df, cov, by = c("X1" = "X1"))
 
 # Create empty final dataframe to populate
-df_final <- as.data.frame(matrix(nrow = 1, ncol = 8))
-colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov")
+df_final <- as.data.frame(matrix(nrow = 1, ncol = 10))
+colnames(df_final) <- c("sample", "total_mapped_reads", "major_ref", "major_reads", "major_cov", "minor_ref", "minor_reads", "minor_cov", "minor_call", "gate_flag")
 
 # Add sample name
 df_final$sample[1] <- sampleName
+
+# Gate-decision defaults. These always carry a value so a row is never emitted
+# with an unexplained empty gate state (D-07). The empty-df / no-major branch
+# leaves these defaults in place; the populated branch overwrites them below.
+df_final$minor_call[1] <- "no"
+df_final$gate_flag[1]  <- "no_mapping"
 
 # Sometimes the mappings stats are completely empty
 if (nrow(df) > 0) {
@@ -110,14 +128,24 @@ is_valid_minor <- function(minor_row) {
     return(major_genotype != minor_genotype)
   }
 
-# Apply rule to find best valid minor
-  tmp <- df %>%
-    filter(X1 != major_ref) %>%
-    rowwise() %>%
-    filter(is_valid_minor(cur_data())) %>%
-    ungroup() %>%
-    arrange(desc(percent_gt_4)) %>%
-    slice(1)
+# Apply rule to find best valid minor.
+# Build the candidate set first. When no reference other than the major mapped,
+# the candidate set is empty; in that case we must NOT invoke is_valid_minor on a
+# zero-row rowwise frame (its `if (...)` conditions receive length-zero vectors and
+# error). Guard the rowwise filter so the no-minor path yields an empty tmp instead.
+  candidates <- df %>%
+    filter(X1 != major_ref)
+
+  if (nrow(candidates) > 0) {
+    tmp <- candidates %>%
+      rowwise() %>%
+      filter(is_valid_minor(cur_data())) %>%
+      ungroup() %>%
+      arrange(desc(percent_gt_4)) %>%
+      slice(1)
+  } else {
+    tmp <- candidates %>% slice(0)
+  }
 
   minor_ref <- tmp %>% pull(X1)
   minor_subtype <- tmp %>% pull(Subtype)
@@ -132,6 +160,21 @@ is_valid_minor <- function(minor_row) {
     df_final$minor_reads[1] <- minor_reads
     df_final$minor_cov[1] <- df %>% filter(X1 == minor_ref) %>% pull(percent_gt_4_int)
   }
+
+  # ---- Gate decision (GATE-01/GATE-02; D-04/D-05/D-07) ---------------------
+  # The major must pass BOTH thresholds before any minor can be reported.
+  # This reproduces the EXACT `>` comparison the Nextflow minor filter used to
+  # do (hcvtyper.nf), so non-gated samples are byte-identical except for the
+  # two new columns. We never blank minor_ref/minor_reads/minor_cov — the
+  # candidate stays visible for QC; gating happens via minor_call only.
+  major_pass <- (df_final$major_reads[1] > minRead) && (df_final$major_cov[1] > minCov)
+  minor_pass <- length(minor_ref) > 0 &&
+                !is.na(df_final$minor_reads[1]) &&
+                (df_final$minor_reads[1] > minRead) &&
+                (df_final$minor_cov[1] > minCov)
+
+  df_final$minor_call[1] <- if (isTRUE(major_pass) && isTRUE(minor_pass)) "yes" else "no"
+  df_final$gate_flag[1]  <- if (!isTRUE(major_pass)) "major_below_threshold" else "ok"
 }
 
 # Write results
@@ -141,6 +184,6 @@ write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
 # Read the reference fasta file
 fasta <- read.fasta(file = references)
 write.fasta(sequences = fasta[major_ref], names = major_ref, file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
-if (length(minor_ref > 0)) {
+if (length(minor_ref) > 0) {
 write.fasta(sequences = fasta[minor_ref], names = minor_ref, file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
 }

@@ -62,7 +62,6 @@ include { UNTAR as UNTAR_KRAKEN_FOCUSED      } from '../modules/nf-core/untar/ma
 //
 include { INSTRUMENTID                       } from '../modules/local/instrumentid/main'
 include { BLASTPARSE                         } from '../modules/local/blastparse/main'
-include { TANOTI_ALIGN                       } from '../modules/local/tanoti.nf'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { HCVGLUE                            } from '../modules/local/hcvglue/main'
@@ -306,7 +305,11 @@ workflow HCVTYPER {
             // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
             //
             if (!params.skip_contamination_check) {
-                CONTAMINATION_CHECK(SPADES.out.contigs)
+                CONTAMINATION_CHECK(
+                    SPADES.out.contigs,
+                    Channel.empty(),  // fastp JSONs — not wired in main pipeline
+                    Channel.empty()   // GLUE JSONs  — not wired in main pipeline
+                )
                 ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
             }
     }
@@ -314,27 +317,15 @@ workflow HCVTYPER {
     //
     // MODULE: Map classified reads against all references
     //
-    if (params.mapper == "bowtie2") {
-        BOWTIE2_ALIGN (
-            KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            BOWTIE2_BUILD.out.index,
-            [ [], file(params.references) ], // Add empty meta map and reference fasta for CRAM support
-            false, // Do not save unmapped reads
-            true // Sort bam file
-        )
-        ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
-        ch_aligned = BOWTIE2_ALIGN.out.bam
-    }
-    else if (params.mapper == "tanoti") {
-        TANOTI_ALIGN (
-            KRAKEN2_FOCUSED.out.classified_reads_fastq,
-            [ [], file(params.references) ], // Add empty meta map before the reference file path
-            true, // Sort bam file
-            params.tanoti_stringency_1
-        )
-        ch_versions = ch_versions.mix(TANOTI_ALIGN.out.versions.first())
-        ch_aligned = TANOTI_ALIGN.out.aligned
-    }
+    BOWTIE2_ALIGN (
+        KRAKEN2_FOCUSED.out.classified_reads_fastq,
+        BOWTIE2_BUILD.out.index,
+        [ [], file(params.references) ], // Add empty meta map and reference fasta for CRAM support
+        false, // Do not save unmapped reads
+        true // Sort bam file
+    )
+    ch_versions = ch_versions.mix(BOWTIE2_ALIGN.out.versions.first())
+    ch_aligned = BOWTIE2_ALIGN.out.bam
 
     //
     // SUBWORKFLOW: Get mapping statistics with duplicates included
@@ -380,39 +371,36 @@ workflow HCVTYPER {
     PARSEFIRSTMAPPING (
         // Join idxstats and depth on the meta map
         ch_parsefirstmapping,
-        file(params.references)
+        file(params.references),
+        file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
     )
 
     //
     // SUBWORKFLOW: Map reads against the majority reference
     //
-    if (params.strategy == "mapping") {
-        // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
-        // Then filter out cases where the majority reference has fewer that minRead mapped and less than minCov coverage
-        ch_major_mapping = PARSEFIRSTMAPPING.out.major_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
+    // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
+    // Then filter out cases where the majority reference has fewer that minRead mapped and less than minCov coverage
+    ch_major_mapping = PARSEFIRSTMAPPING.out.major_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
 
-        // Then create a new channel whith all the elements from the csv file in the meta map.
-        // The new channel has the structure tuple val(meta), path(fasta), path(reads)
-            .map { meta, _csv, major_fasta, _reads ->
-            def elements = _csv.splitCsv( header: true, sep:',')
-            def new_meta = meta + elements[0]
+    // Then create a new channel whith all the elements from the csv file in the meta map.
+    // The new channel has the structure tuple val(meta), path(fasta), path(reads)
+        .map { meta, _csv, major_fasta, _reads ->
+        def elements = _csv.splitCsv( header: true, sep:',')
+        def new_meta = meta + elements[0]
 
-            // Fail if meta.id is not identical to meta.sample (from the csv)
-            assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
+        // Fail if meta.id is not identical to meta.sample (from the csv)
+        assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
 
-            tuple(new_meta, major_fasta, _reads)
-            }
+        tuple(new_meta, major_fasta, _reads)
+        }
 
-        // Then filter on read nr and coverage. This info is from the csv elements
-        // This will result in a channel with values that meet the read nr and coverage criteria
-            .filter { entry ->
-                def mappedReads = entry[0]['major_reads'].toInteger()
-                def majorCov = entry[0]['major_cov'].toInteger()
-                mappedReads > params.minRead && majorCov > params.minCov
-            }
-    } else if (params.strategy == "denovo") {
-        ch_major_mapping = BLASTPARSE.out.major_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
-    }
+    // Then filter on read nr and coverage. This info is from the csv elements
+    // This will result in a channel with values that meet the read nr and coverage criteria
+        .filter { entry ->
+            def mappedReads = entry[0]['major_reads'].toInteger()
+            def majorCov = entry[0]['major_cov'].toInteger()
+            mappedReads > params.minRead && majorCov > params.minCov
+        }
 
     MAJOR_MAPPING(
         ch_major_mapping, // val(meta), path(fasta), path(reads)
@@ -422,50 +410,26 @@ workflow HCVTYPER {
     //
     // SUBWORKFLOW: Map reads against a potential minority reference
     //
-    if (params.strategy == "mapping") {
-        // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
-        // Then filter out cases where the minority reference has fewer that minRead mapped and less than minCov coverage
-        ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
+    // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
+    // Then filter out cases where the minority reference has fewer that minRead mapped and less than minCov coverage
+    ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
 
-        // Then create a new channel whith all the elements from the csv file in the meta map.
-        // The new channel has the structure tuple val(meta), path(fasta), path(reads)
-            .map { meta, _csv, minor_fasta, _reads ->
-            def elements = _csv.splitCsv( header: true, sep:',')
-            def new_meta = meta + elements[0]
+    // Then create a new channel whith all the elements from the csv file in the meta map.
+    // The new channel has the structure tuple val(meta), path(fasta), path(reads)
+        .map { meta, _csv, minor_fasta, _reads ->
+        def elements = _csv.splitCsv( header: true, sep:',')
+        def new_meta = meta + elements[0]
 
-            // Fail if meta.id is not identical to meta.sample (from the csv)
-            assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
+        // Fail if meta.id is not identical to meta.sample (from the csv)
+        assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
 
-            tuple(new_meta, minor_fasta, _reads)
-            }
-
-        // Then filter on read nr and coverage. This info is from the csv elements
-        // This will result in a channel with values that meet the read nr and coverage criteria
-        .filter { entry ->
-            def mappedReads = entry[0]['minor_reads'].toInteger()
-            def minorCov = entry[0]['minor_cov'].toInteger()
-            mappedReads > params.minRead && minorCov > params.minCov
+        tuple(new_meta, minor_fasta, _reads)
         }
-    } else if (params.strategy == "denovo") {
-        ch_join = BLASTPARSE.out.minor_fasta.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // meta, fasta, reads
-        ch_join_2 = ch_join.join(BLASTPARSE.out.csv) // meta, fasta, reads, csv
 
-        // Create a new channel with the structure tuple val(meta), path(reads)
-        // The meta will contain all the elements from meta and the csv file. meta, reads
-        ch_map_minor = ch_join_2
-            .map { meta, fasta, reads_file, csv ->
-            def elements = csv.splitCsv( header: true, sep:',')
-            return [meta + elements[0], fasta, reads_file]
-            }
-
-        // Filter on read nr and coverage
-        // This will result in a channel with values that meet the read nr and coverage criteria
-        ch_minor_mapping = ch_map_minor
-        .filter { entry ->
-            def minorLength = entry[0]['minor_contig_length'].toInteger()
-            minorLength > params.minDenovoLength
-        }
-    }
+    // Then route on the gate decision emitted by the selection script.
+    // minor_call == 'yes' only when the major passes both thresholds AND the minor passes its own (GATE-01).
+    // The R script already applied the read-nr/coverage comparison, so no .toInteger() re-derivation here (avoids NA.toInteger() crash).
+    .filter { entry -> entry[0]['minor_call'] == 'yes' }
 
     MINOR_MAPPING (
         ch_minor_mapping // val(meta), path(fasta), path(reads)
@@ -504,34 +468,45 @@ workflow HCVTYPER {
     ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
     ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
     ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
+    // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
+    // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
+    // staged channel. BLASTPARSE is invoked only inside if (!params.skip_assembly),
+    // so its .out attribute is undefined on a skip-assembly run -- referencing it
+    // unconditionally is a hard Nextflow error (process not invoked), which .ifEmpty
+    // cannot rescue. Guard the channel construction with the same condition (mirroring
+    // the ch_glue if/else below): skip-assembly yields [] -> empty denovo/ staging dir
+    // -> NA de novo columns + no dropped rows (the PLUMB-02 path).
     if (!params.skip_assembly) {
-        ch_blast = BLAST_BLASTN.out.txt.collect({it[1]})
+        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).collect().ifEmpty([])
     } else {
-        ch_blast = file("dummy_file")
+        ch_denovo = []
     }
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
-        ch_glue = file("dummy_file")
+        ch_glue = []
     }
     ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
+    ch_consensus_distance = MAJOR_MAPPING.out.consensus_distance.collect({it[1]}).mix(MINOR_MAPPING.out.consensus_distance.collect({it[1]}))
 
     SUMMARIZE (
         workflow.manifest.version,
         workflow.manifest.name,
         file(params.input),
-        params.tanoti_stringency_1,
-        params.tanoti_stringency_2,
         ch_trimmed_reads.collect(),
         ch_classified_reads.collect(),
         ch_summarize_first_mapping,
         ch_stats_withdup.collect(),
         ch_stats_markdup.collect(),
         ch_depth.collect(),
-        ch_blast,
+        ch_denovo,
         ch_glue,
         ch_sequence_id.collect(),
         ch_variation.collect(),
+        ch_consensus_distance.collect(),
+        file("${projectDir}/bin/genotype_utils.R"),
+        file("${projectDir}/bin/denovo_confirm.R"),
+        file("${projectDir}/bin/denovo_layer.R"),
     )
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 

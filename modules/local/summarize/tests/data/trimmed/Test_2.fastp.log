@@ -1,1 +1,53 @@
-/home/jon.brate/hcv_illumina/work/75/67f62e27dbeebf953c975b3979a4cf/Test_2.fastp.log
+Detecting adapter sequence for read1...
+>Nextera_LMP_Read1_External_Adapter | >Illumina Multiplexing Index Sequencing Primer
+GATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+
+Detecting adapter sequence for read2...
+>Nextera_LMP_Read2_External_Adapter
+GATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+
+Read1 before filtering:
+total reads: 10000
+total bases: 2524031
+Q20 bases: 2243192(88.8734%)
+Q30 bases: 1994943(79.038%)
+Q40 bases: 0(0%)
+
+Read2 before filtering:
+total reads: 10000
+total bases: 2608819
+Q20 bases: 1938346(74.2998%)
+Q30 bases: 1576705(60.4375%)
+Q40 bases: 0(0%)
+
+Read1 after filtering:
+total reads: 9022
+total bases: 2231466
+Q20 bases: 2073108(92.9034%)
+Q30 bases: 1873201(83.9449%)
+Q40 bases: 0(0%)
+
+Read2 after filtering:
+total reads: 9022
+total bases: 2234377
+Q20 bases: 1822390(81.5614%)
+Q30 bases: 1519641(68.0118%)
+Q40 bases: 0(0%)
+
+Filtering result:
+reads passed filter: 18044
+reads failed due to low quality: 1064
+reads failed due to too many N: 2
+reads failed due to too short: 890
+reads with adapter trimmed: 4289
+bases trimmed due to adapters: 362948
+
+Duplication rate: 18.99%
+
+Insert size peak (evaluated by paired-end reads): 205
+
+JSON report: Test_2.fastp.json
+HTML report: Test_2.fastp.html
+
+fastp --in1 Test_2_1.fastq.gz --in2 Test_2_2.fastq.gz --out1 Test_2_1.fastp.fastq.gz --out2 Test_2_2.fastp.fastq.gz --json Test_2.fastp.json --html Test_2.fastp.html --thread 2 --detect_adapter_for_pe 
+fastp v1.0.1, time used: 2 seconds

@@ -14,6 +14,7 @@ process PARSEFIRSTMAPPING {
     input:
     tuple val(meta), path(idxstats), path(depth)
     path(references)
+    path(genotype_utils)
 
     output:
     tuple val(meta), path("*.csv"), path("*major.fa"), emit: major_mapping, optional: true
@@ -34,6 +35,8 @@ process PARSEFIRSTMAPPING {
         ${depth} \\
         ${prefix} \\
         ${references} \\
+        ${params.minRead} \\
+        ${params.minCov} \\
         $args
 
     cat <<-END_VERSIONS > versions.yml
@@ -51,21 +54,24 @@ process PARSEFIRSTMAPPING {
     # Safe echo (interpolated by Groovy)
     echo "${args}"
 
-    # Create outputs matching the declared emit patterns
-    printf "reference,mapped_reads,unmapped_reads,depth_mean\n" > ${prefix}.mapping_summary.csv
-    printf "3a_D17763,8079,1,94.3\n" >> ${prefix}.mapping_summary.csv
-    printf "4k_EU392173,40,0,5.3\n" >> ${prefix}.mapping_summary.csv
+    # Stub CSV must match the real script's output contract: filename
+    # (${prefix}.parsefirstmapping.csv) and the full 10-column header so a
+    # -stub-run of the workflow lifts `sample`/`minor_call` into the meta map
+    # (the downstream `id == sample` assert and `minor_call == 'yes'` filter).
+    printf "sample,total_mapped_reads,major_ref,major_reads,major_cov,minor_ref,minor_reads,minor_cov,minor_call,gate_flag\n" > ${prefix}.parsefirstmapping.csv
+    printf "${prefix},8119,3a_D17763,8079,94,4k_EU392173,40,5,no,ok\n" >> ${prefix}.parsefirstmapping.csv
 
     # Optional FASTA outputs (touch to create empty files)
     : > ${prefix}.major.fa
     : > ${prefix}.minor.fa
 
-    # Stable versions file
-    cat > versions.yml <<'YAML'
-    "${task.process}":
-      r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-      tidyverse: \$(Rscript -e "library(tidyverse); cat(as.character(packageVersion('tidyverse')))")
-      seqinr: \$(Rscript -e "library(seqinr); cat(as.character(packageVersion('seqinr')))")
-    END_VERSIONS
+    # Stable versions file. Plain echo lines (no heredoc) so the output is
+    # immune to Groovy script-indent stripping vs bash <<- tab-stripping — the
+    # mismatch that left a literal END_VERSIONS and stray indentation in the
+    # stub versions.yml. Deterministic, byte-stable across runs.
+    echo '"${task.process}":' > versions.yml
+    echo '  r-base: stub' >> versions.yml
+    echo '  tidyverse: stub' >> versions.yml
+    echo '  seqinr: stub' >> versions.yml
     """
 }

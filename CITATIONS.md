@@ -38,10 +38,6 @@
 
   > Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. Nat Methods. 2012 Mar 4;9(4):357-9. doi: 10.1038/nmeth.1923. PubMed PMID: 22388286; PubMed Central PMCID: PMC3322381.
 
-- [Tanoti](https://github.com/vbsreenu/Tanoti)
-
-  > Sreenu VB. Tanoti: A Fast Read Mapping Tool Optimized for Virus Discovery. Available from: https://github.com/vbsreenu/Tanoti
-
 - [SPAdes](https://pubmed.ncbi.nlm.nih.gov/22506599/)
 
   > Bankevich A, Nurk S, Antipov D, et al. SPAdes: a new genome assembly algorithm and its applications to single-cell sequencing. J Comput Biol. 2012 May;19(5):455-77. doi: 10.1089/cmb.2012.0021. PubMed PMID: 22506599; PubMed Central PMCID: PMC3342519.

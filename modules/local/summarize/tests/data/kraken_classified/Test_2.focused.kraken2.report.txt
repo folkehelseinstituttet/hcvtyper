@@ -1,1 +1,33 @@
-/home/jon.brate/hcv_illumina/work/5b/e895bc6ef5d57dd6b4d22c70731123/Test_2.focused.kraken2.report.txt
+  1.95	176	176	U	0	unclassified
+ 98.05	8846	0	R	1	root
+ 98.05	8846	0	D	10239	  Viruses
+ 98.05	8846	0	D1	2559587	    Riboviria
+ 98.05	8846	0	K	2732396	      Orthornavirae
+ 98.05	8846	0	P	2732406	        Kitrinoviricota
+ 98.05	8846	0	C	2732462	          Flasuviricetes
+ 98.05	8846	0	O	2732545	            Amarillovirales
+ 98.05	8846	0	F	11050	              Flaviviridae
+ 98.05	8846	0	G	11102	                Hepacivirus
+ 98.05	8846	1794	S	11103	                  Hepacivirus C
+ 75.60	6821	1200	S1	356426	                    Hepatitis C virus subtype 3a
+ 62.30	5621	5621	S2	356416	                      Hepatitis C virus (isolate HCV-K3a/650)
+  1.56	141	0	S1	356114	                    Hepatitis C virus genotype 3
+  1.29	116	0	S2	356115	                      Hepatitis C virus subtype 3k
+  1.29	116	116	S3	356417	                        Hepatitis C virus (isolate JK049)
+  0.17	15	15	S2	42792	                      Hepatitis C virus subtype 3g
+  0.10	9	9	S2	1094895	                      Hepatitis C virus subtype 3i
+  0.01	1	0	S2	42791	                      Hepatitis C virus subtype 3b
+  0.01	1	1	S3	357355	                        Hepatitis C virus (isolate Tr Kj)
+  0.83	75	4	S1	42182	                    Hepatitis C virus genotype 6
+  0.40	36	36	S2	413257	                      Hepatitis C virus subtype 6o
+  0.27	24	19	S2	31655	                      Hepatitis C virus subtype 6a
+  0.06	5	5	S3	356420	                        Hepatitis C virus (isolate EUHK2)
+  0.10	9	9	S2	378507	                      Hepatitis C virus subtype 6m
+  0.02	2	2	S2	413256	                      Hepatitis C virus subtype 6l
+  0.09	8	2	S1	33745	                    Hepatitis C virus genotype 4
+  0.06	5	5	S2	1094900	                      Hepatitis C virus subtype 4m
+  0.01	1	1	S2	693426	                      Hepatitis C virus subtype 4n
+  0.08	7	0	S1	41856	                    Hepatitis C virus genotype 1
+  0.07	6	6	S2	31647	                      Hepatitis C virus subtype 1b
+  0.01	1	0	S2	31648	                      Hepatitis C virus subtype 1c
+  0.01	1	1	S3	356386	                        Hepatitis C virus (isolate India)

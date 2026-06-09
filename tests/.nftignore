@@ -6,10 +6,27 @@ multiqc/multiqc_data/multiqc.log
 multiqc/multiqc_data/multiqc_data.json
 multiqc/multiqc_data/multiqc_sources.txt
 multiqc/multiqc_data/multiqc_software_versions.txt
+multiqc/multiqc_data/llms-full.txt
+multiqc/multiqc_data/multiqc.parquet
+multiqc/multiqc_data/multiqc_summary.txt
 multiqc/multiqc_plots/{svg,pdf,png}/*.{svg,pdf,png}
 multiqc/multiqc_report.html
 # FastQC outputs
 fastqc/*_fastqc.{html,zip}
+# fastp HTML report + log carry run timestamps (the .json payload is stable and snapshotted)
+fastp/*.fastp.html
+fastp/*.fastp.log
+# Insert-size QC plot/data are non-deterministic (Picard CollectInsertSizeMetrics embeds run context)
+QC/insert_size/*.{pdf,txt}
+# SPAdes logs + its versions.yml embed timestamps / run-specific content (contigs/gfa are stable)
+spades/*.spades.log
+spades/*.warnings.log
+spades/versions.yml
+# samtools/versions.yml is non-deterministic: SAMTOOLS_IDXSTATS runs multiple times
+# (markdup/withdup x major/minor) and each writes versions.yml keyed by its full process
+# path to the same samtools/ publishDir. Last-writer-wins picks a different process-name key
+# each run -> different md5 despite an identical samtools version. Same class as CR-01.
+samtools/versions.yml
 # Pipeline info with timestamps and variable content
 pipeline_info/*.{html,json,txt,yml}
 # HCV-specific outputs that may have variable content
