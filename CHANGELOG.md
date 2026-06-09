@@ -20,6 +20,7 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 
 ### `Changed`
 
+- Lowered default `--denovo_min_contig_length` from 1000 to **500 bp** and raised default `--denovo_min_kmer_cov` from 2.0 to **10.0×**, calibrated against the SRA validation cohort: the 829 bp / ~20× ERR1810507 minor contig is now considered substantial evidence, while short spurious contigs (~300 bp / ~1–5×) remain below threshold.
 - Single-sourced the 2k1b-aware genotype helper into `bin/genotype_utils.R` (`genotype_from_subtype()`), staged as a process input and used by both the selection and confirmation sides.
 - BLASTPARSE per-contig CSVs (`*.blastparse.csv`, `*_blast_out.csv`) are now consumed by `SUMMARIZE` via `left_join` on `sampleName` (NA-fill on missing samples, no row loss).
 
