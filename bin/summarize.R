@@ -935,16 +935,24 @@ final <- final %>%
         denovo_minor_subtype_match,
         coinfection_flag,
         minor_denovo_status,
-        gate_flag
+        gate_flag,
+        minor_typable
       ),
-      function(maj_match, min_match, coinf, denovo_stat, gflag) {
-        reasons <- character(0)
-        if (!is.na(maj_match)    && maj_match    == "NO")                        reasons <- c(reasons, "major_subtype_mismatch")
-        if (!is.na(min_match)    && min_match    == "NO")                        reasons <- c(reasons, "minor_subtype_mismatch")
-        if (!is.na(coinf)        && coinf        == "possible_multiple_strains") reasons <- c(reasons, "possible_coinfection")
-        if (!is.na(denovo_stat)  && denovo_stat  == "refuted")                   reasons <- c(reasons, "minor_refuted")
-        if (!is.na(gflag)        && gflag        != "ok")                        reasons <- c(reasons, "major_gate_failed")
-        if (length(reasons) == 0) NA_character_ else paste(reasons, collapse = ";")
+      function(maj_match, min_match, coinf, denovo_stat, gflag, m_typable) {
+        msgs        <- character(0)
+        is_coinf    <- !is.na(m_typable) && m_typable == "YES"
+        subtype_dis <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
+        if (is_coinf && subtype_dis)
+          msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
+        if (!is_coinf && !is.na(maj_match) && maj_match == "NO")
+          msgs <- c(msgs, "Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review.")
+        if (!is.na(denovo_stat) && denovo_stat == "refuted")
+          msgs <- c(msgs, "Minor strain candidate refuted by de novo assembly — likely single infection.")
+        if (!is.na(coinf) && coinf == "possible_multiple_strains")
+          msgs <- c(msgs, "Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review.")
+        if (!is.na(gflag) && gflag != "ok")
+          msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
+        if (length(msgs) == 0) NA_character_ else paste(msgs, collapse = " | ")
       }
     )
   })

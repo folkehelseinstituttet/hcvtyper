@@ -73,7 +73,6 @@ custom_data:
       cond_formatting_rules:
         review_flag:
           - warn:
-              - s_contains: "mismatch"
-              - s_contains: "coinfection"
+              - s_contains: "Please review"
               - s_contains: "refuted"
-              - s_contains: "gate_failed"
+              - s_contains: "uncertain"
