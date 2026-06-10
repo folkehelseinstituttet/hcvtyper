@@ -196,6 +196,29 @@ The primary output file containing per-sample genotyping and quality metrics. Ke
 - `GLUE_engine_version` - GLUE engine version
 - `PHE_drug_resistance_extension_version` - Version of the Public Health England (PHE) drug resistance extension applied in HCV-GLUE
 
+**De novo confirmation columns:**
+
+The pipeline runs de novo assembly (SPAdes) and BLAST in parallel with reference mapping. These columns cross-check the two approaches and flag discrepancies for review.
+
+- `gate_flag` - Quality gate status for the major strain call. `ok` = passed all thresholds; any other value indicates the major strain failed coverage or depth requirements and the genotype call is uncertain.
+- `minor_denovo_status` - Whether the minor strain candidate is supported by de novo assembly. `confirmed_by_denovo` = a substantial contig BLASTs to the same genotype; `refuted` = de novo evidence argues against a real co-infection (likely cross-mapping artefact); `unconfirmed` = assembly evidence is insufficient to confirm or refute.
+- `coinfection_flag` - Set to `possible_multiple_strains` when de novo assembly finds evidence for a co-infection that was suppressed by the reference-mapping quality gate (i.e. the minor strain may be real but coverage thresholds prevented it from being called).
+- `denovo_major_ref` / `denovo_minor_ref` - Best-matching reference from the de novo BLAST for the major and minor strain respectively.
+- `denovo_major_contig_length` / `denovo_minor_contig_length` - Length (bp) of the supporting contig from de novo assembly.
+- `denovo_major_subtype` / `denovo_minor_subtype` - Subtype extracted from the de novo BLAST hit (first field before `_` in the reference name).
+- `denovo_major_subtype_match` / `denovo_minor_subtype_match` - Whether the de novo subtype agrees with the reference-mapping subtype (`YES` / `NO` / `NA` if one method had no result).
+
+**Review flag:**
+
+- `review_flag` - Human-readable summary of any issues worth manual inspection. `NA` when all checks pass. Multiple issues are joined with ` | `. Possible messages:
+  - *"Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review."* — Both methods detect a co-infection but disagree on which strain is the major one, likely because mapping uses read count while de novo uses contig coverage.
+  - *"Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review."* — Single-infection sample where de novo and mapping point to different subtypes; may indicate a divergent strain or reference database gap.
+  - *"Minor strain candidate refuted by de novo assembly — likely single infection."* — The minor strain seen in mapping is not supported by assembled contigs; most likely a cross-mapping artefact.
+  - *"Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review."* — De novo assembly finds a second strain but the mapping coverage of the minor strain is below the reporting threshold.
+  - *"Major strain failed mapping quality thresholds — genotype call uncertain."* — The primary genotype call does not meet minimum coverage or depth requirements.
+
+Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC Results summary table.
+
 
 #### MultiQC Report
 A comprehensive HTML report (`multiqc_report.html`) that summarizes:
