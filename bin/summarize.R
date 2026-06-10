@@ -1010,15 +1010,13 @@ header <- c("# id: 'summary'",
 # Convert final data to data frame
 tt <- as.data.frame(final)
 
-# Set up file name for writing to (NB, can't use capital S i summary for MultiQC to pick it up)
-file <- "summary_mqc.csv"
-
-# Add MultiQC header to file
-#write_lines(header, file)
+# TSV avoids quoting issues when field values contain commas (e.g. review_flag sentences).
+# MultiQC config must match: file_format: tsv, fn: "*/summary_mqc.tsv"
+file <- "summary_mqc.tsv"
 
 # Add the column names to file
-tt %>% colnames() %>% paste0(collapse = ",") %>% write_lines(file, append = TRUE)
+tt %>% colnames() %>% paste0(collapse = "\t") %>% write_lines(file, append = TRUE)
 
 # Write the data to file
-write_csv(tt, file, append = TRUE) # colnames will not be included
+write_tsv(tt, file, append = TRUE) # colnames will not be included
 

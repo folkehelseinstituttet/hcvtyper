@@ -61,8 +61,8 @@ module_order:
 custom_data:
   results_summary:
     id: "results_summary"
-    fn: "*/summary_mqc.csv"   # glob pattern
-    file_format: "csv"
+    fn: "*/summary_mqc.tsv"   # glob pattern; TSV avoids quoting issues with comma-containing fields
+    file_format: "tsv"
     plot_type: "table"
     section_name: "Results summary"
     pconfig:
