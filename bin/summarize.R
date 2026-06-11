@@ -914,13 +914,20 @@ if (!"denovo_major_subtype" %in% colnames(final)) {
     )
 }
 
-# Review flag (REVIEW-01). Semicolon-separated list of reason codes for samples
-# that warrant human inspection. NA when no reasons fire. Reasons:
-#   major_subtype_mismatch  — de novo BLAST disagrees with mapping major subtype
-#   minor_subtype_mismatch  — de novo BLAST disagrees with mapping minor subtype
-#   possible_coinfection    — gate suppressed minor but de novo still confirms it
-#   minor_refuted           — de novo refuted the minor call
-#   major_gate_failed       — parsefirstmapping gate fired (major below threshold)
+# Review flag (REVIEW-01). Human-readable inspection prompts for samples that
+# warrant manual review, joined with " | ". NA when no reasons fire. The verbatim
+# message text lives in the pmap_chr() below; the triggers, in order, are:
+#   1. minor_typable == "YES" AND a major or minor subtype mismatch
+#      (denovo_*_subtype_match == "NO") — co-infection confirmed but major/minor
+#      assignment uncertain (de novo and mapping disagree on the dominant strain)
+#   2. single-infection (minor_typable != "YES") AND denovo_major_subtype_match == "NO"
+#      — major subtype conflict between de novo assembly and mapping
+#   3. minor_denovo_status == "refuted" — minor refuted by de novo; likely single infection
+#   4. coinfection_flag == "possible_multiple_strains" — de novo confirms a minor
+#      that the mapping quality gate suppressed
+#   5. gate_flag != "ok" — major failed the first-mapping quality thresholds
+# (Earlier versions emitted semicolon-separated reason codes; rewritten to full
+# sentences in commit ff12009.)
 #
 # MultiQC orange-highlight note: in assets/multiqc_config.yml the results_summary
 # custom_data block includes a cond_formatting_rules entry for this column that
