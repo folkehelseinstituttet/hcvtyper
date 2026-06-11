@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Fixed`
 
+- Corrected `nextflow_schema.json`, which had drifted from `nextflow.config`: the `denovo_min_contig_length` (1000 → 500) and `denovo_min_kmer_cov` (2.0 → 10.0) defaults now match the values shipped in v1.2.0, and the five `contamination_*` parameters (`hop_rate`, `min_dir_ratio`, `genome_size`, `kmer_size`, `min_aln_cov`) are now documented in the schema.
+- Restored green CI on `dev`: the pipeline test now runs to completion (it was failing because the declared minimum Nextflow could not load `nf-schema@2.1.0`), and the Prettier/Black/EditorConfig linting jobs pass again. GLUE nf-test JSON fixtures (which contain GLUE `DEBUG` log lines before their JSON payload and are parsed accordingly) are excluded from Prettier via `.prettierignore`.
+
 ### `Changed`
 
 ### `Removed`
 
 ### `Dependencies`
+
+- Raised the minimum Nextflow version to **24.04.0** (`nextflow.config` and the CI test matrix). The previous `>=23.04.0` floor could not actually run the pipeline: `nf-schema@2.1.0` requires `>=23.10.0`, and the `resourceLimits` process directive used by the test profile requires `>=24.04.0`.
+- Updated deprecated GitHub Actions in the CI/linting workflows (`actions/upload-artifact` v3 → v4, `dawidd6/action-download-artifact` v2 → v6, `actions/checkout` v3 → v4, `actions/setup-node` v3 → v4, `nf-core/setup-nextflow` v1 → v2, `actions/setup-python` v4 → v5) and switched the nf-core lint step to the restructured 4.x CLI (`nf-core pipelines lint`).
 
 ### `Deprecated`
 
