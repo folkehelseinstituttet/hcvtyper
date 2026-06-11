@@ -60,9 +60,11 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 ## v1.1.7 - 2026.06.01
 
 ### `Added`
+
 - Added contamination check reporting with a TSV of cross-sample contig pairs, a heatmap PNG, and a MultiQC-compatible JSON table.
 
 ### `Fixed`
+
 - Fixed sample mix-up risk in `TARGETED_MAPPING` subworkflow: the `reference` key is now added to the meta map before the `multiMap` split, ensuring all branches (`build`, `fasta`, `reads`) share the same meta key throughout the subworkflow. Previously the enrichment happened inside the `BOWTIE2_ALIGN` input map after the split, causing `ch_aligned` to carry a different meta key than `ch_input.build` / `ch_input.fasta`, which could silently pair the wrong reference with the wrong sample in `SAMTOOLS_SORMADUP`, `STATS_WITHDUP`, `STATS_MARKDUP`, and `IVAR_CONSENSUS` during parallel multi-sample runs.
 - Fixed the `reads` branch of the `multiMap` in `TARGETED_MAPPING` to emit `[meta, reads]` instead of `[meta, fasta, reads]`. The extra `fasta` element was silently bundled into the reads input of `TANOTI_ALIGN` (which expects a 2-element tuple), potentially causing alignment failures or wrong reference use in the tanoti mapper path.
 - Fixed potential index/sample mismatch in `TARGETED_MAPPING` (bowtie2 path): `BOWTIE2_ALIGN` now receives reads, index, and fasta joined by meta key rather than positionally. Previously, `BOWTIE2_BUILD.out.index` was passed as a separate positional channel; since build tasks complete in non-deterministic order under parallel execution, sample A's reads could be aligned against sample B's index. The fix joins all three channels by meta key before calling `BOWTIE2_ALIGN`.
@@ -74,6 +76,7 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 ## v1.1.6 - 2026.02.25
 
 ### `Added`
+
 - Do not publish fastq files from FASTP by default
 - Added major coverage and major reference from the first mapping to Summary.csv
 
@@ -86,6 +89,7 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 ## v1.1.5 - 2025.11.10
 
 ### `Added`
+
 - Added check in `bam_coverage.R` to ensure that the reference name extracted from the depth filename matches the reference name found in the depth file itself. If they do not match, the script will stop and print an error message.
 - Added validation to ensure that the sample IDs from the metadata match those in the CSV file when joining channels before the MAJOR_MAPPING and MINOR_MAPPING processes. If there is a mismatch, the workflow will fail with an informative error message.
 - Renamed `script_name_stringency` to `pipeline_version`
@@ -101,6 +105,7 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 ### `Added`
 
 ### `Fixed`
+
 - Updated wrong config references to KRAKEN2 database process names in the server config file.
 - Limit blastparse dot plot to top 100 contigs
 - Pipeline name and version are now correctly passed to the summary process and included in the final summary file.
@@ -112,10 +117,12 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 ## v1.1.3 - 2025.10.21
 
 ### `Added`
+
 - Replaced custom dumpsoftwareversions module with built-in softwareVersionsToYAML functionality in the main workflow.
 - Moved test datasets to a dedicated branch `test-datasets` to reduce repository size.
 
 ### `Fixed`
+
 - Fixed wrong path name to KRAKEN2_KRAKEN2 process in the server config file.
 - Correct samplesheet input now available when running the minimal test profile.
 
@@ -128,6 +135,7 @@ De novo-informed strain selection: de novo/BLAST evidence and a major-gate now d
 ### `Added`
 
 ### `Fixed`
+
 Pipeline version is now fetched from the manifest block of `nextflow.config` and passed to the SUMMARIZE process and included in the final `Summary.csv` file.
 
 ### `Dependencies`
@@ -137,10 +145,11 @@ Pipeline version is now fetched from the manifest block of `nextflow.config` and
 ## v1.1.0 and v1.1.1 - 2025.10.15
 
 ### `Added`
+
 - **Major nf-core compliance update**: Achieved 100% nf-core lint compliance (0 failed tests) with comprehensive modernization
   - Migrated from nf-validation to nf-schema plugin (v2.1.0)
   - Updated JSON schemas to draft-2020-12 format
-  - Implemented resourceLimits instead of deprecated max_* parameters
+  - Implemented resourceLimits instead of deprecated max\_\* parameters
   - Added proper nf-test infrastructure with default.nf.test and .nftignore files
   - Created external script (`bin/run_hcvglue.sh`) to resolve Docker template string issues
   - Fixed parameter type consistency (`hcvglue_threshold` as integer)
@@ -169,6 +178,7 @@ Pipeline version is now fetched from the manifest block of `nextflow.config` and
 - Added option to choose between cutadapt or fastp for read trimming. Default is cutadapt.
 
 ### `Fixed`
+
 - Resolved all configuration warnings by updating process selectors to match nf-core workflow naming conventions.
 - Fixed extensive linting errors in workflows/hcvtyper.nf including variable declarations and parameter naming conflicts.
 - Corrected workflow.onComplete handler placement and implementation following nf-core patterns.
@@ -180,6 +190,7 @@ Pipeline version is now fetched from the manifest block of `nextflow.config` and
 - Handling cases where the de novo assembled contigs produced no blast hits.
 
 ### `Dependencies`
+
 - Updated pipeline structure to comply with latest nf-core template standards and DSL2 best practices.
 
 ### `Deprecated`
@@ -187,6 +198,7 @@ Pipeline version is now fetched from the manifest block of `nextflow.config` and
 ## v1.0.6 - 2025.02.12
 
 ### `Added`
+
 Filter empty idxstats files prior to PARSEFIRSTMAPPING in the HCV workflow
 Run GLUE and create json and html files for all potential major and minor strains.
 GLUE is run as one single process on all bam files. To avoid conflicts with running docker images.
@@ -194,6 +206,7 @@ Compare GLUE genotypes and mapping genotypes for minor strains.
 Updated tidyverse version in GLUE_PARSER.
 
 ### `Fixed`
+
 GLUE json parser does not fail on corrupt GLUE json files.
 
 ### `Dependencies`
@@ -205,6 +218,7 @@ GLUE json parser does not fail on corrupt GLUE json files.
 ### `Added`
 
 ### `Fixed`
+
 Joining the GLUE summary file and the sequencing summary uses tsv-files and not csv
 
 ### `Dependencies`
@@ -218,6 +232,7 @@ Joining the GLUE summary file and the sequencing summary uses tsv-files and not 
 Ignoring errors in the SAMTOOLS_SORMADUP module after the first mapping. When using the Tanoti mapper many bam files fails in this step for some reason.
 
 ### `Fixed`
+
 SUMMARIZE module expects tsv and not csv as output.
 Reverted back to running GLUE outside of Nextflow. Some bugs in the module.
 
@@ -230,6 +245,7 @@ Reverted back to running GLUE outside of Nextflow. Some bugs in the module.
 ### `Added`
 
 ### `Fixed`
+
 HCV_GLUE process now runs with the docker profile.
 Write final summary file as tsv and not csv
 
@@ -242,6 +258,7 @@ Write final summary file as tsv and not csv
 ### `Added`
 
 ### `Fixed`
+
 GLUE json parser script can handle lines beginning with "DEBUG"
 
 ### `Dependencies`
@@ -251,9 +268,11 @@ GLUE json parser script can handle lines beginning with "DEBUG"
 ## v1.0.1 - 2024.11.24
 
 ### `Added`
+
 Adhere versioning to Semantic Versioning.
 
 ### `Fixed`
+
 Renamed niph to folkehelseinstituttet
 Updated repo name and versions throughout
 

@@ -4,6 +4,7 @@
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 
 ## Table of Contents
+
 - [About HCVTyper](#about-hcvtyper)
 - [Requirements](#requirements)
 - [Run the pipeline](#run-the-pipeline)
@@ -28,36 +29,45 @@
 maps Illumina reads to a reference genome and creates a consensus sequence.
 
 ## Requirements
+
 The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
 > [!IMPORTANT]
 > HCV-GLUE is currently only available with the Docker profile. We recommend that you always run the pipeline with Docker.
 
 ## Run the pipeline
+
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
+
 ```
 nextflow run folkehelseinstituttet/hcvtyper -r v1.1.3 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
+
 Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 1.1.3 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
 
 If you want to download a local copy of the pipeline you can run:
+
 ```
 nextflow pull folkehelseinstituttet/hcvtyper -r v1.0.6
 ```
+
 Again, `-r` is optional.
 
-
 ## Test the pipeline
+
 To run a minimal test:
+
 ```
 nextflow run folkehelseinstituttet/hcvtyper -profile docker,test
 ```
+
 This is only to see if you can get the pipeline up and running and will not run the entire pipeline such as HCV-GLUE. The results will be in a directory called `minimal_test`.
 
 To run a full test on a real dataset type:
+
 ```
 # First download the test dataset using nf-core/fetchngs
 nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/refs/heads/dev/assets/test_ids.csv' --outdir full_test
@@ -65,12 +75,15 @@ nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercon
 # Then run the pipeline on the downloaded dataset
 nextflow run folkehelseinstituttet/hcvtyper -profile docker,test_full
 ```
+
 This will download a HCV Illumina dataset from SRA and run the entire pipeline. The results will be in a directory called `full_test`.
 Note that the pipeline will by default download and use the Kraken 2 [PlusPFP-8](https://benlangmead.github.io/aws-indexes/k2) database. This reqires at least 5 GB of free disk space and will take a few minutes to download and unpack. In addition, the default memory and cpu requirements of 12 cpus and 72 GB have been overridden to `50.GB` and `8`.
 
 ## Required parameters
+
 ### Samplesheet input
-You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown below. The sample names can contain numbers and underscores (_), but not spaces, dots (.) or other symbols. The fastq_1 and fastq_2 columns must contain the full path to the gzipped paired fastq files corresponding to the same sample.
+
+You will need to create a samplesheet with information about the samples you would like to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row as shown below. The sample names can contain numbers and underscores (\_), but not spaces, dots (.) or other symbols. The fastq_1 and fastq_2 columns must contain the full path to the gzipped paired fastq files corresponding to the same sample.
 
 ```
 sample,fastq_1,fastq_2
@@ -84,6 +97,7 @@ The samplesheet is input to the pipeline using the `--input` parameter, e.g.:
 An [example samplesheet](assets/samplesheet_illumina.csv) has been provided with the pipeline in the assets directory.
 
 **File naming requirements:**
+
 - FASTQ files should be gzipped and paired-end
 - Files should follow the naming pattern: `*_R1.fastq.gz` and `*_R2.fastq.gz` (or similar R1/R2 designation)
 - All FASTQ files for a project should be organized in a single directory or subdirectories
@@ -101,21 +115,25 @@ docker run --rm \
 ```
 
 ### Output directory
+
 The output directory is specified using the `--outdir` parameter, e.g.:
 `--outdir results`
 
 ### Profiles
+
 The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`.
 
 ### Provide parameters in a file
+
 The different parameters can be provided in a file using the argument `-params-file path/to/params-file.yml`. The file can be either YAML-formatted:
 
 ```yml
-input: 'samplesheet.csv'
-outdir: 'results'
+input: "samplesheet.csv"
+outdir: "results"
 ```
 
 or JSON-formatted:
+
 ```json
 {
   "input": "samplesheet.csv",
@@ -124,7 +142,9 @@ or JSON-formatted:
 ```
 
 ## Optional parameters
+
 ### Kraken2 databases
+
 The pipeline uses [Kraken2](https://github.com/DerrickWood/kraken2) for two purposes. One is to classify the reads against a general database to get a broad overview of the taxonomic diversity within the sample (e.g., are there a lot of human reads?). The second is to classify the reads against a specific HCV-database and then use only the classified reads for the rest of the pipeline. This is done to reduce the computational load and time needed to run mapping and _de novo_ assembly.
 
 By default, the pipeline will download and use the [PlusPFP-8 database](https://benlangmead.github.io/aws-indexes/k2) compiled by Ben Langmead for the broad classification. This requires the download and upacking of a fairly large file (>5 GB) and we recommend that you download and unpack this yourself and specify the path to the database using the `--kraken_all_db` parameter.
@@ -132,17 +152,21 @@ By default, the pipeline will download and use the [PlusPFP-8 database](https://
 For the HCV-specific classification, the pipeline will use a very small and provided database which consists of around 200 different HCV strains. You can specify a custom HCV-datavase using the `--kraken_focused_db` paramter.
 
 ### HCV reference sequences
-The database comes with a provided set of about 200 HCV reference sequences downloaded from NCBI. See the file [data/blast_db/HCVgenosubtypes_8.5.19_clean.fa](data/blast_db/HCVgenosubtypes_8.5.19_clean.fa). The fasta headers have been modified to begin with the genotype and subtype information (e.g., `1a`, `3b`, etc.) followed by an underscore and the NCBI accession number (e.g, `1a_AF009606`).  You can for example add or remove HCV strains by modifying this file. Remember to format the fasta headers accordingly. This file will then be used in the mapping and analysis of the de novo assembled contigs to identify genotype and subtype. You need to provide the path to this file like this: `--references /path/to/HCV-sequences.fasta`.
+
+The database comes with a provided set of about 200 HCV reference sequences downloaded from NCBI. See the file [data/blast_db/HCVgenosubtypes_8.5.19_clean.fa](data/blast_db/HCVgenosubtypes_8.5.19_clean.fa). The fasta headers have been modified to begin with the genotype and subtype information (e.g., `1a`, `3b`, etc.) followed by an underscore and the NCBI accession number (e.g, `1a_AF009606`). You can for example add or remove HCV strains by modifying this file. Remember to format the fasta headers accordingly. This file will then be used in the mapping and analysis of the de novo assembled contigs to identify genotype and subtype. You need to provide the path to this file like this: `--references /path/to/HCV-sequences.fasta`.
 
 ### Co-infections (major and minor strains)
+
 The pipeline will first map all HCV-classified reads against all HCV reference sequences. Then it will identify the reference sequence with the most mapped reads and use the genotype and subtype information from this reference sequence to call major genotype and subtype. To identify a potential co-infection (minor strain), the pipeline will identify the reference that belongs to a different genotype than the major strain (expect for genotypes 1a and 1b which are considered different enough so that we can distinguish them in a co-infection) and has the highest coverage (i.e., percent of the genome covered by 5 or more reads). By default we have set a threshold of minimum 500 reads and 30% genome coverage in order to consider a strain as a minor strain at all. This can be overridden using the parameters `--minRead` and `--minCov`.
 
 Note that there is a recombinant strain between subtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
 
 ## Starting and stopping the pipeline
+
 If the pipeline crashes, or stopped deliberately, it can be restarted from the last completed step by running the same command but with the `-resume` option. Read more about resuming a Nextflow pipeline [here](https://www.nextflow.io/docs/latest/cache-and-resume.html).
 
 ## Customizing the pipeline
+
 Changing the arguments given to the various sub-tools can be done in several ways, perhaps the easiest is to create a custom config file. Described in more detail [here](https://nf-co.re/docs/usage/configuration#custom-configuration-files).
 
 ## Output files
@@ -158,9 +182,11 @@ withName: 'PROCESS_NAME' {
 ### Main output files
 
 #### Summary.csv
+
 The primary output file containing per-sample genotyping and quality metrics. Key columns include:
 
 **Read statistics:**
+
 - `sampleName` - Sample identifier
 - `total_raw_reads` - Total number of raw reads
 - `total_trimmed_reads` - Reads after quality trimming
@@ -169,11 +195,13 @@ The primary output file containing per-sample genotyping and quality metrics. Ke
 - `fraction_mapped_reads_vs_median` - Fraction of mapped reads relative to median across all samples. Useful for identifying outliers in a sequencing batch.
 
 **Genotyping results:**
+
 - `Major_genotype_mapping` / `Minor_genotype_mapping` - Identified genotypes (major/minor variants) from the reference mapping
 - `Major_reference` / `Minor_reference` - CLosest references identified in the mapping against all references. These were used for genotyping and re-mapping
 - `major_typable` / `minor_typable` - Whether the sample meets quality thresholds for reliable genotyping (YES/NO)
 
 **Mapping statistics (major/minor):**
+
 - `Reads_withdup_mapped_major/minor` - Mapped reads including duplicates
 - `Reads_nodup_mapped_major/minor` - Mapped reads after duplicate removal
 - `Percent_reads_mapped_of_trimmed_with_dups_major/minor` - Percentage of trimmed reads that mapped, duplicates included
@@ -181,6 +209,7 @@ The primary output file containing per-sample genotyping and quality metrics. Ke
 - `Major/Minor_avg_depth` - Average sequencing depth across the reference
 
 **HCV-specific outputs (if applicable):**
+
 - `GLUE_genotype` / `GLUE_subtype` - Genotype and subtype determined by HCV-GLUE. "Typable" only if this matches the mapping genotype.
 - `Reference` - GLUE reference sequence
 - Drug resistance markers for NS3/4A inhibitors (glecaprevir, grazoprevir, paritaprevir, voxilaprevir)
@@ -190,6 +219,7 @@ The primary output file containing per-sample genotyping and quality metrics. Ke
 - `*_mut_short` columns - Abbreviated mutation notation
 
 **Technical metadata:**
+
 - `sequencer_id` - Sequencing instrument identifier
 - `pipeline_version` - Version of the folkehelseinstituttet/hcvtyper pipeline
 - `HCV_project_version` - HCV-GLUE version
@@ -210,18 +240,19 @@ The pipeline runs de novo assembly (SPAdes) and BLAST in parallel with reference
 
 **Review flag:**
 
-- `review_flag` - Human-readable summary of any issues worth manual inspection. `NA` when all checks pass. Multiple issues are joined with ` | `. Possible messages:
-  - *"Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review."* — Both methods detect a co-infection but disagree on which strain is the major one, likely because mapping uses read count while de novo uses contig coverage.
-  - *"Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review."* — Single-infection sample where de novo and mapping point to different subtypes; may indicate a divergent strain or reference database gap.
-  - *"Minor strain candidate refuted by de novo assembly — likely single infection."* — The minor strain seen in mapping is not supported by assembled contigs; most likely a cross-mapping artefact.
-  - *"Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review."* — De novo assembly finds a second strain but the mapping coverage of the minor strain is below the reporting threshold.
-  - *"Major strain failed mapping quality thresholds — genotype call uncertain."* — The primary genotype call does not meet minimum coverage or depth requirements.
+- `review_flag` - Human-readable summary of any issues worth manual inspection. `NA` when all checks pass. Multiple issues are joined with `|`. Possible messages:
+  - _"Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review."_ — Both methods detect a co-infection but disagree on which strain is the major one, likely because mapping uses read count while de novo uses contig coverage.
+  - _"Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review."_ — Single-infection sample where de novo and mapping point to different subtypes; may indicate a divergent strain or reference database gap.
+  - _"Minor strain candidate refuted by de novo assembly — likely single infection."_ — The minor strain seen in mapping is not supported by assembled contigs; most likely a cross-mapping artefact.
+  - _"Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review."_ — De novo assembly finds a second strain but the mapping coverage of the minor strain is below the reporting threshold.
+  - _"Major strain failed mapping quality thresholds — genotype call uncertain."_ — The primary genotype call does not meet minimum coverage or depth requirements.
 
 Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC Results summary table.
 
-
 #### MultiQC Report
+
 A comprehensive HTML report (`multiqc_report.html`) that summarizes:
+
 - Run information and pipeline parameters
 - Command line and configuration used
 - Pipeline version and software versions
@@ -246,7 +277,7 @@ The MultiQC report provides an interactive overview of all samples and is the re
 
 ## Citations
 
-If you use  folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [https://doi.org/10.1099/acmi.0.001193.v1](https://doi.org/10.1099/acmi.0.001193.v1)
+If you use folkehelseinstituttet/hcvtyper for your analysis, please cite it using the following doi: [https://doi.org/10.1099/acmi.0.001193.v1](https://doi.org/10.1099/acmi.0.001193.v1)
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
@@ -257,4 +288,3 @@ This pipeline uses code and infrastructure developed and maintained by the [nf-c
 > Philip Ewels, Alexander Peltzer, Sven Fillinger, Harshil Patel, Johannes Alneberg, Andreas Wilm, Maxime Ulysse Garcia, Paolo Di Tommaso & Sven Nahnsen.
 >
 > _Nat Biotechnol._ 2020 Feb 13. doi: [10.1038/s41587-020-0439-x](https://dx.doi.org/10.1038/s41587-020-0439-x).
-
