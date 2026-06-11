@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+### `Fixed`
+
+### `Changed`
+
+### `Removed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## 1.3.0 - 2026.06.11
+
+### `Added`
+
 - **Subtype concordance columns in `Summary.csv`:** `denovo_major_subtype` and `denovo_minor_subtype` (extracted from the de novo/BLAST top-hit reference), plus `denovo_major_subtype_match` and `denovo_minor_subtype_match` (`YES`/`NO`/`NA`), cross-comparing the mapping-selected reference subtype against the de novo/BLAST subtype for the major and minor strain.
 - **`review_flag` column in `Summary.csv`** highlighting samples that need manual inspection, written as human-readable sentences (e.g. de novo/mapping major-subtype conflict, minor candidate refuted by de novo, possible co-infection suppressed by the quality gate, or uncertain major/minor assignment). Multiple reasons are joined with `|` and the value is `NA` when nothing needs review. MultiQC now highlights any non-`NA` `review_flag` cell orange in the Results summary table via conditional formatting in `assets/multiqc_config.yml`.
 
