@@ -190,17 +190,17 @@
         },
         "denovo_min_contig_length": {
             "type": "integer",
-            "default": 1000,
+            "default": 500,
             "description": "Minimum contig length (bp) to count as substantial de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
         },
         "denovo_min_kmer_cov": {
             "type": "number",
-            "default": 2.0,
+            "default": 10,
             "description": "Minimum SPAdes k-mer coverage for a contig to count as de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
         },
         "denovo_min_blast_identity": {
             "type": "number",
-            "default": 90,
+            "default": 90.0,
             "description": "Minimum BLAST percent identity for a contig hit to confirm a minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
         },
         "denovo_match_level": {
@@ -213,6 +213,31 @@
             "type": "boolean",
             "default": true,
             "description": "Require orthogonal de novo/BLAST evidence before reporting a minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+        },
+        "contamination_hop_rate": {
+            "type": "number",
+            "default": 0.001,
+            "description": "Expected index-hopping rate (fraction, e.g. 0.001 = 0.1%)."
+        },
+        "contamination_min_dir_ratio": {
+            "type": "number",
+            "default": 10.0,
+            "description": "Minimum source/recipient coverage ratio for a contamination direction to be reported."
+        },
+        "contamination_genome_size": {
+            "type": "integer",
+            "default": 9500,
+            "description": "Expected viral genome size (bp), used for the index-hop threshold."
+        },
+        "contamination_kmer_size": {
+            "type": "integer",
+            "default": 127,
+            "description": "SPAdes final k-mer size; used to convert k-mer coverage to read depth (150 bp reads, k=127, multiplier=24)."
+        },
+        "contamination_min_aln_cov": {
+            "type": "number",
+            "default": 0.9,
+            "description": "Minimum fraction of the shorter contig that must be covered by the BLAST alignment."
         }
     }
 }
