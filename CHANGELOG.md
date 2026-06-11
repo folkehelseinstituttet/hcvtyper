@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+- **Subtype concordance columns in `Summary.csv`:** `denovo_major_subtype` and `denovo_minor_subtype` (extracted from the de novo/BLAST top-hit reference), plus `denovo_major_subtype_match` and `denovo_minor_subtype_match` (`YES`/`NO`/`NA`), cross-comparing the mapping-selected reference subtype against the de novo/BLAST subtype for the major and minor strain.
+- **`review_flag` column in `Summary.csv`** highlighting samples that need manual inspection, written as human-readable sentences (e.g. de novo/mapping major-subtype conflict, minor candidate refuted by de novo, possible co-infection suppressed by the quality gate, or uncertain major/minor assignment). Multiple reasons are joined with ` | ` and the value is `NA` when nothing needs review. MultiQC now highlights any non-`NA` `review_flag` cell orange in the Results summary table via conditional formatting in `assets/multiqc_config.yml`.
+
 ### `Fixed`
 
+- MultiQC Results summary table no longer disappears when a `review_flag` sentence contains a comma: the per-sample table handed to MultiQC is now written as TSV (`summary_mqc.tsv`) instead of CSV, sidestepping MultiQC's non-RFC-4180 comma-splitting.
 - Corrected `nextflow_schema.json`, which had drifted from `nextflow.config`: the `denovo_min_contig_length` (1000 → 500) and `denovo_min_kmer_cov` (2.0 → 10.0) defaults now match the values shipped in v1.2.0, and the five `contamination_*` parameters (`hop_rate`, `min_dir_ratio`, `genome_size`, `kmer_size`, `min_aln_cov`) are now documented in the schema.
 - Restored green CI on `dev`: the pipeline test now runs to completion (it was failing because the declared minimum Nextflow could not load `nf-schema@2.1.0`), and the Prettier/Black/EditorConfig linting jobs pass again. GLUE nf-test JSON fixtures (which contain GLUE `DEBUG` log lines before their JSON payload and are parsed accordingly) are excluded from Prettier via `.prettierignore`.
 
