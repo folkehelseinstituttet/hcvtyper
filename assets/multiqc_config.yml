@@ -61,7 +61,18 @@ module_order:
 custom_data:
   results_summary:
     id: "results_summary"
-    fn: "*/summary_mqc.csv"   # glob pattern
-    file_format: "csv"
+    fn: "*/summary_mqc.tsv" # glob pattern; TSV avoids quoting issues with comma-containing fields
+    file_format: "tsv"
     plot_type: "table"
     section_name: "Results summary"
+    pconfig:
+      id: "results_summary_table"
+      # Colour the review_flag column orange whenever it is non-NA so analysts
+      # can quickly spot samples that need manual inspection. MultiQC maps the
+      # "warn" class to an orange/amber background in its default CSS.
+      cond_formatting_rules:
+        review_flag:
+          - warn:
+              - s_contains: "Please review"
+              - s_contains: "refuted"
+              - s_contains: "uncertain"

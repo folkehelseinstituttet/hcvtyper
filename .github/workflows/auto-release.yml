@@ -3,7 +3,7 @@ name: Release Management
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v1.1.0
+      - "v*.*.*" # Triggers on version tags like v1.1.0
 
 jobs:
   release:

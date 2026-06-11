@@ -7,7 +7,6 @@ keywords:
   - genomics
 
 tools:
-
   - "hcvglue":
       description: "Run HCV-GLUE on the mapping file to identify resistance variants"
       homepage: "https://github.com/giffordlabcvr/HCV-GLUE"
@@ -22,8 +21,8 @@ input:
       ontologies:
         - edam: http://edamontology.org/format_2572 # BAM
   - hcvglue_threshold:
-        type: float
-        description: Threshold for calling variant in mapping file
+      type: float
+      description: Threshold for calling variant in mapping file
 
 output:
   GLUE_json:

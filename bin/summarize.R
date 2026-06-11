@@ -159,7 +159,8 @@ parsefirstmapping_df <- tibble(
   major_mapped_reads = rep(NA_real_, length(first_mapping_files)),
   minor_mapped_reads = rep(NA_real_, length(first_mapping_files)),
   major_cov_firstmapping = rep(NA_real_, length(first_mapping_files)),
-  major_ref_firstmapping = rep(NA_character_, length(first_mapping_files))
+  major_ref_firstmapping = rep(NA_character_, length(first_mapping_files)),
+  gate_flag = rep(NA_character_, length(first_mapping_files))
 )
 
 # If the length of parsefirstmapping_files is non-zero
@@ -181,12 +182,15 @@ if (length(first_mapping_files) > 0) {
     # Get the number of mapped reads against all minor references belonging to the minor subtype
     parsefirstmapping_df$minor_mapped_reads[i] <- sample_parsefirstmapping %>% pull(minor_reads)
 
-    # If present, capture coverage and reference from the first-mapping report
+    # If present, capture coverage, reference and gate_flag from the first-mapping report
     if ("major_cov" %in% colnames(sample_parsefirstmapping)) {
       parsefirstmapping_df$major_cov_firstmapping[i] <- sample_parsefirstmapping %>% pull(major_cov)
     }
     if ("major_ref" %in% colnames(sample_parsefirstmapping)) {
       parsefirstmapping_df$major_ref_firstmapping[i] <- sample_parsefirstmapping %>% pull(major_ref)
+    }
+    if ("gate_flag" %in% colnames(sample_parsefirstmapping)) {
+      parsefirstmapping_df$gate_flag[i] <- sample_parsefirstmapping %>% pull(gate_flag)
     }
   }
 }
@@ -200,7 +204,7 @@ parsefirstmapping_df <- as_tibble(parsefirstmapping_df) %>%
     percent_mapped_reads_major_firstmapping = round(major_mapped_reads / total_mapped_reads * 100, digits = 2),
     percent_mapped_reads_minor_firstmapping = round(minor_mapped_reads / total_mapped_reads * 100, digits = 2)
   ) %>%
-  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping, major_cov_firstmapping, major_ref_firstmapping)
+  select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping, major_cov_firstmapping, major_ref_firstmapping, gate_flag)
 
 # Second mapping, reads mapped with duplicates ----------------------------
 # List files
@@ -820,6 +824,27 @@ final <- final %>%
     NA_character_
   ))
 
+# De novo subtype comparison columns (ODH-01). Extract the leading subtype token
+# from both the mapping reference names (Major_reference / Minor_reference) and the
+# de novo BLAST top-hit reference names (denovo_major_ref / denovo_minor_ref), then
+# cross-compare them. All four columns are additive; existing columns are unchanged.
+# str_extract returns NA for NA/NULL inputs (safe; see T-odh-01 in threat model).
+final <- final %>%
+  mutate(
+    denovo_major_subtype = str_extract(denovo_major_ref, "^[^_]+"),
+    denovo_minor_subtype = str_extract(denovo_minor_ref, "^[^_]+"),
+    denovo_major_subtype_match = case_when(
+      is.na(denovo_major_subtype) | is.na(Major_reference) ~ NA_character_,
+      str_extract(Major_reference, "^[^_]+") == denovo_major_subtype ~ "YES",
+      .default = "NO"
+    ),
+    denovo_minor_subtype_match = case_when(
+      is.na(denovo_minor_subtype) | is.na(Minor_reference) ~ NA_character_,
+      str_extract(Minor_reference, "^[^_]+") == denovo_minor_subtype ~ "YES",
+      .default = "NO"
+    )
+  )
+
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
   final <- final %>%
@@ -874,6 +899,71 @@ if (!"GLUE_genotype" %in% colnames(final)) {
                )
 }
 
+# Ensure de novo subtype comparison columns are always present in the schema,
+# even when GLUE is absent and the above add_column() block runs but does not
+# include them. Since the columns are derived unconditionally above, they already
+# exist at this point; this guard is a no-op in normal execution and exists only
+# as a safety net for any future refactor that moves the derivation block.
+if (!"denovo_major_subtype" %in% colnames(final)) {
+  final <- final %>%
+    add_column(
+      "denovo_major_subtype"       = NA_character_,
+      "denovo_minor_subtype"       = NA_character_,
+      "denovo_major_subtype_match" = NA_character_,
+      "denovo_minor_subtype_match" = NA_character_
+    )
+}
+
+# Review flag (REVIEW-01). Human-readable inspection prompts for samples that
+# warrant manual review, joined with " | ". NA when no reasons fire. The verbatim
+# message text lives in the pmap_chr() below; the triggers, in order, are:
+#   1. minor_typable == "YES" AND a major or minor subtype mismatch
+#      (denovo_*_subtype_match == "NO") — co-infection confirmed but major/minor
+#      assignment uncertain (de novo and mapping disagree on the dominant strain)
+#   2. single-infection (minor_typable != "YES") AND denovo_major_subtype_match == "NO"
+#      — major subtype conflict between de novo assembly and mapping
+#   3. minor_denovo_status == "refuted" — minor refuted by de novo; likely single infection
+#   4. coinfection_flag == "possible_multiple_strains" — de novo confirms a minor
+#      that the mapping quality gate suppressed
+#   5. gate_flag != "ok" — major failed the first-mapping quality thresholds
+# (Earlier versions emitted semicolon-separated reason codes; rewritten to full
+# sentences in commit ff12009.)
+#
+# MultiQC orange-highlight note: in assets/multiqc_config.yml the results_summary
+# custom_data block includes a cond_formatting_rules entry for this column that
+# colours any non-NA value orange (warn class). See the pconfig.cond_formatting_rules
+# key added there. If that config is absent (older deployments), MultiQC falls back
+# to plain text — the column is still useful as a text summary.
+final <- final %>%
+  mutate(review_flag = {
+    pmap_chr(
+      list(
+        denovo_major_subtype_match,
+        denovo_minor_subtype_match,
+        coinfection_flag,
+        minor_denovo_status,
+        gate_flag,
+        minor_typable
+      ),
+      function(maj_match, min_match, coinf, denovo_stat, gflag, m_typable) {
+        msgs        <- character(0)
+        is_coinf    <- !is.na(m_typable) && m_typable == "YES"
+        subtype_dis <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
+        if (is_coinf && subtype_dis)
+          msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
+        if (!is_coinf && !is.na(maj_match) && maj_match == "NO")
+          msgs <- c(msgs, "Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review.")
+        if (!is.na(denovo_stat) && denovo_stat == "refuted")
+          msgs <- c(msgs, "Minor strain candidate refuted by de novo assembly — likely single infection.")
+        if (!is.na(coinf) && coinf == "possible_multiple_strains")
+          msgs <- c(msgs, "Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review.")
+        if (!is.na(gflag) && gflag != "ok")
+          msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
+        if (length(msgs) == 0) NA_character_ else paste(msgs, collapse = " | ")
+      }
+    )
+  })
+
 # Reorder columns
 final <- final %>%
   select(sampleName,
@@ -890,6 +980,11 @@ final <- final %>%
          minor_typable,
          minor_denovo_status,
          coinfection_flag,
+         denovo_major_subtype,
+         denovo_minor_subtype,
+         denovo_major_subtype_match,
+         denovo_minor_subtype_match,
+         review_flag,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
@@ -922,15 +1017,13 @@ header <- c("# id: 'summary'",
 # Convert final data to data frame
 tt <- as.data.frame(final)
 
-# Set up file name for writing to (NB, can't use capital S i summary for MultiQC to pick it up)
-file <- "summary_mqc.csv"
-
-# Add MultiQC header to file
-#write_lines(header, file)
+# TSV avoids quoting issues when field values contain commas (e.g. review_flag sentences).
+# MultiQC config must match: file_format: tsv, fn: "*/summary_mqc.tsv"
+file <- "summary_mqc.tsv"
 
 # Add the column names to file
-tt %>% colnames() %>% paste0(collapse = ",") %>% write_lines(file, append = TRUE)
+tt %>% colnames() %>% paste0(collapse = "\t") %>% write_lines(file, append = TRUE)
 
 # Write the data to file
-write_csv(tt, file, append = TRUE) # colnames will not be included
+write_tsv(tt, file, append = TRUE) # colnames will not be included
 

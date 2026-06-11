@@ -30,15 +30,15 @@ input:
 
 output:
   png:
-      - "*.png":
-          type: file
-          description: Plot of the nucleotide variation
-          pattern: "*.{png}"
+    - "*.png":
+        type: file
+        description: Plot of the nucleotide variation
+        pattern: "*.{png}"
   tsv:
-      - "*.tsv":
-          type: file
-          description: Raw output of the nucleotide variation per genome position
-          pattern: "*.{tsv}"
+    - "*.tsv":
+        type: file
+        description: Raw output of the nucleotide variation per genome position
+        pattern: "*.{tsv}"
   versions:
     - "versions.yml":
         type: file
