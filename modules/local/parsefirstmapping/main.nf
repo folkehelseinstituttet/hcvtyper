@@ -17,10 +17,16 @@ process PARSEFIRSTMAPPING {
     path(genotype_utils)
 
     output:
-    tuple val(meta), path("*.csv"), path("*major.fa"), emit: major_mapping, optional: true
-    tuple val(meta), path("*.csv"), path("*minor.fa"), emit: minor_mapping, optional: true
-    tuple val(meta), path("*.csv"),                    emit: csv,           optional: true
-    path "versions.yml",                               emit: versions
+    // Legacy wide-CSV emits (D-06 shim). The globs are pinned to the specific
+    // `*.parsefirstmapping.csv` filename so they never also capture the new
+    // long-format `*.candidates.csv` written alongside it (T-06-05 glob collision).
+    tuple val(meta), path("*.parsefirstmapping.csv"), path("*major.fa"), emit: major_mapping, optional: true
+    tuple val(meta), path("*.parsefirstmapping.csv"), path("*minor.fa"), emit: minor_mapping, optional: true
+    tuple val(meta), path("*.parsefirstmapping.csv"),                    emit: csv,           optional: true
+    // Phase 6 (REFSEL-01): long-format candidate table — one row per neutrally-
+    // ranked candidate. The routable channel the Plan-03 workflow fan-out consumes.
+    tuple val(meta), path("*.candidates.csv"),                           emit: candidates,    optional: true
+    path "versions.yml",                                                 emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -37,6 +43,7 @@ process PARSEFIRSTMAPPING {
         ${references} \\
         ${params.minRead} \\
         ${params.minCov} \\
+        ${params.n_candidates} \\
         $args
 
     cat <<-END_VERSIONS > versions.yml
@@ -60,6 +67,13 @@ process PARSEFIRSTMAPPING {
     # (the downstream `id == sample` assert and `minor_call == 'yes'` filter).
     printf "sample,total_mapped_reads,major_ref,major_reads,major_cov,minor_ref,minor_reads,minor_cov,minor_call,gate_flag\n" > ${prefix}.parsefirstmapping.csv
     printf "${prefix},8119,3a_D17763,8079,94,4k_EU392173,40,5,no,ok\n" >> ${prefix}.parsefirstmapping.csv
+
+    # Stub long-format candidates CSV (REFSEL-01 contract). Full header + 2 rows so
+    # a -stub-run of the workflow fans out into 2 candidates (cand_1/cand_2), matching
+    # the default n_candidates=2 two-slot topology consumed by the Plan-03 fan-out.
+    printf "sample,candidate_rank,candidate_ref,candidate_subtype,candidate_genotype,candidate_reads,candidate_cov,confirmation_status\n" > ${prefix}.candidates.csv
+    printf "${prefix},1,3a_D17763,3a,3,8079,94,pass\n" >> ${prefix}.candidates.csv
+    printf "${prefix},2,4k_EU392173,4k,4,40,5,below_threshold\n" >> ${prefix}.candidates.csv
 
     # Optional FASTA outputs (touch to create empty files)
     : > ${prefix}.major.fa
