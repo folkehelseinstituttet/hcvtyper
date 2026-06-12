@@ -24,8 +24,7 @@ include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-schema'
 include { softwareVersionsToYAML                         } from '../subworkflows/nf-core/utils_nfcore_pipeline/main.nf'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows/local/get_mapping_stats'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
-include { TARGETED_MAPPING as MAJOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
-include { TARGETED_MAPPING as MINOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
+include { TARGETED_MAPPING                               } from '../subworkflows/local/targeted_mapping'
 include { CONTAMINATION_CHECK                            } from '../subworkflows/local/contamination_check/main'
 
 /*
@@ -376,71 +375,75 @@ workflow HCVTYPER {
     )
 
     //
-    // SUBWORKFLOW: Map reads against the majority reference
+    // SUBWORKFLOW: Map reads against EACH neutrally-ranked candidate reference (D-04 / REFSEL-03)
     //
-    // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
-    // Then filter out cases where the majority reference has fewer that minRead mapped and less than minCov coverage
-    ch_major_mapping = PARSEFIRSTMAPPING.out.major_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
+    // The two asymmetric major/minor alias routes are collapsed into ONE
+    // uniform per-candidate fan-out over the long-format candidates CSV. We splitCsv ALL rows
+    // (NOT elements[0] — the legacy code only read row[0] because the wide CSV was single-row;
+    // the long-format candidates CSV is one row PER candidate, Assumption A2) and emit one
+    // channel element per candidate. Each candidate carries its own per-rank meta + FASTA.
+    //
+    // The per-rank FASTA paths (_major.fa / _minor.fa) come from the legacy major_mapping /
+    // minor_mapping emits (D-06 shim) so the TARGETED_MAPPING `meta.reference` enrichment
+    // (fasta basename split, e.g. <ref>_major) stays byte-identical to the legacy filenames.
+    //
+    // Join all per-sample inputs by meta.id: the candidates CSV, the per-rank FASTAs, and the
+    // classified reads. The legacy major_mapping/minor_mapping emits are `optional: true`
+    // (a single-candidate sample emits no `_minor.fa`, a no-candidate sample emits neither),
+    // so both legacy joins use `remainder: true` — otherwise a missing optional emit would
+    // silently DROP the whole sample (including its passing major candidate). A null FASTA is
+    // tolerated and the candidate guarded out below.
+    ch_candidate_mapping = PARSEFIRSTMAPPING.out.candidates
+        .join(PARSEFIRSTMAPPING.out.major_mapping, remainder: true)        // meta, candidates_csv, wide_csv?, major_fasta?
+        .join(PARSEFIRSTMAPPING.out.minor_mapping, remainder: true)        // ..., wide_csv?, minor_fasta?
+        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // ..., reads
+        .flatMap { meta, candidates_csv, _wide1, major_fasta, _wide2, minor_fasta, reads ->
+            // Iterate ALL candidate rows (one element per candidate), not just row[0].
+            def rows = candidates_csv.splitCsv( header: true, sep:',' )
+            rows.collect { row ->
+                // Lift the candidate row into the meta map. Carry candidate_rank,
+                // candidate_ref and confirmation_status (R-emitted STRINGS — never coerced
+                // to Integer here, so a single/no-candidate NA field can never crash, Pitfall 3).
+                def new_meta = meta + row
 
-    // Then create a new channel whith all the elements from the csv file in the meta map.
-    // The new channel has the structure tuple val(meta), path(fasta), path(reads)
-        .map { meta, _csv, major_fasta, _reads ->
-        def elements = _csv.splitCsv( header: true, sep:',')
-        def new_meta = meta + elements[0]
+                // Fail loudly if the candidate row's sample disagrees with the pipeline meta.id.
+                assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
 
-        // Fail if meta.id is not identical to meta.sample (from the csv)
-        assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
+                // Per-candidate meta uniqueness: same-sample candidates share meta.id, so an
+                // id-only join inside TARGETED_MAPPING would cross-pair index/fasta/reads (Pitfall 2).
+                // We KEEP meta.id == sample (so output filenames stay <sample>.<ref>... for summarize.R),
+                // and rely on TARGETED_MAPPING joining by the FULL meta map: candidate_rank + candidate_ref
+                // (and the `reference` enrichment inside the subworkflow) differ per candidate, so the
+                // whole-meta join key is distinct for every candidate of a sample.
+                def rank = new_meta.candidate_rank.toString()
 
-        tuple(new_meta, major_fasta, _reads)
+                // Pick the per-rank FASTA from the legacy shim emits (rank 1 -> _major.fa, else _minor.fa).
+                def fasta = (rank == '1') ? major_fasta : minor_fasta
+
+                tuple(new_meta, fasta, reads)
+            }
         }
+        // Route on the R-emitted per-candidate STRING (confirmation_status), never a Groovy
+        // numeric coercion of possibly-NA fields (Pitfall 3 — avoids NA.toInteger() crash).
+        // confirmation_status == 'pass' generalizes the legacy gate: a candidate is mapped only
+        // when its own reads>minRead && cov>minCov comparison passed (rank 1 == the major gate,
+        // rank 2 == a passing second candidate). At default N=2 on a single-strain fixture the
+        // second candidate is 'below_threshold', so the two-slot topology is preserved (D-06).
+        // A passing candidate always has its per-rank FASTA written by the selection script, so
+        // the null-FASTA guard only drops below-threshold/absent candidates (defensive).
+        .filter { entry -> entry[0]['confirmation_status'] == 'pass' && entry[1] != null }
 
-    // Then filter on read nr and coverage. This info is from the csv elements
-    // This will result in a channel with values that meet the read nr and coverage criteria
-        .filter { entry ->
-            def mappedReads = entry[0]['major_reads'].toInteger()
-            def majorCov = entry[0]['major_cov'].toInteger()
-            mappedReads > params.minRead && majorCov > params.minCov
-        }
-
-    MAJOR_MAPPING(
-        ch_major_mapping, // val(meta), path(fasta), path(reads)
+    TARGETED_MAPPING(
+        ch_candidate_mapping, // val(meta), path(fasta), path(reads)
     )
-    ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
-
-    //
-    // SUBWORKFLOW: Map reads against a potential minority reference
-    //
-    // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
-    // Then filter out cases where the minority reference has fewer that minRead mapped and less than minCov coverage
-    ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
-
-    // Then create a new channel whith all the elements from the csv file in the meta map.
-    // The new channel has the structure tuple val(meta), path(fasta), path(reads)
-        .map { meta, _csv, minor_fasta, _reads ->
-        def elements = _csv.splitCsv( header: true, sep:',')
-        def new_meta = meta + elements[0]
-
-        // Fail if meta.id is not identical to meta.sample (from the csv)
-        assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
-
-        tuple(new_meta, minor_fasta, _reads)
-        }
-
-    // Then route on the gate decision emitted by the selection script.
-    // minor_call == 'yes' only when the major passes both thresholds AND the minor passes its own (GATE-01).
-    // The R script already applied the read-nr/coverage comparison, so no .toInteger() re-derivation here (avoids NA.toInteger() crash).
-    .filter { entry -> entry[0]['minor_call'] == 'yes' }
-
-    MINOR_MAPPING (
-        ch_minor_mapping // val(meta), path(fasta), path(reads)
-    )
+    ch_versions = ch_versions.mix(TARGETED_MAPPING.out.versions)
 
     //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
         HCVGLUE (
-            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect(), // Collect all files. Can only have one GLUE process running
+            TARGETED_MAPPING.out.aligned.collect({it[1]}).collect(), // Collect all candidate BAMs (T-2 lockstep). Can only have one GLUE process running
             params.hcvglue_threshold
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
@@ -465,9 +468,12 @@ workflow HCVTYPER {
     }
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
     ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]})
-    ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
-    ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
-    ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
+    // T-2 lockstep: the single per-candidate fan-out already contains ALL candidate
+    // stats/depth/consensus, so each former .mix(MAJOR..., MINOR...) pair collapses to the
+    // single TARGETED_MAPPING.out.* . Missing any one would silently halve the stats.
+    ch_stats_withdup    = TARGETED_MAPPING.out.stats_withdup.collect({it[1]})
+    ch_stats_markdup    = TARGETED_MAPPING.out.stats_markdup.collect({it[1]})
+    ch_depth            = TARGETED_MAPPING.out.depth.collect({it[1]})
     // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
     // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
     // staged channel. BLASTPARSE is invoked only inside if (!params.skip_assembly),
@@ -486,8 +492,8 @@ workflow HCVTYPER {
     } else {
         ch_glue = []
     }
-    ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
-    ch_consensus_distance = MAJOR_MAPPING.out.consensus_distance.collect({it[1]}).mix(MINOR_MAPPING.out.consensus_distance.collect({it[1]}))
+    ch_variation = TARGETED_MAPPING.out.variation.collect()
+    ch_consensus_distance = TARGETED_MAPPING.out.consensus_distance.collect({it[1]})
 
     SUMMARIZE (
         workflow.manifest.version,
