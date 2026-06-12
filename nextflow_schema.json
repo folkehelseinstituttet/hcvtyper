@@ -218,7 +218,8 @@
             "type": "integer",
             "default": 2,
             "minimum": 1,
-            "description": "Number of neutrally-ranked candidate references to select and map (cand_1..cand_n). Default 2 reproduces the legacy two-slot topology under the compatibility shim."
+            "maximum": 2,
+            "description": "Number of neutrally-ranked candidate references to select and map (cand_1..cand_n). Default 2 reproduces the legacy two-slot topology under the compatibility shim. Capped at 2 until the Phase 9 filename-slot migration (COMPAT-02) adds N-slot output; values >2 would silently map later candidates to the wrong reference."
         },
         "contamination_hop_rate": {
             "type": "number",

@@ -76,6 +76,16 @@ workflow HCVTYPER {
 
     main:
 
+    // GUARD (CR-01): The de novo-informed candidate model ranks N candidates, but the
+    // on-disk compatibility shim only writes two filename slots (`.major.`/`.minor.`,
+    // backed by `_major.fa`/`_minor.fa`). With n_candidates > 2, a passing 3rd+ candidate
+    // would be silently mapped against the 2nd candidate's reference — wrong-reference data,
+    // no crash. The N-slot filename migration (`.cand1.`/`.cand2.`/...) is deferred to
+    // Phase 9 (COMPAT-02). Until then, fail loudly rather than emit wrong results.
+    if (params.n_candidates > 2) {
+        error "params.n_candidates = ${params.n_candidates} is not yet supported: the candidate-to-filename shim only has two slots (major/minor). Set --n_candidates to 1 or 2. N>2 support arrives with the Phase 9 filename-slot migration (COMPAT-02)."
+    }
+
     ch_versions = Channel.empty()
 
     //
