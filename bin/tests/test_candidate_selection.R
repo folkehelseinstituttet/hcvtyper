@@ -84,10 +84,12 @@ run_select <- function(case, sampleName, refs, covs, n_candidates,
   if (length(depth_lines) == 0) depth_lines <- character(0)
   writeLines(depth_lines, depth_path)
 
-  # refs.fa: a trivial sequence per reference name.
+  # refs.fa: a trivial sequence per reference name. Coerce to character(0) when
+  # refs is empty (the no-mapping case) so writeLines() does not choke on NULL.
   fa_lines <- unlist(lapply(names(refs), function(r) {
     c(paste0(">", r), strrep("A", 60))
   }))
+  if (is.null(fa_lines)) fa_lines <- character(0)
   refs_path <- file.path(wd, paste0(case, "_refs.fa"))
   writeLines(fa_lines, refs_path)
 
