@@ -403,9 +403,11 @@
                 "parsefirstmapping",
                 "parsefirstmapping/Test_1.1b_EU781827_minor.fa",
                 "parsefirstmapping/Test_1.2a_AB047639_major.fa",
+                "parsefirstmapping/Test_1.candidates.csv",
                 "parsefirstmapping/Test_1.parsefirstmapping.csv",
                 "parsefirstmapping/Test_2.3a_D17763_major.fa",
-                "parsefirstmapping/Test_2.4k_EU392173_minor.fa",
+                "parsefirstmapping/Test_2.3i_JX227955_minor.fa",
+                "parsefirstmapping/Test_2.candidates.csv",
                 "parsefirstmapping/Test_2.parsefirstmapping.csv",
                 "pipeline_info",
                 "pipeline_info/samplesheet.valid.csv",
@@ -555,10 +557,12 @@
                 "multiqc_kraken.txt:md5,805f856012188fdde796f2049aa46934",
                 "Test_1.1b_EU781827_minor.fa:md5,adfbbbe2888176a86fb06277e29b8b52",
                 "Test_1.2a_AB047639_major.fa:md5,f24df467ce79cd1d1933ce2b9e9968fe",
+                "Test_1.candidates.csv:md5,861722f9bf232735a0302aa462a6a2d2",
                 "Test_1.parsefirstmapping.csv:md5,83a2816e22f4742cfaf1df9a46d7aa62",
                 "Test_2.3a_D17763_major.fa:md5,68b1a336e1df07e907e4e6bbf7a6bd0c",
-                "Test_2.4k_EU392173_minor.fa:md5,6c018d8815b2bd6273f947d90a092ec2",
-                "Test_2.parsefirstmapping.csv:md5,4c9266a351c2b5b9552ce1a22884cf1b",
+                "Test_2.3i_JX227955_minor.fa:md5,ff33583a6d1713674fceb02cee88e7df",
+                "Test_2.candidates.csv:md5,a147446f0604416f3732f19429c7c768",
+                "Test_2.parsefirstmapping.csv:md5,0eb3300a216d2aafe406d2fac15951ec",
                 "samplesheet.valid.csv:md5,7c754c105d6f02287be32cc2530e4752",
                 "Test_1.firstmapping.nodup.bam:md5,523aaaef302497821eb4ca5228d39c19",
                 "Test_1.firstmapping.nodup.bam.bai:md5,3b362c84ba98c93692a4f592f29d0de1",
@@ -587,13 +591,13 @@
                 "Test_2.assembly.gfa.gz:md5,a06895753c5684cdf8998a643b78c1e5",
                 "Test_2.contigs.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
                 "Test_2.scaffolds.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
-                "Summary.csv:md5,1484595e3c0b1603a921d8ab91a11063"
+                "Summary.csv:md5,dfd58347c1de790181b1280785771d75"
             ]
         ],
         "meta": {
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-07T06:41:26.056956753"
+        "timestamp": "2026-06-12T18:19:12.547550362"
     }
 }
