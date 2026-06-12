@@ -22,6 +22,14 @@
                 "minor_mapping": [
                     
                 ],
+                "candidates": [
+                    [
+                        {
+                            "id": "2k1b_test"
+                        },
+                        "2k1b_test.candidates.csv:md5,bfafdc53f032906d42f3811cfae24608"
+                    ]
+                ],
                 "versions": [
                     "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
                 ]
@@ -31,7 +39,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T13:54:34.958681917"
+        "timestamp": "2026-06-12T17:03:02.946939887"
     },
     "parsefirstmapping: no minor FASTA when no valid minor (GATE-04)": {
         "content": [
@@ -56,6 +64,14 @@
                 "minor_mapping": [
                     
                 ],
+                "candidates": [
+                    [
+                        {
+                            "id": "no_minor_test"
+                        },
+                        "no_minor_test.candidates.csv:md5,6823ae5b6f2a74dfb038a68df611a51d"
+                    ]
+                ],
                 "versions": [
                     "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
                 ]
@@ -65,7 +81,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T13:54:46.870975782"
+        "timestamp": "2026-06-12T17:03:18.696168326"
     },
     "parsefirstmapping: failing-major reports stats, no minor call (GATE-02)": {
         "content": [
@@ -96,6 +112,14 @@
                         "ERR1810469_test.1a_H77_minor.fa:md5,6ae0ea0027c61e64ed288468aa0c3623"
                     ]
                 ],
+                "candidates": [
+                    [
+                        {
+                            "id": "ERR1810469_test"
+                        },
+                        "ERR1810469_test.candidates.csv:md5,04c65d8c4ebf173e04826f1524c6b196"
+                    ]
+                ],
                 "versions": [
                     "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
                 ]
@@ -105,7 +129,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T13:53:26.152829414"
+        "timestamp": "2026-06-12T17:03:32.850438151"
     },
     "parsefirstmapping: idxstats + depth + references": {
         "content": [
@@ -136,6 +160,14 @@
                         "Test_2.4k_EU392173_minor.fa:md5,379bba7235f582f5ee3d83bc4fa9a4ca"
                     ]
                 ],
+                "candidates": [
+                    [
+                        {
+                            "id": "Test_2"
+                        },
+                        "Test_2.candidates.csv:md5,6dffac00e04e45be909c883b4125d9a1"
+                    ]
+                ],
                 "versions": [
                     "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
                 ]
@@ -145,7 +177,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T13:54:12.193815953"
+        "timestamp": "2026-06-12T17:02:41.338269959"
     },
     "parsefirstmapping: stub": {
         "content": [
@@ -176,6 +208,14 @@
                         "Test_2.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
+                "candidates": [
+                    [
+                        {
+                            "id": "Test_2"
+                        },
+                        "Test_2.candidates.csv:md5,1772b674dbe7afe7c05777e834d04656"
+                    ]
+                ],
                 "versions": [
                     "versions.yml:md5,9fac854f66ac14c545de0dc040b553ef"
                 ]
@@ -185,6 +225,6 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-06T10:35:28.914737548"
+        "timestamp": "2026-06-12T17:02:49.038251198"
     }
 }
