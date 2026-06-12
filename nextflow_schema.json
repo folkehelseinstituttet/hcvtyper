@@ -214,6 +214,12 @@
             "default": true,
             "description": "Require orthogonal de novo/BLAST evidence before reporting a minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
         },
+        "n_candidates": {
+            "type": "integer",
+            "default": 2,
+            "minimum": 1,
+            "description": "Number of neutrally-ranked candidate references to select and map (cand_1..cand_n). Default 2 reproduces the legacy two-slot topology under the compatibility shim."
+        },
         "contamination_hop_rate": {
             "type": "number",
             "default": 0.001,
