@@ -396,8 +396,8 @@ workflow HCVTYPER {
     ch_candidate_mapping = PARSEFIRSTMAPPING.out.candidates
         .join(PARSEFIRSTMAPPING.out.major_mapping, remainder: true)        // meta, candidates_csv, wide_csv?, major_fasta?
         .join(PARSEFIRSTMAPPING.out.minor_mapping, remainder: true)        // ..., wide_csv?, minor_fasta?
-        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // ..., reads
-        .flatMap { meta, candidates_csv, _wide1, major_fasta, _wide2, minor_fasta, reads ->
+        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // ..., classified_reads
+        .flatMap { meta, candidates_csv, _wide1, major_fasta, _wide2, minor_fasta, classified_reads ->
             // Iterate ALL candidate rows (one element per candidate), not just row[0].
             def rows = candidates_csv.splitCsv( header: true, sep:',' )
             rows.collect { row ->
@@ -420,7 +420,7 @@ workflow HCVTYPER {
                 // Pick the per-rank FASTA from the legacy shim emits (rank 1 -> _major.fa, else _minor.fa).
                 def fasta = (rank == '1') ? major_fasta : minor_fasta
 
-                tuple(new_meta, fasta, reads)
+                tuple(new_meta, fasta, classified_reads)
             }
         }
         // Route on the R-emitted per-candidate STRING (confirmation_status), never a Groovy
