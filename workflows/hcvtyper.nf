@@ -477,7 +477,10 @@ workflow HCVTYPER {
         ch_trimmed_reads         = CUTADAPT.out.log.collect({it[1]})
     }
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
-    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]})
+    // Phase 7 (ASUP-02): stage the Phase-6 long-format *.candidates.csv alongside
+    // the legacy *.parsefirstmapping.csv into parsefirst_mapping/ so summarize.R
+    // can read it for the genotype-level assembly-support join.
+    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]}).mix(PARSEFIRSTMAPPING.out.candidates.collect({it[1]})).collect()
     // T-2 lockstep: the single per-candidate fan-out already contains ALL candidate
     // stats/depth/consensus, so each former .mix(MAJOR..., MINOR...) pair collapses to the
     // single TARGETED_MAPPING.out.* . Missing any one would silently halve the stats.
@@ -493,7 +496,9 @@ workflow HCVTYPER {
     // the ch_glue if/else below): skip-assembly yields [] -> empty denovo/ staging dir
     // -> NA de novo columns + no dropped rows (the PLUMB-02 path).
     if (!params.skip_assembly) {
-        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).collect().ifEmpty([])
+        // Phase 7 (ASUP-02): also stage the per-subtype *.assembly_support.csv into
+        // denovo/ so summarize.R can join it to candidates at genotype level.
+        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).mix(BLASTPARSE.out.support.collect({it[1]})).collect().ifEmpty([])
     } else {
         ch_denovo = []
     }

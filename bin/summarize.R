@@ -10,6 +10,10 @@ library(tidyverse)
 source("genotype_utils.R")
 source("denovo_confirm.R")
 source("denovo_layer.R")
+# Phase 7 (ASUP-02): genotype-level assembly-support join helper. Sourced AFTER
+# genotype_utils.R so genotype_from_subtype() is already in scope (the helper
+# does not re-source it). Pure sourced helper; defines join_assembly_support().
+source("assembly_support_join.R")
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -491,6 +495,84 @@ if (length(blast_out_files) > 0) {
   )
 }
 
+# Phase-6 long-format candidate table + Phase-7 per-subtype assembly support
+# (ASUP-02). Both reads mirror the PLUMB-02 typed-empty-tibble guard above so a
+# skip-assembly / no-candidate run NA-fills the new support columns and never
+# aborts (T-07-03 DoS guard). candidates_long is the LEFT side of the genotype-
+# level join (criterion #3, no row loss); support_df is the per-subtype RIGHT side.
+candidates_files <- list.files(path = path_3, pattern = "\\.candidates.csv$", full.names = TRUE)
+
+if (length(candidates_files) > 0) {
+  candidates_long <- map_dfr(candidates_files, ~ read_csv(.x, show_col_types = FALSE)) %>%
+    rename(sampleName = sample)
+} else {
+  # Declare all eight Phase-6 candidate columns with their types so a no-candidate
+  # run yields a typed zero-row frame (the join then returns a typed zero-row frame).
+  candidates_long <- tibble(
+    sampleName          = character(),
+    candidate_rank      = integer(),
+    candidate_ref       = character(),
+    candidate_subtype   = character(),
+    candidate_genotype  = character(),
+    candidate_reads     = double(),
+    candidate_cov       = double(),
+    confirmation_status = character()
+  )
+}
+
+support_files <- list.files(path = path_denovo, pattern = "\\.assembly_support.csv$", full.names = TRUE)
+
+if (length(support_files) > 0) {
+  support_df <- map_dfr(support_files, ~ read_csv(.x, show_col_types = FALSE)) %>%
+    rename(sampleName = sample)
+} else {
+  # Declare the six Plan-01 assembly-support columns (+ sampleName) with their
+  # types so a skip-assembly run yields a zero-row frame -> every candidate NA-fills.
+  support_df <- tibble(
+    sampleName             = character(),
+    subtype                = character(),
+    best_contig_length     = double(),
+    best_contig_pident     = double(),
+    best_contig_aln_length = double(),
+    best_contig_kmer_cov   = double()
+  )
+}
+
+# Join assembly support to candidates at the parameterized denovo_match_level
+# (default genotype). Candidates anchor the LEFT side (no row loss). The per-
+# candidate support columns are pivoted to wide cand_<rank> slots below so they
+# can left_join onto `final` (one row/sample) without exploding rows.
+candidate_support <- join_assembly_support(candidates_long, support_df, denovo_match_level)
+
+if (nrow(candidate_support) > 0) {
+  candidate_support_wide <- candidate_support %>%
+    select(
+      sampleName,
+      candidate_rank,
+      assembly_support,
+      assembly_support_subtype,
+      assembly_support_best_contig_length,
+      assembly_support_best_contig_pident,
+      assembly_support_best_contig_aln_length,
+      assembly_support_best_contig_kmer_cov
+    ) %>%
+    pivot_wider(
+      id_cols     = sampleName,
+      names_from  = candidate_rank,
+      names_glue  = "cand_{candidate_rank}_{.value}",
+      values_from = c(
+        assembly_support,
+        assembly_support_subtype,
+        assembly_support_best_contig_length,
+        assembly_support_best_contig_pident,
+        assembly_support_best_contig_aln_length,
+        assembly_support_best_contig_kmer_cov
+      )
+    )
+} else {
+  candidate_support_wide <- tibble(sampleName = character())
+}
+
 # GLUE --------------------------------------------------------------------
 
 glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
@@ -732,7 +814,12 @@ final <- input_samplesheet %>%
   # Add de novo / BLAST evidence (PLUMB-01). Samplesheet anchors the left side so a
   # sample with no de novo output keeps its row with NA de novo fields (PLUMB-02).
   # The downstream select(..., everything()) carries the four denovo_ columns through.
-  left_join(df_denovo, join_by(sampleName))
+  left_join(df_denovo, join_by(sampleName)) %>%
+  # Phase 7 (ASUP-02): per-candidate assembly support, pivoted to wide cand_<rank>
+  # slots. Samplesheet still anchors the left side so a sample with no candidate /
+  # no de novo support keeps its row with NA support columns (criterion #3, no row
+  # loss). everything() in the select reorder below carries these columns through.
+  left_join(candidate_support_wide, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
