@@ -22,6 +22,7 @@ process BLASTPARSE {
     tuple val(meta), path("*major.fa")      , emit: major_fasta, optional: true
     tuple val(meta), path("*minor.fa")      , emit: minor_fasta, optional: true
     tuple val(meta), path("*blastparse.csv"), emit: csv
+    tuple val(meta), path("*assembly_support.csv"), emit: support
     tuple val(meta), path("*.png")          , emit: png
     path "versions.yml"                     , emit: versions
 
@@ -59,6 +60,7 @@ process BLASTPARSE {
     # Deterministic stub outputs matching declared outputs
     printf "qseqid,sseqid,pident,length,mismatch,gapopen,qstart,qend,sstart,send,evalue,bitscore\n" > ${prefix}.blast_out.csv
     printf "id,header\n" > ${prefix}.blastparse.csv
+    printf "sample,subtype,best_contig_length,best_contig_pident,best_contig_aln_length,best_contig_kmer_cov\n" > ${prefix}.assembly_support.csv
     : > ${prefix}.png
 
     # Optional outputs (safe to keep empty)
