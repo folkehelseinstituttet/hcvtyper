@@ -30,6 +30,7 @@ process SUMMARIZE {
     path(genotype_utils)
     path(denovo_confirm)
     path(denovo_layer)
+    path(assembly_support_join)
 
     output:
     path 'Summary.csv'      , emit: summary

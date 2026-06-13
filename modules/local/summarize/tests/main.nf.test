@@ -12,11 +12,12 @@ nextflow_process {
         when {
             process {
                 """
-                // Module input order (14 declared + 3 helpers):
+                // Module input order (14 declared + 4 helpers):
                 // [0] version, [1] name, [2] samplesheet,
                 // [3] trimmed/, [4] kraken_classified/, [5] parsefirst_mapping/, [6] stats_withdup/,
                 // [7] stats_markdup/, [8] depth/, [9] denovo/, [10] glue/, [11] id/, [12] variation/,
-                // [13] consensus_distance/, [14] genotype_utils.R, [15] denovo_confirm.R, [16] denovo_layer.R
+                // [13] consensus_distance/, [14] genotype_utils.R, [15] denovo_confirm.R, [16] denovo_layer.R,
+                // [17] assembly_support_join.R
                 input[0] = "test"   // version
                 input[1] = "hcvtyper"   // name
                 input[2] = file("${projectDir}/modules/local/summarize/tests/data/samplesheet.csv", checkIfExists: true)
@@ -36,6 +37,7 @@ nextflow_process {
                 input[14] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
                 input[15] = file("${projectDir}/bin/denovo_confirm.R", checkIfExists: true)
                 input[16] = file("${projectDir}/bin/denovo_layer.R", checkIfExists: true)
+                input[17] = file("${projectDir}/bin/assembly_support_join.R", checkIfExists: true)
                 """
             }
         }
@@ -74,6 +76,7 @@ nextflow_process {
                 input[14] = file("${projectDir}/bin/genotype_utils.R", checkIfExists: true)
                 input[15] = file("${projectDir}/bin/denovo_confirm.R", checkIfExists: true)
                 input[16] = file("${projectDir}/bin/denovo_layer.R", checkIfExists: true)
+                input[17] = file("${projectDir}/bin/assembly_support_join.R", checkIfExists: true)
                 """
             }
         }

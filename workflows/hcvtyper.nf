@@ -528,6 +528,7 @@ workflow HCVTYPER {
         file("${projectDir}/bin/genotype_utils.R"),
         file("${projectDir}/bin/denovo_confirm.R"),
         file("${projectDir}/bin/denovo_layer.R"),
+        file("${projectDir}/bin/assembly_support_join.R"),
     )
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 
