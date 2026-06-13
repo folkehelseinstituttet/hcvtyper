@@ -190,13 +190,13 @@
         },
         "denovo_min_contig_length": {
             "type": "integer",
-            "default": 500,
-            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+            "default": 1000,
+            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Reconciled to the 03-RESEARCH-validated 1000 (Phase 8 D-10): the runtime ext.args value overrides the helper default, so the shipped corroboration floor must equal the validated calibration."
         },
         "denovo_min_kmer_cov": {
             "type": "number",
-            "default": 10,
-            "description": "Minimum SPAdes k-mer coverage for a contig to count as de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+            "default": 2.0,
+            "description": "Minimum SPAdes k-mer coverage for a contig to count as de novo evidence. Reconciled to the validated 2.0 (Phase 8 D-10): the prior 10.0 was stricter than validated and would wrongly refute genuine partial contigs (e.g. ERR1810453's 2b at k-mer cov ~5) that CLASS-02 must preserve."
         },
         "denovo_min_blast_identity": {
             "type": "number",
@@ -220,6 +220,26 @@
             "minimum": 1,
             "maximum": 2,
             "description": "Number of neutrally-ranked candidate references to select and map (cand_1..cand_n). Default 2 reproduces the legacy two-slot topology under the compatibility shim. Capped at 2 until the Phase 9 filename-slot migration (COMPAT-02) adds N-slot output; values >2 would silently map later candidates to the wrong reference."
+        },
+        "score_weight_evenness": {
+            "type": "number",
+            "default": 3.0,
+            "description": "Weight on the CV-evenness factor in the Phase 8 dominance score (SCORE-02 / D-02). This is the DOMINANT term and must exceed score_weight_reads so a spiky high-read cross-mapping artefact loses to a genuine even minor."
+        },
+        "score_weight_reads": {
+            "type": "number",
+            "default": 1.0,
+            "description": "Weight on log10(candidate reads) in the Phase 8 dominance score (D-02). Read counts alone are contamination-prone, so this is kept below score_weight_evenness."
+        },
+        "score_weight_kmercov": {
+            "type": "number",
+            "default": 0.5,
+            "description": "Weight on the bonus-only log(k-mer coverage) term in the Phase 8 dominance score (D-05). Contributes only positively; missing/none assembly support yields no boost and never a penalty."
+        },
+        "score_evenness_k": {
+            "type": "number",
+            "default": 1.0,
+            "description": "Evenness-transform constant in the Phase 8 dominance score: the CV-evenness factor is 1/(1 + score_evenness_k * CV) over per-position depth including zeros (D-03)."
         },
         "contamination_hop_rate": {
             "type": "number",
