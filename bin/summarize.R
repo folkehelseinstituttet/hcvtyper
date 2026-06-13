@@ -44,6 +44,20 @@ min_targeted_cov  <- if (length(args) >= 10 && nchar(args[10]) > 0) as.numeric(a
 # given batch. Default 2 mirrors nextflow.config params.n_candidates.
 n_candidates <- if (length(args) >= 11 && nchar(args[11]) > 0) as.integer(args[11]) else 2L
 
+# Phase 8 dominance-score weights (D-04). APPENDED at args[12]+ — strictly AFTER
+# n_candidates (args[11]) — because the SUMMARIZE ext.args string is positional
+# (conf/modules_hcv.config) and the R side reads args by index; inserting these
+# mid-string would silently re-map every later position (Pitfall 2 / T-08-04).
+# Read with the same defensive index-guarded form; defaults mirror the
+# nextflow.config values declared in Plan 01 (evenness 3.0 > reads 1.0 so
+# breadth-evenness dominates raw read count, SCORE-02).
+score_weight_evenness <- if (length(args) >= 12 && nchar(args[12]) > 0) as.numeric(args[12]) else 3.0
+score_weight_reads    <- if (length(args) >= 13 && nchar(args[13]) > 0) as.numeric(args[13]) else 1.0
+score_weight_kmercov  <- if (length(args) >= 14 && nchar(args[14]) > 0) as.numeric(args[14]) else 0.5
+# Evenness-transform constant (factor = 1/(1 + k*CV)); plumbed end-to-end so a
+# caller supplying a raw CV instead of a precomputed factor stays configurable.
+score_evenness_k      <- if (length(args) >= 15 && nchar(args[15]) > 0) as.numeric(args[15]) else 1.0
+
 script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
 } else {
@@ -354,8 +368,8 @@ df_mapped_reads <- full_join(df_with_dups, df_nodups, join_by(sampleName, Major_
 cov_files <- list.files(path = path_6, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 7))
-colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth")
+tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 8))
+colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth", "cv_evenness")
 
 for (i in 1:length(cov_files)) {
   try(rm(cov))
@@ -377,6 +391,18 @@ for (i in 1:length(cov_files)) {
 
   # Average depth
   tmp_df$avg_depth[i] <- mean(cov$X3)
+
+  # CV-evenness factor (Phase 8, D-03). SAMTOOLS_DEPTH runs with `-aa`
+  # (conf/modules_hcv.config:259) so cov$X3 spans EVERY reference position incl.
+  # zeros — the coefficient of variation (sd/mean) over this full vector captures
+  # how spiky/uneven the per-position depth is. Map it to a 0–1 evenness factor
+  # 1/(1+CV): a perfectly flat pileup -> 1, a spiky cross-mapping artefact -> ~0.
+  # The factor is computed HERE because cov$X3 exists only inside this loop and is
+  # discarded once the loop iterates. Guard the zero-mean / zero-length edge
+  # (no reads mapped, or empty depth file) -> cv_evenness = 0, never NaN/Inf
+  # (Pitfall 3 / T-08-06).
+  cv_raw <- if (ref_length > 0 && mean(cov$X3) > 0) sd(cov$X3) / mean(cov$X3) else NA_real_
+  tmp_df$cv_evenness[i] <- if (!is.na(cv_raw)) 1 / (1 + cv_raw) else 0
 
   # Nr. of positions with coverage >=1, >= 5 and > 9
   # If ref_length is zero it means that no reads were mapped. Set coverage to zero.
@@ -414,6 +440,22 @@ for (i in 1:length(cov_files)) {
 
 # Create column for subtype and Sample_ref
 tmp_df <- as_tibble(tmp_df)
+
+# Phase 8 (D-03): per-reference cv_evenness lookup for the role classifier.
+# df_coverage (below) collapses to one row/sample with Major_/Minor_ slots, which
+# loses the per-candidate granularity the classifier needs. Build a long lookup
+# keyed by sampleName + the cleaned mapping-reference name (the cov-loop `reference`
+# carries a `_major`/`_minor` targeted-mapping suffix; strip it so it matches the
+# Phase-6 `candidate_ref` token like `3a_D17763`). This is left_joined into the
+# long candidate_support frame so score_candidates() can read cv_evenness per
+# candidate. A candidate whose reference was never targeted-mapped (no depth file)
+# NA-fills here and score_candidates() treats the missing factor as neutral 0.
+cv_by_ref <- tmp_df %>%
+  filter(reference != "first_mapping") %>%
+  mutate(candidate_ref = str_remove(reference, "_(major|minor)$")) %>%
+  select(sampleName, candidate_ref, cv_evenness) %>%
+  filter(!is.na(candidate_ref)) %>%
+  distinct(sampleName, candidate_ref, .keep_all = TRUE)
 
 df_coverage <- tmp_df %>%
   # Don't need first mapping data
