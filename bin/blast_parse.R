@@ -5,8 +5,8 @@
 #                   and an “alignment” bar‑plot of top hits.
 #
 # Usage: blast_parse.R <prefix> <blast_out> <contigs> <references> <agens>
-#        * <references> and <agens> are kept for CLI compatibility
-#          but no longer used by this script.
+#        * <references> IS used (read and consumed by write_ref_fasta).
+#        * <agens> is retained for CLI compatibility but no longer used.
 # ---------------------------------------------------------------------------
 
 suppressPackageStartupMessages({
@@ -189,7 +189,10 @@ if (nrow(scaf_top) > 0) {
     subtype                = character(0),
     best_contig_length     = double(0),
     best_contig_pident     = double(0),
-    best_contig_aln_length = integer(0),
+    # WR-03: double (not integer) to match the populated path (`length` from
+    # read_tsv) and the join helper's typed-empty support frame, so the same
+    # logical column has ONE consistent type everywhere.
+    best_contig_aln_length = double(0),
     best_contig_kmer_cov   = double(0)
   )
 }
