@@ -30,11 +30,19 @@ denovo_min_contig_length  <- if (length(args) >= 4 && nchar(args[4]) > 0) as.num
 denovo_min_kmer_cov       <- if (length(args) >= 5 && nchar(args[5]) > 0) as.numeric(args[5]) else 2.0
 denovo_min_blast_identity <- if (length(args) >= 6 && nchar(args[6]) > 0) as.numeric(args[6]) else 90
 denovo_match_level        <- if (length(args) >= 7 && nchar(args[7]) > 0) args[7] else "genotype"
+# WR-04: reject a malformed match level at the source rather than silently
+# misinterpreting any non-"subtype" value as "genotype" downstream.
+stopifnot(denovo_match_level %in% c("genotype", "subtype"))
 denovo_confirm_minor      <- if (length(args) >= 8 && nchar(args[8]) > 0) as.logical(args[8]) else TRUE
 # Secondary targeted-mapping gate thresholds (GATE-03). Mirror parsefirstmapping
 # minRead/minCov so both gates use the same configured values.
 min_targeted_read <- if (length(args) >= 9  && nchar(args[9])  > 0) as.numeric(args[9])  else NA_real_
 min_targeted_cov  <- if (length(args) >= 10 && nchar(args[10]) > 0) as.numeric(args[10]) else NA_real_
+# Number of neutrally-ranked candidate slots (cand_1..cand_n). Used to give the
+# Phase-7 assembly-support wide block a FIXED column set (WR-01/WR-02) so the
+# Summary.csv schema is stable regardless of which ranks happen to populate in a
+# given batch. Default 2 mirrors nextflow.config params.n_candidates.
+n_candidates <- if (length(args) >= 11 && nchar(args[11]) > 0) as.integer(args[11]) else 2L
 
 script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
@@ -503,7 +511,21 @@ if (length(blast_out_files) > 0) {
 candidates_files <- list.files(path = path_3, pattern = "\\.candidates.csv$", full.names = TRUE)
 
 if (length(candidates_files) > 0) {
-  candidates_long <- map_dfr(candidates_files, ~ read_csv(.x, show_col_types = FALSE)) %>%
+  # CR-01/CR-02: pin column types so (a) a header-only candidates.csv (no-mapping
+  # branch) and a populated one combine cleanly under map_dfr/bind_rows, and (b)
+  # candidate_genotype is read as character — HCV genotypes 1–7 are purely-digit,
+  # which readr would otherwise infer as <double>, breaking the genotype-level
+  # join. col_types declares only the columns we depend on; the rest are inferred.
+  candidates_long <- map_dfr(candidates_files, ~ read_csv(.x, col_types = cols(
+    sample              = col_character(),
+    candidate_rank      = col_integer(),
+    candidate_ref       = col_character(),
+    candidate_subtype   = col_character(),
+    candidate_genotype  = col_character(),
+    candidate_reads     = col_double(),
+    candidate_cov       = col_double(),
+    confirmation_status = col_character()
+  ))) %>%
     rename(sampleName = sample)
 } else {
   # Declare all eight Phase-6 candidate columns with their types so a no-candidate
@@ -523,7 +545,19 @@ if (length(candidates_files) > 0) {
 support_files <- list.files(path = path_denovo, pattern = "\\.assembly_support.csv$", full.names = TRUE)
 
 if (length(support_files) > 0) {
-  support_df <- map_dfr(support_files, ~ read_csv(.x, show_col_types = FALSE)) %>%
+  # CR-02: pin column types so a header-only assembly_support.csv (skip-assembly /
+  # no-contig sample) and a populated one from another sample combine cleanly
+  # under map_dfr/bind_rows. readr types every column of a header-only CSV as
+  # <character>, while a populated CSV types the metric columns as <double>;
+  # without col_types the bind_rows across them aborts SUMMARIZE.
+  support_df <- map_dfr(support_files, ~ read_csv(.x, col_types = cols(
+    sample                 = col_character(),
+    subtype                = col_character(),
+    best_contig_length     = col_double(),
+    best_contig_pident     = col_double(),
+    best_contig_aln_length = col_double(),
+    best_contig_kmer_cov   = col_double()
+  ))) %>%
     rename(sampleName = sample)
 } else {
   # Declare the six Plan-01 assembly-support columns (+ sampleName) with their
@@ -544,33 +578,71 @@ if (length(support_files) > 0) {
 # can left_join onto `final` (one row/sample) without exploding rows.
 candidate_support <- join_assembly_support(candidates_long, support_df, denovo_match_level)
 
+# WR-01/WR-02: the wide assembly-support block must carry a FIXED column set —
+# cand_1..cand_{n_candidates} × the six support values — regardless of which
+# ranks actually populate in a given batch (otherwise Summary.csv's schema drifts
+# run to run, and a no-candidate batch silently drops the whole block). Build the
+# full schema explicitly, then fill it from whatever candidate_support holds.
+support_value_cols <- c(
+  "assembly_support",
+  "assembly_support_subtype",
+  "assembly_support_best_contig_length",
+  "assembly_support_best_contig_pident",
+  "assembly_support_best_contig_aln_length",
+  "assembly_support_best_contig_kmer_cov"
+)
+# Column types per support value, in support_value_cols order: the two status/
+# subtype columns are character, the four metrics are double.
+support_value_is_character <- c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)
+
+# The complete, deterministic set of wide column names (cand_<rank>_<value>) for
+# ranks 1..n_candidates. names_glue below emits "cand_{rank}_{value}".
+expected_wide_cols <- as.vector(t(outer(
+  seq_len(n_candidates),
+  support_value_cols,
+  function(rk, val) paste0("cand_", rk, "_", val)
+)))
+expected_wide_is_character <- as.vector(t(outer(
+  seq_len(n_candidates),
+  support_value_is_character,
+  function(rk, is_chr) is_chr
+)))
+
+# A zero-row tibble carrying sampleName + every expected wide column at its type.
+# Used both as the empty-branch frame and to back-fill any rank columns missing
+# from the pivot (e.g. a batch where no sample reached rank 2).
+empty_wide <- tibble(sampleName = character())
+for (i in seq_along(expected_wide_cols)) {
+  empty_wide[[expected_wide_cols[i]]] <-
+    if (expected_wide_is_character[i]) character() else double()
+}
+
 if (nrow(candidate_support) > 0) {
   candidate_support_wide <- candidate_support %>%
     select(
       sampleName,
       candidate_rank,
-      assembly_support,
-      assembly_support_subtype,
-      assembly_support_best_contig_length,
-      assembly_support_best_contig_pident,
-      assembly_support_best_contig_aln_length,
-      assembly_support_best_contig_kmer_cov
+      all_of(support_value_cols)
     ) %>%
     pivot_wider(
       id_cols     = sampleName,
       names_from  = candidate_rank,
       names_glue  = "cand_{candidate_rank}_{.value}",
-      values_from = c(
-        assembly_support,
-        assembly_support_subtype,
-        assembly_support_best_contig_length,
-        assembly_support_best_contig_pident,
-        assembly_support_best_contig_aln_length,
-        assembly_support_best_contig_kmer_cov
-      )
+      values_from = all_of(support_value_cols)
     )
+  # Add any expected cand_<rank>_* columns that this batch's ranks did not produce
+  # (WR-02), typed to match empty_wide so the schema is identical run to run.
+  missing_wide <- setdiff(expected_wide_cols, names(candidate_support_wide))
+  for (col in missing_wide) {
+    candidate_support_wide[[col]] <- empty_wide[[col]][NA_integer_][seq_len(nrow(candidate_support_wide))]
+  }
+  # Reorder to the canonical sampleName + expected-column order.
+  candidate_support_wide <- candidate_support_wide %>%
+    select(sampleName, all_of(expected_wide_cols))
 } else {
-  candidate_support_wide <- tibble(sampleName = character())
+  # WR-01: a no-candidate batch must still contribute the full (zero-row) column
+  # block so the left_join below never drops the assembly-support columns.
+  candidate_support_wide <- empty_wide
 }
 
 # GLUE --------------------------------------------------------------------

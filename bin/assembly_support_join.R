@@ -42,6 +42,13 @@ if (!exists("group_by")) {
 }
 
 join_assembly_support <- function(candidates_df, support_df, match_level = "genotype") {
+  # WR-04: reject any match_level other than the two supported values up front.
+  # The downstream `if (match_level == "subtype") ... else ...` branch otherwise
+  # treats every non-"subtype" value (a typo, NA, or empty string from a
+  # mis-parsed arg) as the genotype path silently — a correctness risk for a
+  # clinical genotyping tool.
+  stopifnot(match_level %in% c("genotype", "subtype"))
+
   # The per-candidate support columns this function attaches. Declared once so
   # the typed zero-row path and the NA-fill path stay in lockstep.
   supported_cols <- c(
@@ -73,9 +80,16 @@ join_assembly_support <- function(candidates_df, support_df, match_level = "geno
   }
 
   # Candidate-side match key: reuse the precomputed Phase-6 columns
-  # (07-PATTERNS line 118 — prefer reusing over recomputing).
+  # (07-PATTERNS line 118 — prefer reusing over recomputing). CR-01: coerce to
+  # character so the key type is deterministic regardless of how the candidates
+  # CSV was typed by readr. HCV genotypes 1–7 are purely-digit, so readr infers
+  # <double> for candidate_genotype on a real run; the support side is always
+  # character (genotype_from_subtype), and an un-coerced left_join would abort on
+  # incompatible key types at the default match_level="genotype".
   cand <- candidates_df %>%
-    mutate(.match_key = if (match_level == "subtype") candidate_subtype else candidate_genotype)
+    mutate(.match_key = as.character(
+      if (match_level == "subtype") candidate_subtype else candidate_genotype
+    ))
 
   # Support-side match key: derive with the exact denovo_confirm.R line-64 branch
   # so both sides compute the key identically. Collapse to one row per
@@ -93,7 +107,9 @@ join_assembly_support <- function(candidates_df, support_df, match_level = "geno
     )
   } else {
     support_collapsed <- support_df %>%
-      mutate(.match_key = if (match_level == "subtype") subtype else genotype_from_subtype(subtype)) %>%
+      mutate(.match_key = as.character(
+        if (match_level == "subtype") subtype else genotype_from_subtype(subtype)
+      )) %>%
       group_by(sampleName, .match_key) %>%
       slice_max(best_contig_length, n = 1, with_ties = FALSE) %>%
       ungroup() %>%

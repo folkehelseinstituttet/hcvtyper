@@ -155,4 +155,94 @@ if (cand2_len != denovo_minor_contig_length) {
 if (cand2_len != 2949) fail("Test4 cand_2 length must be the 2949 best 2b contig, not the 300bp noise")
 ok("Test4 (criterion #4): cand_2 assembly support equals today's denovo_minor_contig_length")
 
+# --- Test 5: production read_csv/map_dfr typing path (locks CR-01 + CR-02) ----
+# The in-memory tests above never exercise the readr type-inference that breaks
+# the real summarize.R path (IN-01). Here we WRITE candidates + support to temp
+# CSVs and READ them back exactly as summarize.R does — including a header-only
+# (0-row) file mixed with a populated one in the map_dfr combine — then run the
+# join. This reproduces CR-01 (numeric candidate_genotype) and CR-02 (header-only
+# + populated bind_rows type clash) and asserts the join still succeeds.
+tmp <- tempfile("asup_join_csv_"); dir.create(tmp)
+
+# Candidate CSV written WITHOUT pinned types: genotype values are purely-digit
+# ("3", "1"), so a naive read_csv infers <double> for candidate_genotype — the
+# CR-01 trigger. The helper must coerce to character and still join at genotype.
+cand_csv <- bind_rows(
+  mk_cand("S5", 1, "1a_ACC", "1a", 8000, 95),
+  mk_cand("S5", 2, "3b_ACC", "3b", 200, 8)
+)
+cand_path <- file.path(tmp, "S5.candidates.csv")
+# The real *.candidates.csv carries `sample` (not `sampleName`); summarize.R adds
+# sampleName via rename on read. mk_cand() carries both for the in-memory tests,
+# so drop sampleName before writing to mirror the production CSV schema.
+write_csv(cand_csv %>% select(-sampleName), cand_path)
+# Round-trip exactly like summarize.R (col_types pinned there for CR-01/CR-02).
+candidates_long5 <- map_dfr(cand_path, ~ read_csv(.x, col_types = cols(
+  sample              = col_character(),
+  candidate_rank      = col_integer(),
+  candidate_ref       = col_character(),
+  candidate_subtype   = col_character(),
+  candidate_genotype  = col_character(),
+  candidate_reads     = col_double(),
+  candidate_cov       = col_double(),
+  confirmation_status = col_character()
+))) %>% rename(sampleName = sample)
+
+# Two support CSVs: one populated, one HEADER-ONLY (the skip-assembly sample).
+# Reading them with map_dfr is the CR-02 trigger when types are not pinned. The
+# real *.assembly_support.csv carries `sample` (blast_parse.R writes it); mirror
+# that schema so the rename(sampleName = sample) round-trips like production.
+support_pop <- mk_support("S5", "3a", 2949, 97, 2800, 6) %>%
+  rename(sample = sampleName)
+support_pop_path <- file.path(tmp, "S5.assembly_support.csv")
+write_csv(support_pop, support_pop_path)
+
+support_empty_path <- file.path(tmp, "S6.assembly_support.csv")
+# A genuinely header-only CSV: write a zero-row tibble with the six columns.
+write_csv(support_pop[0, ], support_empty_path)
+
+support_df5 <- map_dfr(c(support_pop_path, support_empty_path), ~ read_csv(.x, col_types = cols(
+  sample                 = col_character(),
+  subtype                = col_character(),
+  best_contig_length     = col_double(),
+  best_contig_pident     = col_double(),
+  best_contig_aln_length = col_double(),
+  best_contig_kmer_cov   = col_double()
+))) %>% rename(sampleName = sample)
+
+# The join must succeed at the DEFAULT genotype level despite the numeric-looking
+# genotype column and the mixed header-only/populated support combine.
+r5 <- join_assembly_support(candidates_long5, support_df5, match_level = "genotype")
+if (nrow(r5) != 2) fail("Test5 row count must equal 2 candidates (no row loss through CSV path)")
+cand2_row5 <- r5 %>% filter(candidate_rank == 2)
+if (cand2_row5$assembly_support != "supported")
+  fail("Test5 cand_2 (3b) must be supported by 3a at genotype level through the read_csv path")
+if (cand2_row5$assembly_support_best_contig_length != 2949)
+  fail("Test5 cand_2 must inherit the 3a 2949 contig length through the CSV round-trip")
+ok("Test5 (CR-01/CR-02): join survives numeric genotype + header-only/populated map_dfr combine")
+
+# --- Test 5b: helper coerces a <double> candidate_genotype itself (CR-01 belt) -
+# Independently of summarize.R's pinned col_types, the helper must be robust to a
+# caller that handed it a numeric candidate_genotype (the readr default for a
+# purely-digit column). Read the SAME candidates CSV WITHOUT col_types so readr
+# infers <double> for candidate_genotype, then join at the default genotype
+# level. An un-coerced left_join would abort on <double> vs <character> keys.
+candidates_double <- read_csv(cand_path, show_col_types = FALSE) %>%
+  rename(sampleName = sample)
+if (!is.numeric(candidates_double$candidate_genotype))
+  fail("Test5b precondition: readr must infer numeric candidate_genotype here")
+r5b <- join_assembly_support(candidates_double, support_df5, match_level = "genotype")
+if (nrow(r5b) != 2) fail("Test5b row count must equal 2 candidates")
+if ((r5b %>% filter(candidate_rank == 2) %>% pull(assembly_support)) != "supported")
+  fail("Test5b helper must coerce numeric candidate_genotype and still match 3a at genotype level")
+ok("Test5b (CR-01): helper coerces a numeric candidate_genotype key and joins cleanly")
+
+# --- Test 6: match_level validation (WR-04) ---------------------------------
+bad <- tryCatch({
+  join_assembly_support(cand1, support1, match_level = "geneotype")  # typo
+  FALSE
+}, error = function(e) TRUE)
+if (!bad) fail("Test6 an invalid match_level must error, not silently mean genotype")
+ok("Test6 (WR-04): invalid match_level is rejected")
+
 cat("\nALL PASS\n")
