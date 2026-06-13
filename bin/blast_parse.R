@@ -155,6 +155,46 @@ scaf %>%
 }
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
+## ── 4b. Neutral per‑subtype assembly‑support roll‑up (ASUP‑01, D‑01/D‑02/D‑03) ----
+# Dominance‑neutral replacement for the §7 major/minor logic: for every subtype
+# seen in the de novo contigs, summarise the SINGLE best contig by sc_length
+# (D‑03) and carry THAT contig's four ASUP‑01 metrics — full contig length,
+# BLAST % identity, BLAST alignment length, and k‑mer coverage. Raw metrics ONLY:
+# no denovo_min_* threshold floor is applied (D‑01 — the substantiality verdict
+# is Phase 8). The raw subtype token is carried; genotype derivation is deferred
+# to summarize.R (D‑02). §6/§7 below stay UNCHANGED (D‑04 legacy shim).
+if (nrow(scaf_top) > 0) {
+  support_tbl <- scaf_top %>%
+    group_by(subtype) %>%
+    # single best contig per subtype, by full contig length (D‑03). distinct() on
+    # qseqid/sc_length is load‑bearing: one contig can have several BLAST hits to
+    # the same reference and would otherwise duplicate the winning row.
+    slice_max(sc_length, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    select(subtype, qseqid, sc_length, pident, length, kmer_cov) %>%
+    distinct() %>%
+    transmute(
+      sample                = prefix,
+      subtype,
+      best_contig_length    = sc_length,
+      best_contig_pident    = pident,
+      best_contig_aln_length = length,
+      best_contig_kmer_cov  = kmer_cov
+    )
+} else {
+  # T‑07‑01 DoS guard: zero hits / skip‑assembly → typed header‑only CSV, exit 0,
+  # never abort (mirror the §6/§7 empty guards and the line‑110 empty‑write idiom).
+  support_tbl <- tibble(
+    sample                 = character(0),
+    subtype                = character(0),
+    best_contig_length     = double(0),
+    best_contig_pident     = double(0),
+    best_contig_aln_length = integer(0),
+    best_contig_kmer_cov   = double(0)
+  )
+}
+write_csv(support_tbl, paste0(prefix, ".assembly_support.csv"))
+
 ## ── 5. Alignment‑style bar plot (100 top hit contigs) ----------------------------
 # Create scaffold factor levels sorted by subtype, then by sstart
 if (nrow(scaf_top) > 0) {
