@@ -14,6 +14,15 @@ source("denovo_layer.R")
 # genotype_utils.R so genotype_from_subtype() is already in scope (the helper
 # does not re-source it). Pure sourced helper; defines join_assembly_support().
 source("assembly_support_join.R")
+# Phase 8 (SCORE-01/02, CLASS-01..04): dominance scoring + strain-role classifier.
+# Sourced AFTER genotype_utils.R (relies on genotype_from_subtype() being in scope;
+# does not re-source it) and AFTER assembly_support_join.R. Pure sourced helper;
+# defines score_candidates() + classify_roles() + is_valid_minor(). This REPLACES
+# the consumption of denovo_layer.R / denovo_confirm.R below (D-15 — one
+# confirmation system, not two). The source() lines for the legacy helpers are
+# retained so the staged files still load cleanly, but apply_denovo_layer() is no
+# longer called.
+source("classify_roles.R")
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -619,6 +628,39 @@ if (length(support_files) > 0) {
 # candidate support columns are pivoted to wide cand_<rank> slots below so they
 # can left_join onto `final` (one row/sample) without exploding rows.
 candidate_support <- join_assembly_support(candidates_long, support_df, denovo_match_level)
+
+# Phase 8 dominance scoring + role classification (SCORE-01/02, CLASS-01..04, D-15).
+# Attach the per-candidate cv_evenness factor computed in the cov loop (joined on
+# sampleName + candidate_ref; a candidate whose reference was never targeted-mapped
+# NA-fills and score_candidates() treats it as neutral 0), then run the pure
+# classifier: score_candidates() emits dominance_score (breadth-evenness dominating
+# raw reads), classify_roles() emits role / role_reason / overall_sample_call per
+# candidate. This is the N-candidate role model that REPLACES the legacy
+# apply_denovo_layer() / minor_denovo_status / coinfection_flag path retired below.
+# left_join (not inner) so a no-cov / no-candidate batch keeps every candidate row
+# (the classifier's typed zero-row guard handles the empty frame, T-08-01/CLASS-03).
+candidate_support <- candidate_support %>%
+  left_join(cv_by_ref, by = c("sampleName", "candidate_ref"))
+
+candidate_support <- score_candidates(
+  candidate_support,
+  score_weights  = list(
+    evenness = score_weight_evenness,
+    reads    = score_weight_reads,
+    kmercov  = score_weight_kmercov
+  ),
+  evenness_const = score_evenness_k
+)
+
+candidate_support <- classify_roles(
+  candidate_support,
+  minRead = minRead,
+  minCov  = minCov,
+  denovo_min_contig_length  = denovo_min_contig_length,
+  denovo_min_kmer_cov       = denovo_min_kmer_cov,
+  denovo_min_blast_identity = denovo_min_blast_identity,
+  match_level               = denovo_match_level
+)
 
 # WR-01/WR-02: the wide assembly-support block must carry a FIXED column set —
 # cand_1..cand_{n_candidates} × the six support values — regardless of which
