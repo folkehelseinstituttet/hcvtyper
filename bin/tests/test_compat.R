@@ -140,8 +140,8 @@ run_summarize <- function(case, sampleName, cands,
     minor_ref          = if (nrow(minor) > 0) minor$candidate_ref else NA_character_,
     minor_reads        = if (nrow(minor) > 0) minor$candidate_reads else NA_real_,
     minor_cov          = if (nrow(minor) > 0) minor$candidate_cov else NA_real_,
-    minor_call         = if (nrow(minor) > 0) "co-infection" else "monoinfection",
-    gate_flag          = "pass"
+    minor_call         = if (nrow(minor) > 0) "yes" else "no",
+    gate_flag          = "ok"
   )
   write_csv(legacy, file.path(wd, "parsefirst_mapping",
                               paste0(sampleName, ".parsefirstmapping.csv")))
