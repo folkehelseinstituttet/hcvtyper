@@ -2,7 +2,7 @@
 
 ## What This Is
 
-HCVTyper is a Nextflow DSL2 pipeline that genotypes Hepatitis C virus (HCV) from NGS data and detects major/minor strain co-infections. As of **v1.0 (De novo Minor Confirmation)**, the de novo assembly + BLAST evidence — formerly **output-only QC never fed back into the strain call** — now actively informs which minor strains get reported, gated behind a major-pass rule. This fixed the two benchmarked failure modes that coverage thresholds alone could not: a false minor on a single-infection sample, and a minor reported on top of a failed major.
+HCVTyper is a Nextflow DSL2 pipeline that genotypes Hepatitis C virus (HCV) from NGS data and detects major/minor strain co-infections. As of **v3.0 (Strain Model Redraw)**, the pipeline replaces the overloaded major/minor model with three clearly separated axes: dominance-neutral candidate selection during the run, independent per-genotype assembly support (de novo/BLAST), and summary-step strain-role classification (dominant / co-infection / background) driven by a breadth-evenness-weighted dominance score. Index-hopping/contamination false co-infections are now caught by the "guilty until corroborated" classification rule, while genuine low-abundance co-infections are preserved.
 
 For: the HCVTyper maintainers/analysts at FHI and downstream users running clinical/research HCV genotyping. Tied to manuscript revision Access Microbiology ACMI-D-26-00042.
 
@@ -10,19 +10,9 @@ For: the HCVTyper maintainers/analysts at FHI and downstream users running clini
 
 A reported minor strain (co-infection) must be backed by orthogonal de novo/BLAST evidence — never reported on top of a failed major, and never reported when de novo refutes it as a cross-mapping artefact — while genuine low-abundance co-infections are preserved.
 
-## Current Milestone: v3.0 Strain Model Redraw (REFSEL-01)
+## Paused: v2.0 HCVGLUE Refactor
 
-**Goal:** Replace the overloaded "major/minor" model with three separated axes — neutral candidate-reference *selection* during the run, independent per-genotype *assembly support*, and summary-only *strain-role classification* (dominant / co-infection / background) driven by a combined dominance score — fixing index-hopping/contamination false co-infections while preserving genuine ones.
-
-**Target features:**
-- Reference selection ranks neutral candidates (`cand_1..cand_n`, default 2) by read recruitment — no dominance semantics during the run
-- De novo/BLAST evidence reframed as independent per-genotype assembly support, joined to candidates at genotype level
-- Summary-step strain-role classification: dominant / co-infection / background, "guilty until corroborated"
-- Combined dominance score (mapped reads + k-mer coverage + breadth, breadth-evenness weighted strongly)
-- Background/artefact candidates surfaced explicitly (never silently dropped) to expose index-hopping / cross-sample contamination
-- Non-breaking: default flags + candidate count 2 reproduce prior reporting; legacy `Major_*`/`Minor_*` columns aliased one release
-
-**Paused in parallel — v2.0 HCVGLUE Refactor:** Phase 05 is paused mid-execution (Plan 03 Task 2, blocked by `run-glue.sh` container defects — see `.continue-here.md`). v2.0 requirements GLUE-01..05 remain Active and unfinished; v3.0 is being built in parallel by user decision. Resume v2.0 via `/gsd-resume-work` (Phase 5 directory + `.continue-here.md` intact).
+Phase 05 is paused mid-execution (Plan 03 Task 2, blocked by `run-glue.sh` container defects — see `.continue-here.md`). GLUE-02..05 remain Active. Resume via `/gsd-resume-work` (Phase 5 directory + `.continue-here.md` intact).
 
 ## Requirements
 
@@ -46,44 +36,23 @@ A reported minor strain (co-infection) must be backed by orthogonal de novo/BLAS
 - ✓ **Preserved exceptions** (CONF-06) — v1.0. 1a/1b co-infection + 2k1b recombinant handling intact after both changes.
 - ✓ **Tests / regression guard** (TEST-01, TEST-02) — v1.0. `bin/tests/run_all.sh` covers major-gate, all three branches, genotype-match, flag-OFF reproduction, and non-suppression of genuine co-infections; wired into CI.
 
-- ✓ **Per-genotype assembly support** (ASUP-01, ASUP-02) — v3.0 Phase 7. De novo/BLAST evidence is reframed as a dominance-neutral per-subtype roll-up (single best contig by `sc_length` → best contig length, BLAST identity, BLAST alignment length, k-mer coverage) emitted as `*.assembly_support.csv` from `blast_parse.R`, then left-joined to the neutral candidates at genotype level (parameterized `denovo_match_level`, default genotype) via the sourceable `assembly_support_join.R`. Candidates are the LEFT side (no row loss); unmatched candidates resolve to explicit `assembly_support = "none"` with NA metrics. Verified 4/4 must-haves; `bin/tests/` extended with round-trip typing coverage.
+- ✓ **Per-genotype assembly support** (ASUP-01, ASUP-02) — v3.0 Phase 7. De novo/BLAST evidence is reframed as a dominance-neutral per-subtype roll-up (single best contig by `sc_length` → best contig length, BLAST identity, BLAST alignment length, k-mer coverage) emitted as `*.assembly_support.csv` from `blast_parse.R`, then left-joined to the neutral candidates at genotype level (parameterized `denovo_match_level`, default genotype) via the sourceable `assembly_support_join.R`. Candidates are the LEFT side (no row loss); unmatched candidates resolve to explicit `assembly_support = "none"` with NA metrics.
+- ✓ **Neutral candidate selection** (REFSEL-01, REFSEL-02, REFSEL-03) — v3.0 Phase 6. `is_valid_minor()` validity filtering deleted; `params.n_candidates` (default 2) drives uniform read-recruitment ranking; single `TARGETED_MAPPING` fan-out via `splitCsv.flatMap`; `confirmation_status` per candidate replaces `gate_flag`/`minor_call`.
+- ✓ **Dominance score + strain-role classification** (SCORE-01, SCORE-02, CLASS-01, CLASS-02, CLASS-03, CLASS-04) — v3.0 Phase 8. Breadth-evenness-weighted dominance score (`score_weight_evenness=3.0 > score_weight_reads=1.0`); guilty-until-corroborated classification (dominant/co-infection/background) with `overall_sample_call`; false 4g refuted to background; genuine 2b co-infection preserved; `classify_roles.R` pure sourced helper in SUMMARIZE.
+- ✓ **Compatibility, filename migration + regression suite** (COMPAT-01, COMPAT-02, COMPAT-03, COMPAT-04, TEST-01) — v3.0 Phase 9. `.major.`/`.minor.` → `.cand{rank}.` lockstep migration; legacy `Major_*`/`Minor_*` aliases retained one release; `test_compat.R` golden reproduction + exception coverage; wired into CI.
 
 ### Active
 
-<!-- v3.0 scope: Strain Model Redraw (REFSEL-01) -->
-
-**Candidate Selection (REFSEL)**
-- [ ] **REFSEL-01**: Reference selection ranks candidates neutrally (`cand_1..cand_n`) by read recruitment, with no major/minor dominance semantics during the run
-- [ ] **REFSEL-02**: Candidate count is a parameter, default 2 (reproduces today's two-slot behaviour)
-- [ ] **REFSEL-03**: Each candidate is independently targeted-mapped, replacing the asymmetric `MAJOR_MAPPING`/`MINOR_MAPPING` aliases; `gate_flag`/`minor_call` plumbing becomes per-candidate `confirmation_status`
-
-**Assembly Support (ASUP)** — ✓ validated in Phase 7 (see Validated)
-
-**Strain Classification (CLASS)**
-- [ ] **CLASS-01**: Each candidate is classified at the summary step into a strain role: dominant / co-infection / background
-- [ ] **CLASS-02**: A non-dominant candidate is reported as co-infection only if it clears an abundance floor AND has genotype-level assembly support; otherwise background/artefact ("guilty until corroborated")
-- [ ] **CLASS-03**: Background/artefact candidates are surfaced explicitly with their reason (no assembly support / below floor), never silently dropped
-- [ ] **CLASS-04**: An overall sample call is derived from roles (monoinfection / co-infection / indeterminate)
-
-**Dominance Scoring (SCORE)**
-- [ ] **SCORE-01**: Dominance is a combined score over mapped read count, k-mer coverage, and mapping coverage breadth
-- [ ] **SCORE-02**: Breadth evenness/uniformity across the genome is weighted strongly (read counts alone are contamination-prone)
-
-**Compatibility (COMPAT)**
-- [ ] **COMPAT-01**: Non-breaking — existing default flags + candidate count 2 reproduce v1.0/v2.0 reporting
-- [ ] **COMPAT-02**: Output-filename slot field migrates `.major.`/`.minor.` → `.cand1.`/`.cand2.`, with `bin/summarize.R` parsing updated in lockstep
-- [ ] **COMPAT-03**: Legacy `Major_*`/`Minor_*` summary columns are aliased for one release alongside the new role-based columns
-- [ ] **COMPAT-04**: Existing 1a/1b co-infection and 2k/1b recombinant exceptions are preserved
-
-**Validation (TEST)**
-- [ ] **TEST-01**: Regression suite extended to cover candidate ranking, all three role classifications, combined-score dominance, and legacy reproduction; wired into CI
-
-<!-- v2.0 scope: HCVGLUE Refactor — PAUSED, see Current Milestone note -->
-- [ ] **GLUE-01**: HCVGLUE process runs as a single self-contained container per task (no shared MySQL container, no bespoke docker-spawning script)
+<!-- v2.0 scope: HCVGLUE Refactor — PAUSED -->
 - [ ] **GLUE-02**: Concurrent HCVGLUE tasks do not collide — each task is isolated and parallel-safe
 - [ ] **GLUE-03**: Output format preserved — `*.json` + `*.html` per sample, compatible with existing GLUE_PARSER
 - [ ] **GLUE-04**: Process works under Docker, Singularity/Apptainer, and Podman profiles
 - [ ] **GLUE-05**: `bin/run_hcvglue.sh` simplified or replaced; no apt-get inside containers, no deprecated `--link` flag
+
+<!-- Post-v3.0 candidates for next milestone -->
+- [ ] **COMPAT-03-DROP**: Drop the legacy `Major_*`/`Minor_*` column aliases after the one-release deprecation window
+- [ ] **NYQUIST-01-03**: Close Nyquist validation for phases 01–03 (nyquist_compliant: false in VALIDATION.md)
+- [ ] **CRASH-01**: Fix the latent Phase-1 `no_mapping` FASTA-write crash (T-04-03, documented)
 
 ### Out of Scope
 - **Full manuscript re-benchmarking as part of DoD** — re-running sim + real datasets and diffing against `combined_analysis.tsv` is a separate manual analyst step. This project ships code + tests; the analyst validates afterward.
@@ -121,10 +90,17 @@ A reported minor strain (co-infection) must be backed by orthogonal de novo/BLAS
 | Asymmetric refute rule | Absence of a minor contig only refutes when de novo otherwise assembled a substantial major contig; protects genuine low-yield co-infections. | ✓ Good — verified across evidence-table fixtures |
 | Remove the `strategy='denovo'` branch + `strategy` param entirely (Phase 1) | Dead/non-functional (`minDenovoLength` undeclared), never default, in no config profile, undocumented; it's a crude Change-3 prototype that bypasses all selection safeguards — the #1 pitfall flagged in research. | ✓ Good — removed at all 4 sites; security re-verified |
 | Verify Phase 4 via UAT + live R suite (no machine VERIFICATION.md) | gsd-verifier never ran on Phase 4; UAT 5/5 + a live `run_all.sh` pass is stronger evidence than a re-derivation. | ⚠️ Revisit — generate the verifier artifact retroactively in v2 if needed |
+| Delete `is_valid_minor()` from selection; port to `classify_roles.R` (v3.0 D-05) | Validity rules (different-genotype / 1a-1b / 2k1b) belong at classification time, not selection time. | ✓ Good — classification is now the single place for HCV exception logic |
+| Reconcile denovo floors to validated 1000/2.0/90 (v3.0 Pitfall 1) | Old 10.0 k-mer floor would refute ERR1810453's genuine partial 2b (k-mer ~5); 2.0 passes it correctly. | ✓ Good — test_classify_roles.R Test 2b locks this against regression |
+| Breadth-evenness weighting 3× reads in dominance score (v3.0 SCORE-02) | Read counts alone cannot separate index-hopping contamination from genuine co-infection; breadth uniformity is the discriminator. | ✓ Good — 4g artefact loses to genuine even minor even at 12× fewer reads |
+| Lockstep `.major.`/`.minor.` → `.cand{rank}.` migration in single phase (v3.0 COMPAT-02) | Producer (6 ext.prefix closures + FASTA loop) and consumer (`summarize.R` join) must change atomically; a split risks silent empty rows. | ✓ Good — one-phase lockstep confirmed by integration checker (0 broken flows) |
+| Legacy `Major_*`/`Minor_*` aliases for one release (v3.0 COMPAT-03) | Downstream consumers read old column names; breaking change without a deprecation window is unsafe. | ✓ Good — drop in next milestone after deprecation window |
 
 ## Current State
 
-**In progress: v3.0 — Strain Model Redraw.** Phase 6 (neutral candidate selection) and **Phase 7 (per-genotype assembly support, ASUP-01/02) complete (2026-06-13)** — de novo/BLAST evidence is now an independent per-genotype "assembly support" signal joined to the neutral candidate set at genotype level, ready for Phase 8 dominance scoring + dominant/co-infection/background classification. Next: Phase 8 (SCORE/CLASS).
+**Shipped: v3.0 — Strain Model Redraw (2026-06-14).** 4 phases (6-9), 11 plans, 45 commits over 3 days. The pipeline now classifies each candidate into dominant / co-infection / background at the summary step, driven by a breadth-evenness-weighted dominance score. The false 4g artefact is refuted to background; genuine 2b co-infections are preserved. Filename slots migrated `.major.`/`.minor.` → `.cand{rank}.`; legacy `Major_*`/`Minor_*` columns aliased for one release; regression suite covers all four COMPAT requirements. 16/16 requirements satisfied.
+
+**Tech debt from v3.0 close:** Phase 8 Docker runtime test pending (run `bash bin/tests/run_all.sh` in the pipeline container); nf-test workflow snapshot needs `--update-snapshot`; `modules_hcv.config` L123-129 has a stale comment.
 
 **Shipped: v1.0 — De novo Minor Confirmation (2026-06-08).** 4 phases, 12 plans. Changes 1 + 2 are live and default-ON.
 
@@ -157,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-13 — Phase 7 (per-genotype assembly support, ASUP-01/02) complete: ASUP requirements moved Active → Validated. v3.0 (Strain Model Redraw) running in parallel with paused v2.0 (HCVGLUE Refactor, Phase 5 mid-execution). v3.0 replaces the overloaded major/minor model with neutral candidate selection + independent assembly support + summary-time dominant/co-infection/background classification driven by a combined dominance score. Phases continue at 6+; no phase directories cleared (v2.0 preserved).*
+*Last updated: 2026-06-14 after v3.0 milestone — all REFSEL/ASUP/CLASS/SCORE/COMPAT/TEST requirements moved Active → Validated. v2.0 HCVGLUE Refactor remains paused at Phase 5.*
