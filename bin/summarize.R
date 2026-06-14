@@ -937,9 +937,10 @@ variation_plot_files <- list.files(path = path_10, pattern = ".*variation_plot.*
 # Create R-code that will gather all the variation plots, then plot them as a grid with four columns and as many rows as needed.
 # Make separate grids for files containing the string "major" and "minor"
 if (length(variation_plot_files) > 0) {
-  # Create a grid of plots for major and minor
-  major_plots <- variation_plot_files[grepl("major", variation_plot_files)]
-  minor_plots <- variation_plot_files[grepl("minor", variation_plot_files)]
+  # Create a grid of plots for major (cand1) and minor (cand2).
+  # Phase-9 naming: filenames contain "_cand1." / "_cand2." (not "major"/"minor").
+  major_plots <- variation_plot_files[grepl("_cand1\\.", variation_plot_files)]
+  minor_plots <- variation_plot_files[grepl("_cand2\\.", variation_plot_files)]
 
   # Create a grid of plots for major
   if (length(major_plots) > 0) {
