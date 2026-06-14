@@ -17,12 +17,15 @@ process PARSEFIRSTMAPPING {
     path(genotype_utils)
 
     output:
-    // Legacy wide-CSV emits (D-06 shim). The globs are pinned to the specific
-    // `*.parsefirstmapping.csv` filename so they never also capture the new
-    // long-format `*.candidates.csv` written alongside it (T-06-05 glob collision).
-    tuple val(meta), path("*.parsefirstmapping.csv"), path("*major.fa"), emit: major_mapping, optional: true
-    tuple val(meta), path("*.parsefirstmapping.csv"), path("*minor.fa"), emit: minor_mapping, optional: true
-    tuple val(meta), path("*.parsefirstmapping.csv"),                    emit: csv,           optional: true
+    // Phase 9 (COMPAT-02 / D-01 / D-04): N-FASTA candidate emit — one entry per
+    // ranked candidate (`*_cand*.fa` written by summarize_mapping_to_all_references.R),
+    // replacing the fixed two-slot major_mapping/minor_mapping pair. The Plan-02
+    // workflow fan-out joins this by full meta and iterates per rank.
+    // The `*.parsefirstmapping.csv` glob is pinned to the specific filename so it
+    // never also captures the long-format `*.candidates.csv` written alongside it
+    // (T-06-05 glob collision).
+    tuple val(meta), path("*.parsefirstmapping.csv"), path("*_cand*.fa"), emit: candidate_fasta, optional: true
+    tuple val(meta), path("*.parsefirstmapping.csv"),                    emit: csv,             optional: true
     // Phase 6 (REFSEL-01): long-format candidate table — one row per neutrally-
     // ranked candidate. The routable channel the Plan-03 workflow fan-out consumes.
     tuple val(meta), path("*.candidates.csv"),                           emit: candidates,    optional: true
@@ -75,9 +78,9 @@ process PARSEFIRSTMAPPING {
     printf "${prefix},1,3a_D17763,3a,3,8079,94,pass\n" >> ${prefix}.candidates.csv
     printf "${prefix},2,4k_EU392173,4k,4,40,5,below_threshold\n" >> ${prefix}.candidates.csv
 
-    # Optional FASTA outputs (touch to create empty files)
-    : > ${prefix}.major.fa
-    : > ${prefix}.minor.fa
+    # Optional per-rank cand FASTA outputs (one per stub candidates.csv row).
+    : > ${prefix}.cand1.fa
+    : > ${prefix}.cand2.fa
 
     # Stable versions file. Plain echo lines (no heredoc) so the output is
     # immune to Groovy script-indent stripping vs bash <<- tab-stripping — the
