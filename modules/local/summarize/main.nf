@@ -83,7 +83,7 @@ EOF
     : > summary_plot.png
 
     # Enriched long candidates CSV placeholder (CLASS-03)
-    printf 'sampleName\tcandidate_rank\tcandidate_ref\tcandidate_subtype\tcandidate_genotype\treads\tcov\tcv_evenness\tassembly_support\tdomainance_score\trole\trole_reason\toverall_sample_call\n' > candidates.csv
+    printf 'sampleName\tcandidate_rank\tcandidate_ref\tcandidate_subtype\tcandidate_genotype\treads\tcov\tcv_evenness\tassembly_support\tdominance_score\trole\trole_reason\toverall_sample_call\n' > candidates.csv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
