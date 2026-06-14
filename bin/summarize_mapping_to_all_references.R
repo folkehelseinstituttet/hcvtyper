@@ -203,18 +203,16 @@ write_csv(candidates_long, file = paste0(sampleName, ".candidates.csv"))
 # Write the reconstructed legacy wide CSV (shim).
 write_csv(df_final, file = paste0(sampleName, ".parsefirstmapping.csv"))
 
-# ---- FASTA write — rank-keyed slot suffix, guarded (D-06; Pitfall 3) -------
-# cand_1 -> _major.fa, cand_2 -> _minor.fa. Only write when a candidate exists at
-# that rank, so we never write _minor.fa on a single-candidate sample and never
-# crash on the no-mapping branch (selected_refs is empty there).
+# ---- FASTA write — uniform per-rank cand{k} slot, guarded (D-06; Pitfall 3) --
+# Writes one <sample>.<ref>_cand{k}.fa per selected candidate (k = 1..N), so the
+# downstream meta.reference enrichment (fasta basename split) yields <ref>_cand{k}
+# consistently with the new config slot. Only write when candidates exist, so the
+# no-mapping branch (selected_refs empty) writes nothing and never crashes.
 if (length(selected_refs) > 0) {
   fasta <- read.fasta(file = references)
-  major_ref <- selected_refs[1]
-  write.fasta(sequences = fasta[major_ref], names = major_ref,
-              file.out = paste0(sampleName, ".", major_ref, "_major.fa"))
-  if (length(selected_refs) > 1) {
-    minor_ref <- selected_refs[2]
-    write.fasta(sequences = fasta[minor_ref], names = minor_ref,
-                file.out = paste0(sampleName, ".", minor_ref, "_minor.fa"))
+  for (k in seq_along(selected_refs)) {
+    ref <- selected_refs[k]
+    write.fasta(sequences = fasta[ref], names = ref,
+                file.out = paste0(sampleName, ".", ref, "_cand", k, ".fa"))
   }
 }
