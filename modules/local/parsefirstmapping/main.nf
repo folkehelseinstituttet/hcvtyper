@@ -79,8 +79,10 @@ process PARSEFIRSTMAPPING {
     printf "${prefix},2,4k_EU392173,4k,4,40,5,below_threshold\n" >> ${prefix}.candidates.csv
 
     # Optional per-rank cand FASTA outputs (one per stub candidates.csv row).
-    : > ${prefix}.cand1.fa
-    : > ${prefix}.cand2.fa
+    # Filenames must match the declared emit glob "*_cand*.fa" (underscore before cand),
+    # consistent with the real script's "<sample>.<ref>_cand{rank}.fa" output format.
+    : > ${prefix}.stubref_cand1.fa
+    : > ${prefix}.stubref_cand2.fa
 
     # Stable versions file. Plain echo lines (no heredoc) so the output is
     # immune to Groovy script-indent stripping vs bash <<- tab-stripping — the

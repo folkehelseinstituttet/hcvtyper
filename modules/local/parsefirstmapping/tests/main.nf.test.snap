@@ -173,7 +173,16 @@
                     ]
                 ],
                 "candidate_fasta": [
-                    
+                    [
+                        {
+                            "id": "Test_2"
+                        },
+                        "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93",
+                        [
+                            "Test_2.stubref_cand1.fa:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "Test_2.stubref_cand2.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ]
+                    ]
                 ],
                 "candidates": [
                     [
@@ -192,6 +201,6 @@
             "nf-test": "0.9.2",
             "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-14T16:29:09.469456403"
+        "timestamp": "2026-06-14T21:48:11.836821622"
     }
 }
