@@ -26,9 +26,19 @@ workflow TARGETED_MAPPING {
         // Enrich the meta map with the reference name before splitting the channel.
         // This ensures all branches (build, fasta, reads) share the same meta key so
         // that downstream joins and positional pairings are always in sync.
+        //
+        // The PARSEFIRSTMAPPING FASTA basename is "<sample>.<ref>_cand{rank}.fa", so
+        // `.split('.').last()` yields "3a_D17763_cand1" — a ref name that already carries
+        // the cand-slot suffix. The config (modules_hcv.config) then appends
+        // ".cand${meta.candidate_rank}" again, producing "3a_D17763_cand1.cand1" doubling.
+        // Strip the trailing "_cand\d+" from meta.reference here so the config appends
+        // exactly one cand-slot (WR-03 fix). summarize.R's str_remove("_cand[0-9]+$") strip
+        // remains a harmless no-op.
         ch_input = ch_major_mapping
         .map { meta, fasta, reads ->
-            def new_meta = meta + [ reference: fasta.getBaseName().toString().split('\\.').last() ]
+            def ref_raw   = fasta.getBaseName().toString().split('\\.').last()
+            def ref_clean = ref_raw.replaceAll(/_cand\d+$/, '')
+            def new_meta  = meta + [ reference: ref_clean ]
             tuple(new_meta, fasta, reads)
         }
         .multiMap { meta, fasta, reads ->
