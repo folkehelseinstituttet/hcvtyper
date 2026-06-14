@@ -529,7 +529,12 @@ tmp_df <- tmp_df %>%
 # NA-fills here and score_candidates() treats the missing factor as neutral 0.
 cv_by_ref <- tmp_df %>%
   filter(reference != "first_mapping") %>%
-  mutate(candidate_ref = str_remove(reference, "_(major|minor)$")) %>%
+  # Phase-9 (COMPAT-02 / D-02): the cov-loop `reference` carries the new `_cand{rank}`
+  # targeted-mapping suffix; strip it (identical regex to the stats-loop joins above)
+  # so candidate_ref matches the Phase-6 token like `3a_D17763`. tmp_df already holds
+  # this column from the coverage candidate_rank join, but re-derive it here so the
+  # strip is explicit and cannot drift from the other sites.
+  mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
   select(sampleName, candidate_ref, cv_evenness) %>%
   filter(!is.na(candidate_ref)) %>%
   distinct(sampleName, candidate_ref, .keep_all = TRUE)
