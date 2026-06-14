@@ -76,16 +76,6 @@ workflow HCVTYPER {
 
     main:
 
-    // GUARD (CR-01): The de novo-informed candidate model ranks N candidates, but the
-    // on-disk compatibility shim only writes two filename slots (`.major.`/`.minor.`,
-    // backed by `_major.fa`/`_minor.fa`). With n_candidates > 2, a passing 3rd+ candidate
-    // would be silently mapped against the 2nd candidate's reference — wrong-reference data,
-    // no crash. The N-slot filename migration (`.cand1.`/`.cand2.`/...) is deferred to
-    // Phase 9 (COMPAT-02). Until then, fail loudly rather than emit wrong results.
-    if (params.n_candidates > 2) {
-        error "params.n_candidates = ${params.n_candidates} is not yet supported: the candidate-to-filename shim only has two slots (major/minor). Set --n_candidates to 1 or 2. N>2 support arrives with the Phase 9 filename-slot migration (COMPAT-02)."
-    }
-
     ch_versions = Channel.empty()
 
     //
@@ -393,21 +383,28 @@ workflow HCVTYPER {
     // the long-format candidates CSV is one row PER candidate, Assumption A2) and emit one
     // channel element per candidate. Each candidate carries its own per-rank meta + FASTA.
     //
-    // The per-rank FASTA paths (_major.fa / _minor.fa) come from the legacy major_mapping /
-    // minor_mapping emits (D-06 shim) so the TARGETED_MAPPING `meta.reference` enrichment
-    // (fasta basename split, e.g. <ref>_major) stays byte-identical to the legacy filenames.
+    // The per-rank FASTAs come from PARSEFIRSTMAPPING.out.candidate_fasta — a single N-FASTA
+    // emit `tuple(meta, parsefirstmapping_csv, [*_cand{rank}.fa, ...])` (D-01/D-04). Each
+    // candidate's FASTA is picked from the collected list by matching `_cand${rank}` in the
+    // basename (rank 1 -> *_cand1.fa, rank 2 -> *_cand2.fa, ... generalizes to N candidates),
+    // replacing the hard two-slot `rank == '1' ? major : minor` pick. The TARGETED_MAPPING
+    // `meta.reference` enrichment (fasta basename split) keeps the cand-slot filenames.
     //
-    // Join all per-sample inputs by meta.id: the candidates CSV, the per-rank FASTAs, and the
-    // classified reads. The legacy major_mapping/minor_mapping emits are `optional: true`
-    // (a single-candidate sample emits no `_minor.fa`, a no-candidate sample emits neither),
-    // so both legacy joins use `remainder: true` — otherwise a missing optional emit would
-    // silently DROP the whole sample (including its passing major candidate). A null FASTA is
-    // tolerated and the candidate guarded out below.
+    // Join all per-sample inputs by meta.id: the candidates CSV, the candidate FASTAs, and the
+    // classified reads. The candidate_fasta emit is `optional: true` (a no-candidate sample
+    // emits no FASTAs, a single-candidate sample emits only `_cand1.fa`), so its join uses
+    // `remainder: true` — otherwise a missing optional emit would silently DROP the whole
+    // sample (including its passing first candidate). A null/absent FASTA is tolerated and the
+    // candidate guarded out below.
     ch_candidate_mapping = PARSEFIRSTMAPPING.out.candidates
-        .join(PARSEFIRSTMAPPING.out.major_mapping, remainder: true)        // meta, candidates_csv, wide_csv?, major_fasta?
-        .join(PARSEFIRSTMAPPING.out.minor_mapping, remainder: true)        // ..., wide_csv?, minor_fasta?
+        .join(PARSEFIRSTMAPPING.out.candidate_fasta, remainder: true)      // meta, candidates_csv, parsefirstmapping_csv?, fasta_list?
         .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // ..., classified_reads
-        .flatMap { meta, candidates_csv, _wide1, major_fasta, _wide2, minor_fasta, classified_reads ->
+        .flatMap { meta, candidates_csv, _parsefirstmapping_csv, fasta_list, classified_reads ->
+            // candidate_fasta collects per-sample FASTAs into a single list element. A single
+            // FASTA may arrive bare (not wrapped in a list); normalize to a list so the
+            // rank-indexed lookup below is uniform. A no-candidate sample yields null.
+            def fastas = (fasta_list == null) ? [] : (fasta_list instanceof List ? fasta_list : [fasta_list])
+
             // Iterate ALL candidate rows (one element per candidate), not just row[0].
             def rows = candidates_csv.splitCsv( header: true, sep:',' )
             rows.collect { row ->
@@ -427,8 +424,9 @@ workflow HCVTYPER {
                 // whole-meta join key is distinct for every candidate of a sample.
                 def rank = new_meta.candidate_rank.toString()
 
-                // Pick the per-rank FASTA from the legacy shim emits (rank 1 -> _major.fa, else _minor.fa).
-                def fasta = (rank == '1') ? major_fasta : minor_fasta
+                // Pick this candidate's FASTA from the collected N-FASTA list by rank-indexed
+                // basename match (`_cand${rank}.`), generalizing the old two-slot major/minor pick.
+                def fasta = fastas?.find { it.toString().contains("_cand${rank}.") }
 
                 tuple(new_meta, fasta, classified_reads)
             }
