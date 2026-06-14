@@ -654,13 +654,89 @@ candidate_support <- score_candidates(
 
 candidate_support <- classify_roles(
   candidate_support,
-  minRead = minRead,
-  minCov  = minCov,
+  # D-07/D-09: the dominant major-gate and the co-infection floor share ONE
+  # threshold set. The SUMMARIZE ext.args passes ${params.minRead}/${params.minCov}
+  # at positions 6/7 -> args[9]/args[10], parsed above as min_targeted_read /
+  # min_targeted_cov. classify_roles() applies `reads > minRead & cov > minCov`,
+  # so the gate floor is exactly the configured minRead/minCov (NA -> treated as a
+  # non-passing gate via the NA guard inside classify_roles()).
+  minRead = min_targeted_read,
+  minCov  = min_targeted_cov,
   denovo_min_contig_length  = denovo_min_contig_length,
   denovo_min_kmer_cov       = denovo_min_kmer_cov,
   denovo_min_blast_identity = denovo_min_blast_identity,
   match_level               = denovo_match_level
 )
+
+# Enriched long *.candidates.csv (D-16, CLASS-03). Write EVERY candidate — incl.
+# background / refuted — carrying the new role / dominance_score / role_reason +
+# overall_sample_call alongside the original Phase-6 candidate columns and the
+# Phase-7 assembly-support join. Backgrounds are surfaced here, never dropped; the
+# wide Summary.csv below only carries the dominant + corroborated co-infection
+# slots. Empty-batch safe: classify_roles() returns a typed zero-row frame, so a
+# no-candidate run writes a header-only candidates.csv (never aborts, T-08-01).
+write_csv(candidate_support, file = "candidates.csv")
+
+# Map the per-candidate roles into the wide one-row-per-sample layout (D-16). The
+# `dominant` candidate fills the role_* major slot and the first corroborated
+# `co-infection` candidate fills the role_* minor slot; `overall_sample_call` is a
+# new wide column. These role_* columns sit ALONGSIDE the legacy Major_*/Minor_*
+# mapping/coverage slots (the legacy Major_*/Minor_* column ALIASING onto the role
+# model is Phase 9 / COMPAT-03 — Phase 8 only retires the legacy confirmation
+# LOGIC, D-15). overall_sample_call is taken per-sample (constant within a sample).
+if (nrow(candidate_support) > 0) {
+  role_dominant <- candidate_support %>%
+    filter(role == "dominant") %>%
+    group_by(sampleName) %>%
+    slice(1) %>%
+    ungroup() %>%
+    transmute(
+      sampleName,
+      Major_role_reference     = candidate_ref,
+      Major_role_subtype       = candidate_subtype,
+      Major_dominance_score    = dominance_score,
+      Major_role_reason        = role_reason
+    )
+
+  role_minor <- candidate_support %>%
+    filter(role == "co-infection") %>%
+    group_by(sampleName) %>%
+    # Deterministic: the highest-scoring corroborated co-infection fills the minor
+    # slot (ties already broken inside classify_roles()'s dominant selection; here
+    # we just take the top remaining co-infection by dominance_score then ref name).
+    arrange(desc(dominance_score), candidate_ref, .by_group = TRUE) %>%
+    slice(1) %>%
+    ungroup() %>%
+    transmute(
+      sampleName,
+      Minor_role_reference     = candidate_ref,
+      Minor_role_subtype       = candidate_subtype,
+      Minor_dominance_score    = dominance_score,
+      Minor_role_reason        = role_reason
+    )
+
+  overall_call <- candidate_support %>%
+    distinct(sampleName, overall_sample_call)
+
+  candidate_roles_wide <- overall_call %>%
+    left_join(role_dominant, by = "sampleName") %>%
+    left_join(role_minor, by = "sampleName")
+} else {
+  # No-candidate batch: typed zero-row wide frame so the left_join onto `final`
+  # below still emits every role_* column (NA-filled per sample), never drops them.
+  candidate_roles_wide <- tibble(
+    sampleName               = character(),
+    overall_sample_call      = character(),
+    Major_role_reference     = character(),
+    Major_role_subtype       = character(),
+    Major_dominance_score    = double(),
+    Major_role_reason        = character(),
+    Minor_role_reference     = character(),
+    Minor_role_subtype       = character(),
+    Minor_dominance_score    = double(),
+    Minor_role_reason        = character()
+  )
+}
 
 # WR-01/WR-02: the wide assembly-support block must carry a FIXED column set —
 # cand_1..cand_{n_candidates} × the six support values — regardless of which
@@ -975,7 +1051,13 @@ final <- input_samplesheet %>%
   # slots. Samplesheet still anchors the left side so a sample with no candidate /
   # no de novo support keeps its row with NA support columns (criterion #3, no row
   # loss). everything() in the select reorder below carries these columns through.
-  left_join(candidate_support_wide, join_by(sampleName))
+  left_join(candidate_support_wide, join_by(sampleName)) %>%
+  # Phase 8 (D-16): per-sample role slots + overall_sample_call. Dominant ->
+  # Major_role_*, corroborated co-infection -> Minor_role_*, plus the new wide
+  # overall_sample_call. Samplesheet anchors the left side so a no-candidate
+  # sample keeps its row with NA role columns. everything() in the select reorder
+  # below carries the role columns through.
+  left_join(candidate_roles_wide, join_by(sampleName))
 
 if (nrow(glue_report) > 0) {
   final <- final %>%
@@ -1037,35 +1119,17 @@ if (!is.na(min_targeted_read) && !is.na(min_targeted_cov)) {
     ))
 }
 
-# De novo confirmation of the reported minor (Change 2, D-13: DOWNGRADE-ONLY).
-# This is the authoritative chokepoint: it runs IMMEDIATELY after the
-# minor_typable case_when so it can only ever flip a YES→NO (refute), never
-# resurrect a suppressed minor (CONF-06, by construction). The 1a/1b allowance
-# above and the upstream 2k1b suppression are untouched.
-#
-# Genotypes are derived UNCONDITIONALLY from the mapping reference names
-# (`<subtype>_<acc>` → leading subtype token → genotype_from_subtype()), so the
-# layer is robust to GLUE absence (does NOT depend on Major_subtype/Minor_subtype).
-# minor_denovo_status is ALWAYS present afterwards (D-12), on both branches.
-# The downgrade layer is extracted into bin/denovo_layer.R (D-02) as a sourceable
-# apply_denovo_layer() so the unit test exercises the REAL function instead of an
-# inline re-implementation. This call is behaviour-preserving and at the SAME
-# pipeline point as the former inline block.
-final <- apply_denovo_layer(
-  final, df_blast_out, denovo_confirm_minor,
-  denovo_min_contig_length, denovo_min_kmer_cov,
-  denovo_min_blast_identity, denovo_match_level
-)
-
-# Flag ambiguous cases: gate suppressed the minor call but de novo still confirms
-# the minor genotype. These samples warrant manual review of QC plots and assembly
-# contigs.
-final <- final %>%
-  mutate(coinfection_flag = if_else(
-    minor_typable == "NO" & !is.na(minor_denovo_status) & minor_denovo_status == "confirmed_by_denovo",
-    "possible_multiple_strains",
-    NA_character_
-  ))
+# De novo confirmation of the reported minor — RETIRED (D-15). The legacy
+# apply_denovo_layer() / minor_denovo_status / coinfection_flag chokepoint has been
+# REPLACED by the Phase-8 N-candidate role classifier (score_candidates() +
+# classify_roles() above, run over the long candidate_support frame). There is now
+# ONE confirmation system, not two: the corroboration verdict + asymmetric refute
+# (D-10/D-11) + the HCV exceptions (is_valid_minor, D-12) live in classify_roles(),
+# and review_flag (below) is rewired onto role / role_reason / overall_sample_call.
+# bin/denovo_layer.R / bin/denovo_confirm.R are still SOURCED above so the staged
+# files load cleanly and the unit suite can exercise them directly, but their
+# consumption here is removed. Phase 9 handles the Major_*/Minor_* column aliasing
+# (COMPAT-03); Phase 8 only retires the legacy LOGIC.
 
 # De novo subtype comparison columns (ODH-01). Extract the leading subtype token
 # from both the mapping reference names (Major_reference / Minor_reference) and the
@@ -1157,20 +1221,49 @@ if (!"denovo_major_subtype" %in% colnames(final)) {
     )
 }
 
-# Review flag (REVIEW-01). Human-readable inspection prompts for samples that
-# warrant manual review, joined with " | ". NA when no reasons fire. The verbatim
-# message text lives in the pmap_chr() below; the triggers, in order, are:
-#   1. minor_typable == "YES" AND a major or minor subtype mismatch
-#      (denovo_*_subtype_match == "NO") — co-infection confirmed but major/minor
-#      assignment uncertain (de novo and mapping disagree on the dominant strain)
-#   2. single-infection (minor_typable != "YES") AND denovo_major_subtype_match == "NO"
-#      — major subtype conflict between de novo assembly and mapping
-#   3. minor_denovo_status == "refuted" — minor refuted by de novo; likely single infection
-#   4. coinfection_flag == "possible_multiple_strains" — de novo confirms a minor
-#      that the mapping quality gate suppressed
-#   5. gate_flag != "ok" — major failed the first-mapping quality thresholds
+# Per-sample role-reason summary for the rewired review_flag (D-13/D-15). The
+# review sentences are now derived from the N-candidate role model, not the retired
+# minor_denovo_status / coinfection_flag. Roll the long classified candidate_support
+# frame up to one row per sample, capturing whether ANY candidate was refuted by de
+# novo (background/refuted_denovo) or kept as an uncorroborated co-infection
+# (co-infection/uncorroborated_kept). These per-sample booleans feed the pmap_chr
+# below alongside overall_sample_call + gate_flag + the subtype-match columns.
+if (nrow(candidate_support) > 0) {
+  role_review <- candidate_support %>%
+    group_by(sampleName) %>%
+    summarise(
+      any_refuted_denovo     = any(role_reason == "refuted_denovo", na.rm = TRUE),
+      any_uncorroborated     = any(role_reason == "uncorroborated_kept", na.rm = TRUE),
+      .groups = "drop"
+    )
+} else {
+  role_review <- tibble(
+    sampleName         = character(),
+    any_refuted_denovo = logical(),
+    any_uncorroborated = logical()
+  )
+}
+
+final <- final %>%
+  left_join(role_review, join_by(sampleName))
+
+# Review flag (REVIEW-01), rewired onto the Phase-8 roles (D-13/D-15). Human-readable
+# inspection prompts for samples that warrant manual review, joined with " | ". NA
+# when no reasons fire. The verbatim message text lives in the pmap_chr() below; the
+# triggers, in order, are now driven by role / role_reason / overall_sample_call
+# instead of the retired minor_denovo_status / coinfection_flag:
+#   1. overall_sample_call == "co-infection" AND a major or minor subtype mismatch
+#      (denovo_*_subtype_match == "NO") — co-infection called but major/minor
+#      assignment uncertain (de novo and mapping disagree on which strain is dominant)
+#   2. monoinfection AND denovo_major_subtype_match == "NO" — major subtype conflict
+#      between de novo assembly and mapping
+#   3. any_refuted_denovo — a minor candidate refuted by de novo; likely single infection
+#   4. any_uncorroborated — a co-infection kept without de novo corroboration (de novo
+#      inconclusive for both strains); warrants analyst review of QC plots / contigs
+#   5. overall_sample_call == "indeterminate" — no candidate passed the major-gate
+#   6. gate_flag != "ok" — major failed the first-mapping quality thresholds
 # (Earlier versions emitted semicolon-separated reason codes; rewritten to full
-# sentences in commit ff12009.)
+# sentences in commit ff12009; rewired onto roles in Phase 8 / D-15.)
 #
 # MultiQC orange-highlight note: in assets/multiqc_config.yml the results_summary
 # custom_data block includes a cond_formatting_rules entry for this column that
@@ -1183,29 +1276,35 @@ final <- final %>%
       list(
         denovo_major_subtype_match,
         denovo_minor_subtype_match,
-        coinfection_flag,
-        minor_denovo_status,
-        gate_flag,
-        minor_typable
+        overall_sample_call,
+        any_refuted_denovo,
+        any_uncorroborated,
+        gate_flag
       ),
-      function(maj_match, min_match, coinf, denovo_stat, gflag, m_typable) {
+      function(maj_match, min_match, sample_call, refuted, uncorr, gflag) {
         msgs        <- character(0)
-        is_coinf    <- !is.na(m_typable) && m_typable == "YES"
+        is_coinf    <- !is.na(sample_call) && sample_call == "co-infection"
+        is_mono     <- !is.na(sample_call) && sample_call == "monoinfection"
+        is_indet    <- !is.na(sample_call) && sample_call == "indeterminate"
         subtype_dis <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
         if (is_coinf && subtype_dis)
           msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
-        if (!is_coinf && !is.na(maj_match) && maj_match == "NO")
+        if (is_mono && !is.na(maj_match) && maj_match == "NO")
           msgs <- c(msgs, "Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review.")
-        if (!is.na(denovo_stat) && denovo_stat == "refuted")
+        if (isTRUE(refuted))
           msgs <- c(msgs, "Minor strain candidate refuted by de novo assembly — likely single infection.")
-        if (!is.na(coinf) && coinf == "possible_multiple_strains")
-          msgs <- c(msgs, "Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review.")
+        if (isTRUE(uncorr))
+          msgs <- c(msgs, "Co-infection kept without de novo corroboration — de novo inconclusive for both strains; minor strain may be a genuine low-yield co-infection. Please review.")
+        if (is_indet)
+          msgs <- c(msgs, "No candidate passed the major-gate — overall sample call indeterminate.")
         if (!is.na(gflag) && gflag != "ok")
           msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
         if (length(msgs) == 0) NA_character_ else paste(msgs, collapse = " | ")
       }
     )
-  })
+  }) %>%
+  # Drop the per-sample role-review helper booleans now they have been consumed.
+  select(-any_refuted_denovo, -any_uncorroborated)
 
 # Reorder columns
 final <- final %>%
@@ -1221,8 +1320,17 @@ final <- final %>%
          Minor_reference,
          major_typable,
          minor_typable,
-         minor_denovo_status,
-         coinfection_flag,
+         # Phase 8 (D-16): overall sample call from the N-candidate role model,
+         # placed where the retired minor_denovo_status / coinfection_flag sat.
+         overall_sample_call,
+         Major_role_reference,
+         Major_role_subtype,
+         Major_dominance_score,
+         Major_role_reason,
+         Minor_role_reference,
+         Minor_role_subtype,
+         Minor_dominance_score,
+         Minor_role_reason,
          denovo_major_subtype,
          denovo_minor_subtype,
          denovo_major_subtype_match,

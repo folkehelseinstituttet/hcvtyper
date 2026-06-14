@@ -68,11 +68,20 @@ read_blast_out_frame <- function(path_denovo) {
 parse(file.path(bin_dir, "summarize.R"))
 ok("summarize.R parses")
 
-# Sanity: summarize.R sources and calls the extracted layer (key_links contract).
+# Sanity: D-15 retirement contract. Phase 8 replaced the legacy minor-coupled
+# confirmation layer with the N-candidate role classifier. summarize.R still SOURCES
+# denovo_layer.R / denovo_confirm.R (so the staged files load cleanly and the
+# fixture tests below can exercise apply_denovo_layer() directly), but it must NO
+# LONGER CALL apply_denovo_layer() — there is one confirmation system, not two.
+# Instead it sources + runs classify_roles() over the candidate frame.
 src <- readLines(file.path(bin_dir, "summarize.R"))
 if (!any(grepl("source\\(\"denovo_layer.R\"\\)", src))) fail("summarize.R missing source(denovo_layer.R)")
-if (!any(grepl("apply_denovo_layer\\(", src))) fail("summarize.R missing apply_denovo_layer() call")
-ok("summarize.R sources + calls apply_denovo_layer()")
+if (!any(grepl("source\\(\"classify_roles.R\"\\)", src))) fail("summarize.R missing source(classify_roles.R)")
+# An UNcommented apply_denovo_layer( call must not survive the D-15 retirement.
+uncommented_layer_call <- any(grepl("^[^#]*apply_denovo_layer\\(", src))
+if (uncommented_layer_call) fail("summarize.R must NOT call apply_denovo_layer() after D-15 retirement")
+if (!any(grepl("classify_roles\\(", src))) fail("summarize.R missing classify_roles() call")
+ok("summarize.R retires apply_denovo_layer() + sources/calls classify_roles() (D-15)")
 
 # --- Block 2: read_blast_out_frame() fixtures -----------------------------
 
