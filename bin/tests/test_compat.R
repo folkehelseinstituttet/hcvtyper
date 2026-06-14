@@ -283,4 +283,97 @@ if (!all(role_cols %in% colnames(coinf_summary)))
              paste(setdiff(role_cols, colnames(coinf_summary)), collapse = ",")))
 ok("COMPAT-03: Summary.csv carries legacy Major_*/Minor_* alongside role columns + overall_sample_call")
 
+# =========================================================================
+# COMPAT-04 — 1a/1b allowed, 2k/1b suppressed (D-12), exercised end-to-end
+# through the FULL summarize.R path AND locked at the helper level.
+# =========================================================================
+
+# --- Part A: observable Summary.csv signal via the run_summarize() harness ---
+# A 1a-dominant + 1b-corroborated sample must surface as a co-infection with the
+# 1b ref in the Minor_role slot. We reuse the COMPAT-01 co-infection run (1a/1b),
+# which already exercises the production score_candidates -> classify_roles call
+# site inside summarize.R, and assert the role-level outcome here.
+if (is.na(coinf_summary$overall_sample_call[1]) ||
+    coinf_summary$overall_sample_call[1] != "co-infection")
+  fail(sprintf("COMPAT-04 (1a/1b): overall_sample_call must be co-infection, got '%s'",
+               coinf_summary$overall_sample_call[1]))
+if (is.na(coinf_summary$Minor_role_reference[1]) ||
+    coinf_summary$Minor_role_reference[1] != "1b_D90208")
+  fail(sprintf("COMPAT-04 (1a/1b): Minor_role_reference must be the 1b ref, got '%s'",
+               coinf_summary$Minor_role_reference[1]))
+ok("COMPAT-04 (1a/1b): end-to-end summarize.R yields co-infection with 1b in the minor role slot")
+
+# A genotype-2-dominant + 2k1b-second sample must NOT be reported as a co-infection
+# minor — the 2k1b recombinant is suppressed to background, so its ref never reaches
+# the Minor_role slot and the sample is not a co-infection.
+suppress_cands <- mk_cands(
+  mk_cand(1, "2a_ref",   "2a",   200000, 98),
+  mk_cand(2, "2k1b_ref", "2k1b", 150000, 96)
+)
+suppress_summary <- run_summarize("suppress", "SUPPRESS", suppress_cands)
+if (is.null(suppress_summary)) fail("COMPAT-04 (2k1b): summarize.R wrote no Summary.csv")
+if (!is.na(suppress_summary$overall_sample_call[1]) &&
+    suppress_summary$overall_sample_call[1] == "co-infection")
+  fail("COMPAT-04 (2k1b): a suppressed 2k1b recombinant must NOT yield a co-infection sample")
+if (!is.na(suppress_summary$Minor_role_reference[1]) &&
+    suppress_summary$Minor_role_reference[1] == "2k1b_ref")
+  fail("COMPAT-04 (2k1b): the suppressed 2k1b ref must NOT appear in Minor_role_reference")
+ok("COMPAT-04 (2k1b): end-to-end summarize.R suppresses the 2k1b recombinant (not a co-infection minor)")
+
+# --- Part B: lock the exact role / role_reason vocabulary at the helper level ---
+# The wide Summary.csv only carries the dominant + corroborated-minor role slots, so
+# it cannot surface the per-candidate role_reason. Source the REAL helpers and mirror
+# the test_classify_roles.R sim1 (1a/1b) + 2k1b cases to assert the precise role and
+# role_reason values the D-12 exception preserves. Scoped to ONLY these two cases
+# (COMPAT-04) — the broader classifier behaviours live in test_classify_roles.R.
+source(file.path(bin_dir, "genotype_utils.R"))
+source(file.path(bin_dir, "classify_roles.R"))
+
+mk_helper_cand <- function(sample, ref, subtype, reads, cov, even,
+                           sup_len = NA_real_, sup_kmer = NA_real_, sup_pid = NA_real_) {
+  tibble(
+    sampleName                            = sample,
+    candidate_ref                         = ref,
+    candidate_subtype                     = subtype,
+    candidate_genotype                    = genotype_from_subtype(subtype),
+    candidate_reads                       = reads,
+    candidate_cov                         = cov,
+    cv_evenness                           = even,
+    assembly_support_best_contig_length   = sup_len,
+    assembly_support_best_contig_kmer_cov = sup_kmer,
+    assembly_support_best_contig_pident   = sup_pid
+  )
+}
+classify_helper <- function(df) {
+  classify_roles(score_candidates(df), minRead = 500, minCov = 30,
+                 denovo_min_contig_length = 1000, denovo_min_kmer_cov = 2.0,
+                 denovo_min_blast_identity = 90, match_level = "genotype")
+}
+role_of   <- function(r, ref) r %>% filter(candidate_ref == ref) %>% pull(role)
+reason_of <- function(r, ref) r %>% filter(candidate_ref == ref) %>% pull(role_reason)
+
+# 1a/1b allowance (D-12): the 1b candidate is preserved as co-infection.
+ab <- bind_rows(
+  mk_helper_cand("ab", "1a_ref", "1a", 150000, 99, 0.90, sup_len = 9076, sup_kmer = 40, sup_pid = 99),
+  mk_helper_cand("ab", "1b_ref", "1b", 120000, 97, 0.88, sup_len = 9339, sup_kmer = 38, sup_pid = 99)
+)
+r_ab <- classify_helper(ab)
+if (!identical(role_of(r_ab, "1b_ref"), "co-infection"))
+  fail("COMPAT-04 helper: 1a/1b cross-subtype-within-gt1 must keep the 1b candidate as co-infection")
+if ((r_ab %>% pull(overall_sample_call) %>% unique()) != "co-infection")
+  fail("COMPAT-04 helper: the 1a/1b sample must be a co-infection")
+ok("COMPAT-04 helper (D-12): 1a/1b -> 1b candidate role == co-infection")
+
+# 2k1b suppression (D-12): the 2k1b candidate is demoted to background/recombinant_2k1b.
+k2 <- bind_rows(
+  mk_helper_cand("k2", "2a_ref",   "2a",   200000, 98, 0.90, sup_len = 9000, sup_kmer = 40, sup_pid = 99),
+  mk_helper_cand("k2", "2k1b_ref", "2k1b", 6000,   82, 0.72, sup_len = 8800, sup_kmer = 33, sup_pid = 96)
+)
+r_k2 <- classify_helper(k2)
+if (!identical(role_of(r_k2, "2k1b_ref"), "background"))
+  fail("COMPAT-04 helper: a 2k1b recombinant paired with a genotype-2 dominant must be background")
+if (!identical(reason_of(r_k2, "2k1b_ref"), "recombinant_2k1b"))
+  fail("COMPAT-04 helper: the 2k1b suppression reason must be recombinant_2k1b")
+ok("COMPAT-04 helper (D-12): 2k1b -> background/recombinant_2k1b")
+
 cat("\nALL PASS\n")
