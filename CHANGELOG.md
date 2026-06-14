@@ -7,15 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+- **Neutral candidate selection (`params.n_candidates`, default 2):** Reference selection now ranks up to N candidates neutrally by read recruitment — no major/minor dominance semantics during the run. The top reference per distinct subtype is selected; `is_valid_minor()` validity filtering is removed from selection and moved to classification. A new `*.candidates.csv` (long-format, one row per candidate) is emitted by PARSEFIRSTMAPPING alongside the legacy wide CSV.
+- **Per-genotype assembly support (`*.assembly_support.csv`):** `blast_parse.R` now emits a per-subtype assembly-support roll-up (best contig by `sc_length`) carrying four metrics: best contig length, BLAST % identity, BLAST alignment length, and k-mer coverage. These are joined to the neutral candidates at genotype level (parameterised by `--denovo_match_level`, default `genotype`) via the new `bin/assembly_support_join.R` helper, replacing the former major/minor-specific de novo evidence pass-through. Candidates with no matching assembly evidence resolve to `assembly_support = "none"` with NA metrics (no row loss).
+- **Dominance scoring:** Each candidate receives a combined dominance score over log10(mapped reads), coverage breadth fraction, CV-of-depth evenness, and log10(1 + k-mer coverage). Breadth evenness is weighted 3× raw read count by default (`--score_weight_evenness 3.0`, `--score_weight_reads 1.0`, `--score_weight_kmercov 0.5`), making the score resistant to index-hopping artefacts that have high read count but uneven breadth.
+- **Strain-role classification (`dominant` / `co-infection` / `background`):** The new `bin/classify_roles.R` helper classifies each candidate at the summary step using a "guilty until corroborated" rule: a non-dominant candidate is reported as co-infection only when it (a) clears the abundance floor (`minRead` + `minCov`) **and** (b) has genotype-level assembly support; otherwise it is classified `background`. Background/artefact candidates are surfaced explicitly in `candidates.csv` with a `role_reason` (e.g. `refuted_denovo`, `uncorroborated_kept`, `below_floor`) and never silently dropped.
+- **`overall_sample_call` column in `Summary.csv`:** Derived from candidate roles — `monoinfection`, `co-infection`, or `indeterminate` — reported once per sample.
+- **New `candidates.csv` output:** Per-sample long-format file listing every candidate (including background) with `candidate_rank`, `dominance_score`, `role`, `role_reason`, and all assembly-support metrics. Published to `summary/candidates/`.
+- **New parameters:** `--score_weight_evenness`, `--score_weight_reads`, `--score_weight_kmercov`, `--score_evenness_k`.
+- **Regression suite extension (`bin/tests/test_compat.R`):** New auto-discovered test file covering golden strain-call reproduction (COMPAT-01), cand-slot filename lockstep (COMPAT-02), legacy + role column co-presence (COMPAT-03), and the 1a/1b co-infection and 2k/1b recombinant suppression exceptions (COMPAT-04). Runs automatically with `bash bin/tests/run_all.sh` (CI `r-regression` job, no YAML change required).
+
 ### `Fixed`
 
+- **Reconciled de novo confirmation floor defaults** to the values validated against the SRA cohort: `--denovo_min_contig_length` 500 → **1000** bp; `--denovo_min_kmer_cov` 10.0 → **2.0**×. The prior 10.0× k-mer floor was incorrectly strict and would refute ERR1810453's genuine partial 2b co-infection (k-mer coverage ~5×).
+- **Variation-plot grid no longer silently empty after the cand-slot rename:** `bin/summarize.R` now splits variation-plot PNGs by `_cand1.` / `_cand2.` patterns (was `"major"` / `"minor"`, which never matched after the filename migration).
+- **`plot_bam_variation.R` cand-slot extraction:** The BAM basename is now parsed by searching for a field matching `^cand[0-9]+$` (with a legacy fallback to position 3), replacing the hard-coded position-3 `str_split` that read `"nodup"` instead of the cand slot after the Phase-9 rename.
+
 ### `Changed`
+
+- **Output filename slot migrated `.major.` / `.minor.` → `.cand1.` / `.cand2.`** across all TARGETED_MAPPING outputs (BAM, stats, consensus). `bin/summarize.R` recovers `candidate_rank` via a join against `*.candidates.csv` rather than parsing a hard-coded filename field.
+- **Uniform per-candidate TARGETED_MAPPING fan-out:** The asymmetric `MAJOR_MAPPING` / `MINOR_MAPPING` subworkflow aliases are replaced by a single `TARGETED_MAPPING` call fanning out over all rows of `PARSEFIRSTMAPPING.out.candidates` (`splitCsv.flatMap`). Per-candidate `confirmation_status` replaces the former `gate_flag` / `minor_call` plumbing.
+- **`Major_role_*` / `Minor_role_*` columns added to `Summary.csv`** alongside the new overall call: `Major_role_reference`, `Major_role_subtype`, `Major_role_dominance_score`, `Minor_role_reference`, `Minor_role_subtype`, `Minor_role_dominance_score`, `overall_sample_call`.
+- The legacy `apply_denovo_layer` / `minor_denovo_status` / `coinfection_flag` classification path in `bin/summarize.R` is retired; `bin/denovo_layer.R` is still staged and unit-tested but is no longer called from the main reporting path. `review_flag` is now set from per-sample role roll-up.
+
+### `Deprecated`
+
+- **`Major_*` / `Minor_*` summary columns are aliased for one release** alongside the new `Major_role_*` / `Minor_role_*` equivalents. These legacy columns will be removed in the next release (COMPAT-03 drop).
+- **`minor_denovo_status` and `coinfection_flag`** are no longer populated by the main reporting path; they remain in `Summary.csv` as NA-filled stubs for one release.
 
 ### `Removed`
 
 ### `Dependencies`
-
-### `Deprecated`
 
 ## 1.3.0 - 2026.06.11
 
