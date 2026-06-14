@@ -35,6 +35,7 @@ process SUMMARIZE {
 
     output:
     path 'Summary.csv'      , emit: summary
+    path 'candidates.csv'   , emit: candidates
     path '*mqc.tsv'         , emit: mqc
     path '*png'             , emit: png
     path "versions.yml"     , emit: versions
@@ -80,6 +81,9 @@ EOF
 
     # Create a minimal PNG plot placeholder
     : > summary_plot.png
+
+    # Enriched long candidates CSV placeholder (CLASS-03)
+    printf 'sampleName\tcandidate_rank\tcandidate_ref\tcandidate_subtype\tcandidate_genotype\treads\tcov\tcv_evenness\tassembly_support\tdomainance_score\trole\trole_reason\toverall_sample_call\n' > candidates.csv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

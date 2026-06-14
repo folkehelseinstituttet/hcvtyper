@@ -854,7 +854,7 @@ if (exists("major_gt") & exists("minor_gt")) {
 # Sequencer ID ------------------------------------------------------------
 id_files <- list.files(path = path_9, pattern = "sequencerID.tsv$", full.names = TRUE)
 
-if (length(id_files > 0)) {
+if (length(id_files) > 0) {
     # Empty df
     id_df <- as.data.frame(matrix(nrow = length(id_files), ncol = 2))
     colnames(id_df) <- c("sampleName", "sequencer_id")
