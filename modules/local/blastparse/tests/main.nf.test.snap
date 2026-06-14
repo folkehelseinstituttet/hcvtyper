@@ -23,7 +23,10 @@
                         {
                             "id": "toy"
                         },
-                        "toy.major.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        [
+                            "toy.cand1.fa:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "toy.cand2.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ]
                     ]
                 ],
                 "3": [
@@ -31,7 +34,7 @@
                         {
                             "id": "toy"
                         },
-                        "toy.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "toy.blastparse.csv:md5,cd5ec569f4a4411f5406d5222d2de0ef"
                     ]
                 ],
                 "4": [
@@ -39,7 +42,7 @@
                         {
                             "id": "toy"
                         },
-                        "toy.blastparse.csv:md5,cd5ec569f4a4411f5406d5222d2de0ef"
+                        "toy.assembly_support.csv:md5,91375f8515793c5d6308a5a57c0a51f7"
                     ]
                 ],
                 "5": [
@@ -61,6 +64,17 @@
                         "toy.blast_out.csv:md5,854d3f407b6d8747e8dc79862c911522"
                     ]
                 ],
+                "candidate_fasta": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        [
+                            "toy.cand1.fa:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "toy.cand2.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ]
+                    ]
+                ],
                 "contigs": [
                     [
                         {
@@ -77,22 +91,6 @@
                         "toy.blastparse.csv:md5,cd5ec569f4a4411f5406d5222d2de0ef"
                     ]
                 ],
-                "major_fasta": [
-                    [
-                        {
-                            "id": "toy"
-                        },
-                        "toy.major.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
-                    ]
-                ],
-                "minor_fasta": [
-                    [
-                        {
-                            "id": "toy"
-                        },
-                        "toy.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
-                    ]
-                ],
                 "png": [
                     [
                         {
@@ -101,16 +99,24 @@
                         "toy.png:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
+                "support": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.assembly_support.csv:md5,91375f8515793c5d6308a5a57c0a51f7"
+                    ]
+                ],
                 "versions": [
                     "versions.yml:md5,1618d74e63656df309db763cabd3556a"
                 ]
             }
         ],
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "25.04.2"
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
         },
-        "timestamp": "2025-10-06T11:24:56.058643387"
+        "timestamp": "2026-06-14T16:30:27.859521455"
     },
     "blastparse: blast6 + contigs + references": {
         "content": [
