@@ -894,13 +894,13 @@ if (exists("major_gt") & exists("minor_gt")) {
 # Sequencer ID ------------------------------------------------------------
 id_files <- list.files(path = path_9, pattern = "sequencerID.tsv$", full.names = TRUE)
 
-if (length(id_files) > 0) {
-    # Empty df
-    id_df <- as.data.frame(matrix(nrow = length(id_files), ncol = 2))
-    colnames(id_df) <- c("sampleName", "sequencer_id")
-}
+# Initialize id_df unconditionally so the tibble conversion at line 931 never
+# references an undefined variable when id_files is empty.
+# (WR-02: "1:0" anti-pattern yielded c(1L,0L) and crashed with "object id_df not found")
+id_df <- as.data.frame(matrix(nrow = length(id_files), ncol = 2))
+colnames(id_df) <- c("sampleName", "sequencer_id")
 
-for (i in 1:length(id_files)) {
+for (i in seq_along(id_files)) {
   try(rm(id))
 
   # Get sample name
