@@ -241,13 +241,60 @@ parsefirstmapping_df <- as_tibble(parsefirstmapping_df) %>%
   ) %>%
   select(sampleName, total_mapped_reads, fraction_mapped_reads_vs_median, percent_mapped_reads_major_firstmapping, percent_mapped_reads_minor_firstmapping, major_cov_firstmapping, major_ref_firstmapping, gate_flag)
 
+# Phase-9 (COMPAT-02 / D-02): load the long-format candidate table BEFORE the three
+# stats loops so each loop can recover its candidate rank by joining its per-file
+# reference token to candidate_rank, instead of parsing a major/minor slot from
+# filename position 3. The load depends only on path_3 (set near the top), so it is
+# safe to hoist here ahead of the stats loops (originally loaded near the Phase-7
+# assembly-support join). The Phase-7 assembly-support join below reuses this frame.
+candidates_files <- list.files(path = path_3, pattern = "\\.candidates.csv$", full.names = TRUE)
+
+if (length(candidates_files) > 0) {
+  # CR-01/CR-02: pin column types so (a) a header-only candidates.csv (no-mapping
+  # branch) and a populated one combine cleanly under map_dfr/bind_rows, and (b)
+  # candidate_genotype is read as character — HCV genotypes 1–7 are purely-digit,
+  # which readr would otherwise infer as <double>, breaking the genotype-level
+  # join. col_types declares only the columns we depend on; the rest are inferred.
+  candidates_long <- map_dfr(candidates_files, ~ read_csv(.x, col_types = cols(
+    sample              = col_character(),
+    candidate_rank      = col_integer(),
+    candidate_ref       = col_character(),
+    candidate_subtype   = col_character(),
+    candidate_genotype  = col_character(),
+    candidate_reads     = col_double(),
+    candidate_cov       = col_double(),
+    confirmation_status = col_character()
+  ))) %>%
+    rename(sampleName = sample)
+} else {
+  # Declare all eight Phase-6 candidate columns with their types so a no-candidate
+  # run yields a typed zero-row frame (the join then returns a typed zero-row frame).
+  candidates_long <- tibble(
+    sampleName          = character(),
+    candidate_rank      = integer(),
+    candidate_ref       = character(),
+    candidate_subtype   = character(),
+    candidate_genotype  = character(),
+    candidate_reads     = double(),
+    candidate_cov       = double(),
+    confirmation_status = character()
+  )
+}
+
+# Phase-9 (COMPAT-02 / D-02): per-sample (candidate_ref -> candidate_rank) lookup
+# used by all three stats loops to recover the slot by join. Built once from the
+# hoisted candidates_long frame.
+candidate_rank_lookup <- candidates_long %>%
+  select(sampleName, candidate_ref, candidate_rank) %>%
+  distinct(sampleName, candidate_ref, .keep_all = TRUE)
+
 # Second mapping, reads mapped with duplicates ----------------------------
 # List files
 stats_files <- list.files(path = path_4, pattern = "\\withdup.stats$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_withdups_mapped")
+tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 3))
+colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_withdups_mapped")
 
 for (i in 1:length(stats_files)) {
   try(rm(map_stats))
@@ -257,8 +304,9 @@ for (i in 1:length(stats_files)) {
   # Get reference name
   tmp_df$reference[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][2]
 
-  # Get major or minor
-  tmp_df$first_major_minor[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][3]
+  # Phase-9 (COMPAT-02 / D-02): the candidate rank is no longer parsed from
+  # filename position 3 (.major./.minor./.cand{rank}.). It is recovered by joining
+  # the cleaned reference token to candidate_rank below.
 
   # Read the mapping stats
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
@@ -271,6 +319,13 @@ for (i in 1:length(stats_files)) {
 }
 tmp_df <- as_tibble(tmp_df)
 
+# Phase-9 (COMPAT-02 / D-02): recover candidate_rank by join. Strip the new
+# `_cand{rank}` slot suffix off the reference token to get the cleaned candidate_ref
+# (e.g. `3a_D17763`), then join to the per-sample candidate_rank_lookup.
+tmp_df <- tmp_df %>%
+  mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
+  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref"))
+
 # Add number of raw and trimmed reads - needed for calculation of percentages
 tmp_df <- left_join(tmp_df, trimmed_df, by = "sampleName")
 
@@ -279,17 +334,16 @@ tmp_df <- left_join(tmp_df, kraken_df, by = "sampleName")
 
 df_with_dups <- tmp_df %>%
   # Create columns for reads mapped to major and minor genotype
-  mutate(Reads_withdup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_withdups_mapped)) %>%
-  mutate(Reads_withdup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_withdups_mapped)) %>%
+  mutate(Reads_withdup_mapped_major = case_when(candidate_rank == 1 ~ trimmed_reads_withdups_mapped)) %>%
+  mutate(Reads_withdup_mapped_minor = case_when(candidate_rank == 2 ~ trimmed_reads_withdups_mapped)) %>%
   # Don't include number of reads mapped in the first mapping. Info must be taken from another process if we should include
-  #mutate(Reads_withdup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>%
+  #mutate(Reads_withdup_mapped_first_mapping = case_when(reference == "first_mapping" ~ trimmed_reads_withdups_mapped)) %>%
   select(-trimmed_reads_withdups_mapped) %>%
-  # Create columns for the major and minor references
-  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
-  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
-  mutate(Major_reference = str_remove(Major_reference, "_major"),
-         Minor_reference = str_remove(Minor_reference, "_minor")) %>%
-  select(-reference) %>%
+  # Create columns for the major and minor references (cleaned candidate_ref — no
+  # slot suffix — so it stays byte-identical to the legacy join key, COMPAT-02 D-02).
+  mutate(Major_reference = case_when(candidate_rank == 1 ~ candidate_ref)) %>%
+  mutate(Minor_reference = case_when(candidate_rank == 2 ~ candidate_ref)) %>%
+  select(-reference, -candidate_ref) %>%
   # Calculate percent of the trimmed reads mapped
   #mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
   #       Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
@@ -299,7 +353,7 @@ df_with_dups <- tmp_df %>%
          Percent_reads_mapped_of_trimmed_with_dups_minor = Reads_withdup_mapped_minor / total_trimmed_reads * 100) %>%
          #Percent_reads_mapped_with_dups_first_mapping = Reads_withdup_mapped_first_mapping / total_trimmed_reads_with_dups * 100) %>%
   # Create one row per sample
-  select(-first_major_minor) %>%
+  select(-candidate_rank) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
@@ -310,8 +364,8 @@ df_with_dups <- tmp_df %>%
 stats_files <- list.files(path = path_5, pattern = "nodup.stats$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "first_major_minor", "trimmed_reads_nodups_mapped")
+tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 3))
+colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_nodups_mapped")
 
 for (i in 1:length(stats_files)) {
   try(rm(mapped_reads))
@@ -322,8 +376,8 @@ for (i in 1:length(stats_files)) {
   # Get reference name
   tmp_df$reference[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][2]
 
-  # Get major or minor
-  tmp_df$first_major_minor[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][3]
+  # Phase-9 (COMPAT-02 / D-02): candidate rank recovered by join below, not from
+  # filename position 3.
 
   # Read the mapping stats
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
@@ -337,26 +391,33 @@ for (i in 1:length(stats_files)) {
 }
 tmp_df <- as_tibble(tmp_df)
 
+# Phase-9 (COMPAT-02 / D-02): recover candidate_rank by join. Strip the `_cand{rank}`
+# slot suffix to get candidate_ref; the `first_mapping` reference has no suffix and
+# no candidate_rank, so it survives the join with candidate_rank == NA and is matched
+# below by `reference == "first_mapping"`.
+tmp_df <- tmp_df %>%
+  mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
+  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref"))
+
 df_nodups <- tmp_df %>%
   # Create columns for major and minor
-  separate(reference, into = c("genotype", NA), sep = "_", remove = F) %>%
-  mutate(Major_genotype_mapping = case_when(first_major_minor == "major" ~ genotype)) %>%
-  mutate(Minor_genotype_mapping = case_when(first_major_minor == "minor" ~ genotype)) %>%
+  separate(candidate_ref, into = c("genotype", NA), sep = "_", remove = F) %>%
+  mutate(Major_genotype_mapping = case_when(candidate_rank == 1 ~ genotype)) %>%
+  mutate(Minor_genotype_mapping = case_when(candidate_rank == 2 ~ genotype)) %>%
   select(-genotype) %>%
   # Create columns for reads mapped to major and minor genotype
-  mutate(Reads_nodup_mapped_major = case_when(first_major_minor == "major" ~ trimmed_reads_nodups_mapped)) %>%
-  mutate(Reads_nodup_mapped_minor = case_when(first_major_minor == "minor" ~ trimmed_reads_nodups_mapped)) %>%
-  mutate(Reads_nodup_mapped_first_mapping = case_when(first_major_minor == "first_mapping" ~ trimmed_reads_nodups_mapped)) %>%
+  mutate(Reads_nodup_mapped_major = case_when(candidate_rank == 1 ~ trimmed_reads_nodups_mapped)) %>%
+  mutate(Reads_nodup_mapped_minor = case_when(candidate_rank == 2 ~ trimmed_reads_nodups_mapped)) %>%
+  mutate(Reads_nodup_mapped_first_mapping = case_when(reference == "first_mapping" ~ trimmed_reads_nodups_mapped)) %>%
   select(-trimmed_reads_nodups_mapped) %>%
-  #mutate(Percent_mapped_major = case_when(first_major_minor == "major" ~ Percent_trimmed_reads_mapped)) %>%
-  #mutate(Percent_mapped_minor = case_when(first_major_minor == "minor" ~ Percent_trimmed_reads_mapped)) %>%
-  # Create columns for the major and minor references
-  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
-  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
-  mutate(Major_reference = str_remove(Major_reference, "_major"),
-         Minor_reference = str_remove(Minor_reference, "_minor")) %>%
+  #mutate(Percent_mapped_major = case_when(candidate_rank == 1 ~ Percent_trimmed_reads_mapped)) %>%
+  #mutate(Percent_mapped_minor = case_when(candidate_rank == 2 ~ Percent_trimmed_reads_mapped)) %>%
+  # Create columns for the major and minor references (cleaned candidate_ref — no
+  # slot suffix — byte-identical to the legacy join key, COMPAT-02 D-02).
+  mutate(Major_reference = case_when(candidate_rank == 1 ~ candidate_ref)) %>%
+  mutate(Minor_reference = case_when(candidate_rank == 2 ~ candidate_ref)) %>%
   # Create one row per sample
-  select(-reference, -first_major_minor) %>%
+  select(-reference, -candidate_ref, -candidate_rank) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
@@ -377,8 +438,8 @@ df_mapped_reads <- full_join(df_with_dups, df_nodups, join_by(sampleName, Major_
 cov_files <- list.files(path = path_6, pattern = "tsv$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 8))
-colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "first_major_minor", "avg_depth", "cv_evenness")
+tmp_df <- as.data.frame(matrix(nrow = length(cov_files), ncol = 7))
+colnames(tmp_df) <- c("sampleName", "reference", "cov_breadth_min_1", "cov_breadth_min_5", "cov_breadth_min_10", "avg_depth", "cv_evenness")
 
 for (i in 1:length(cov_files)) {
   try(rm(cov))
@@ -389,8 +450,8 @@ for (i in 1:length(cov_files)) {
   # Get reference name
   tmp_df$reference[i] <- str_split(basename(cov_files[i]), "\\.")[[1]][2]
 
-  # Get major or minor
-  tmp_df$first_major_minor[i] <- str_split(basename(cov_files[i]), "\\.")[[1]][3]
+  # Phase-9 (COMPAT-02 / D-02): candidate rank recovered by join below, not from
+  # filename position 3.
 
   # Read the depth per position
   cov <- read_tsv(cov_files[i], col_names = FALSE)
@@ -450,6 +511,13 @@ for (i in 1:length(cov_files)) {
 # Create column for subtype and Sample_ref
 tmp_df <- as_tibble(tmp_df)
 
+# Phase-9 (COMPAT-02 / D-02): recover candidate_rank by join. Strip the `_cand{rank}`
+# slot suffix to get candidate_ref; `first_mapping` has no suffix / no candidate_rank
+# and is filtered out below before any rank-based logic runs.
+tmp_df <- tmp_df %>%
+  mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
+  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref"))
+
 # Phase 8 (D-03): per-reference cv_evenness lookup for the role classifier.
 # df_coverage (below) collapses to one row/sample with Major_/Minor_ slots, which
 # loses the per-candidate granularity the classifier needs. Build a long lookup
@@ -470,22 +538,21 @@ df_coverage <- tmp_df %>%
   # Don't need first mapping data
   filter(reference != "first_mapping") %>%
   # Create columns for major and minor coverage
-  mutate(Major_cov_breadth_min_1 = case_when(first_major_minor == "major" ~ cov_breadth_min_1)) %>%
-  mutate(Minor_cov_breadth_min_1 = case_when(first_major_minor == "minor" ~ cov_breadth_min_1)) %>%
-  mutate(Major_cov_breadth_min_5 = case_when(first_major_minor == "major" ~ cov_breadth_min_5)) %>%
-  mutate(Minor_cov_breadth_min_5 = case_when(first_major_minor == "minor" ~ cov_breadth_min_5)) %>%
-  mutate(Major_cov_breadth_min_10 = case_when(first_major_minor == "major" ~ cov_breadth_min_10)) %>%
-  mutate(Minor_cov_breadth_min_10 = case_when(first_major_minor == "minor" ~ cov_breadth_min_10)) %>%
+  mutate(Major_cov_breadth_min_1 = case_when(candidate_rank == 1 ~ cov_breadth_min_1)) %>%
+  mutate(Minor_cov_breadth_min_1 = case_when(candidate_rank == 2 ~ cov_breadth_min_1)) %>%
+  mutate(Major_cov_breadth_min_5 = case_when(candidate_rank == 1 ~ cov_breadth_min_5)) %>%
+  mutate(Minor_cov_breadth_min_5 = case_when(candidate_rank == 2 ~ cov_breadth_min_5)) %>%
+  mutate(Major_cov_breadth_min_10 = case_when(candidate_rank == 1 ~ cov_breadth_min_10)) %>%
+  mutate(Minor_cov_breadth_min_10 = case_when(candidate_rank == 2 ~ cov_breadth_min_10)) %>%
   # Create columns for major and minor average depth
-  mutate(Major_avg_depth = case_when(first_major_minor == "major" ~ avg_depth)) %>%
-  mutate(Minor_avg_depth = case_when(first_major_minor == "minor" ~ avg_depth)) %>%
-  # Create columns for the major and minor references
-  mutate(Major_reference = case_when(first_major_minor == "major" ~ reference)) %>%
-  mutate(Minor_reference = case_when(first_major_minor == "minor" ~ reference)) %>%
-  mutate(Major_reference = str_remove(Major_reference, "_major"),
-         Minor_reference = str_remove(Minor_reference, "_minor")) %>%
+  mutate(Major_avg_depth = case_when(candidate_rank == 1 ~ avg_depth)) %>%
+  mutate(Minor_avg_depth = case_when(candidate_rank == 2 ~ avg_depth)) %>%
+  # Create columns for the major and minor references (cleaned candidate_ref — no
+  # slot suffix — byte-identical to the legacy join key, COMPAT-02 D-02).
+  mutate(Major_reference = case_when(candidate_rank == 1 ~ candidate_ref)) %>%
+  mutate(Minor_reference = case_when(candidate_rank == 2 ~ candidate_ref)) %>%
   # Create one row per sample
-  select(-reference, -first_major_minor, -cov_breadth_min_1, -cov_breadth_min_5, -cov_breadth_min_10, -avg_depth) %>%
+  select(-reference, -candidate_ref, -candidate_rank, -cov_breadth_min_1, -cov_breadth_min_5, -cov_breadth_min_10, -avg_depth) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
@@ -554,45 +621,13 @@ if (length(blast_out_files) > 0) {
   )
 }
 
-# Phase-6 long-format candidate table + Phase-7 per-subtype assembly support
-# (ASUP-02). Both reads mirror the PLUMB-02 typed-empty-tibble guard above so a
-# skip-assembly / no-candidate run NA-fills the new support columns and never
-# aborts (T-07-03 DoS guard). candidates_long is the LEFT side of the genotype-
-# level join (criterion #3, no row loss); support_df is the per-subtype RIGHT side.
-candidates_files <- list.files(path = path_3, pattern = "\\.candidates.csv$", full.names = TRUE)
-
-if (length(candidates_files) > 0) {
-  # CR-01/CR-02: pin column types so (a) a header-only candidates.csv (no-mapping
-  # branch) and a populated one combine cleanly under map_dfr/bind_rows, and (b)
-  # candidate_genotype is read as character — HCV genotypes 1–7 are purely-digit,
-  # which readr would otherwise infer as <double>, breaking the genotype-level
-  # join. col_types declares only the columns we depend on; the rest are inferred.
-  candidates_long <- map_dfr(candidates_files, ~ read_csv(.x, col_types = cols(
-    sample              = col_character(),
-    candidate_rank      = col_integer(),
-    candidate_ref       = col_character(),
-    candidate_subtype   = col_character(),
-    candidate_genotype  = col_character(),
-    candidate_reads     = col_double(),
-    candidate_cov       = col_double(),
-    confirmation_status = col_character()
-  ))) %>%
-    rename(sampleName = sample)
-} else {
-  # Declare all eight Phase-6 candidate columns with their types so a no-candidate
-  # run yields a typed zero-row frame (the join then returns a typed zero-row frame).
-  candidates_long <- tibble(
-    sampleName          = character(),
-    candidate_rank      = integer(),
-    candidate_ref       = character(),
-    candidate_subtype   = character(),
-    candidate_genotype  = character(),
-    candidate_reads     = double(),
-    candidate_cov       = double(),
-    confirmation_status = character()
-  )
-}
-
+# Phase-7 per-subtype assembly support (ASUP-02). The long-format candidate table
+# (candidates_long) is loaded earlier — before the three stats loops — so those
+# loops can recover their candidate rank by join (Phase-9 / COMPAT-02 / D-02). The
+# typed-empty-tibble guard there mirrors the PLUMB-02 pattern so a skip-assembly /
+# no-candidate run NA-fills the new support columns and never aborts (T-07-03 DoS
+# guard). candidates_long is the LEFT side of the genotype-level join (criterion #3,
+# no row loss); support_df is the per-subtype RIGHT side.
 support_files <- list.files(path = path_denovo, pattern = "\\.assembly_support.csv$", full.names = TRUE)
 
 if (length(support_files) > 0) {
@@ -946,14 +981,14 @@ if (length(variation_plot_files) > 0) {
 }
 
 # Consensus distance to reference -----------------------------------------
-# Read the TSV files produced by CONSENSUS_DISTANCE for both major and minor mappings.
+# Read the TSV files produced by CONSENSUS_DISTANCE for each ranked candidate.
 # Each file has columns: sample, reference, similarity_pct, n_differences, alignment_length, consensus_length
 
 distance_files <- list.files(path = path_11, pattern = "consensus_distance\\.tsv$", full.names = TRUE)
 
 df_consensus_distance <- tibble(
   sampleName                    = character(),
-  first_major_minor             = character(),
+  candidate_rank                = integer(),
   consensus_similarity_pct      = numeric(),
   consensus_n_differences       = integer(),
   consensus_alignment_length    = integer(),
@@ -962,11 +997,14 @@ df_consensus_distance <- tibble(
 
 if (length(distance_files) > 0) {
   for (df_file in distance_files) {
-    # Parse the sample name and major/minor from the filename
-    # Expected pattern: <sampleName>.<major|minor>.consensus_distance.tsv
+    # Phase-9 (COMPAT-02 / D-02): parse the sample name and candidate slot from the
+    # filename. The CONSENSUS_DISTANCE prefix is `${meta.id}.cand{rank}` (no reference
+    # field), so the slot lives at filename position 2 and carries the integer rank.
+    # Expected pattern: <sampleName>.cand{rank}.consensus_distance.tsv
     fname_parts <- str_split(basename(df_file), "\\.")[[1]]
     sample_name <- fname_parts[1]
-    major_minor <- fname_parts[2]
+    slot        <- fname_parts[2]
+    cand_rank   <- as.integer(str_remove(slot, "^cand"))
 
     dat <- tryCatch(
       read_tsv(df_file, col_types = cols(
@@ -982,19 +1020,20 @@ if (length(distance_files) > 0) {
 
     if (!is.null(dat) && nrow(dat) > 0) {
       sample_col <- dat$sample[1]
-      # Extract sampleName and major_minor from sample_col for validation
+      # Extract sampleName and slot from sample_col for validation (the iVar consensus
+      # header carries the `${meta.id}.cand{rank}` prefix written by IVAR_CONSENSUS).
       file_sample_name <- str_extract(sample_col, "(?<=Consensus_)[^\\.]+")
-      file_major_minor <- str_extract(sample_col, "major|minor")
-      if (!identical(sample_name, file_sample_name) || !identical(major_minor, file_major_minor)) {
+      file_slot        <- str_extract(sample_col, "cand[0-9]+")
+      if (!identical(sample_name, file_sample_name) || !identical(slot, file_slot)) {
         warning(glue::glue(
-          "Consensus distance file {basename(df_file)}: filename sample/major_minor ({sample_name}, {major_minor}) does not match file content ({file_sample_name}, {file_major_minor})"
+          "Consensus distance file {basename(df_file)}: filename sample/slot ({sample_name}, {slot}) does not match file content ({file_sample_name}, {file_slot})"
         ))
       }
       df_consensus_distance <- bind_rows(
         df_consensus_distance,
         tibble(
           sampleName                 = sample_name,
-          first_major_minor          = major_minor,
+          candidate_rank             = cand_rank,
           consensus_similarity_pct   = dat$similarity_pct[1],
           consensus_n_differences    = dat$n_differences[1],
           consensus_alignment_length = dat$alignment_length[1],
@@ -1005,13 +1044,13 @@ if (length(distance_files) > 0) {
   }
 }
 
-# Pivot to wide format: separate columns for major and minor
+# Pivot to wide format: separate columns for major (rank 1) and minor (rank 2)
 df_distance_wide <- df_consensus_distance %>%
   mutate(
-    Major_consensus_similarity_pct   = case_when(first_major_minor == "major" ~ consensus_similarity_pct),
-    Major_consensus_n_differences    = case_when(first_major_minor == "major" ~ consensus_n_differences),
-    Minor_consensus_similarity_pct   = case_when(first_major_minor == "minor" ~ consensus_similarity_pct),
-    Minor_consensus_n_differences    = case_when(first_major_minor == "minor" ~ consensus_n_differences)
+    Major_consensus_similarity_pct   = case_when(candidate_rank == 1 ~ consensus_similarity_pct),
+    Major_consensus_n_differences    = case_when(candidate_rank == 1 ~ consensus_n_differences),
+    Minor_consensus_similarity_pct   = case_when(candidate_rank == 2 ~ consensus_similarity_pct),
+    Minor_consensus_n_differences    = case_when(candidate_rank == 2 ~ consensus_n_differences)
   ) %>%
   select(sampleName,
          Major_consensus_similarity_pct, Major_consensus_n_differences,
