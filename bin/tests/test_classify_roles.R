@@ -62,7 +62,7 @@ mk_cand <- function(sample, ref, subtype, reads, cov, even,
 # and the default minRead/minCov (500/30) from the handoff.
 classify <- function(df, minRead = 500, minCov = 30) {
   classify_roles(score_candidates(df), minRead = minRead, minCov = minCov,
-                 denovo_min_contig_length = 1000, denovo_min_kmer_cov = 2.0,
+                 denovo_min_contig_length = 500, denovo_min_kmer_cov = 2.0,
                  denovo_min_blast_identity = 90, match_level = "genotype")
 }
 
@@ -215,5 +215,26 @@ for (col in c("role", "dominance_score", "role_reason", "overall_sample_call")) 
 r11 <- classify_roles(NULL, minRead = 500, minCov = 30)
 if (nrow(r11) != 0) fail("Test9 NULL input must yield a zero-row frame, not an abort")
 ok("Test9 (CLASS-03/T-08-01): zero-row and NULL input return typed frames, never stop()")
+
+# --- Test 10: 500 bp floor keeps ERR1810507-class 829bp minor contig (D5) -------
+# Dominant 1a has a full contig. Minor 3a has a genuine but short contig: 829 bp /
+# 30x / 92%. At 500: own_substantial=TRUE -> co-infection/corroborated.
+# At 1000: own_substantial=FALSE (829 < 1000) AND dominant assembled -> refuted_denovo.
+err507 <- bind_rows(
+  mk_cand("ERR1810507", "1a_ref", "1a", 300000, 98, 0.92, sup_len = 9000, sup_kmer = 40, sup_pid = 99),
+  mk_cand("ERR1810507", "3a_ref", "3a", 5000,   80, 0.70, sup_len = 829,  sup_kmer = 30, sup_pid = 92)
+)
+r_err507 <- classify(err507)   # uses the 500-floor classify() helper
+if (role_of(r_err507, "3a_ref") != "co-infection")
+  fail("Test10: ERR1810507 829bp 3a contig must be co-infection at the 500bp floor")
+if (reason_of(r_err507, "3a_ref") != "corroborated")
+  fail("Test10: ERR1810507 829bp 3a contig reason must be corroborated")
+# Precondition: at the old 1000bp floor the same contig would be refuted.
+r_err507_strict <- classify_roles(score_candidates(err507), minRead = 500, minCov = 30,
+                                  denovo_min_contig_length = 1000, denovo_min_kmer_cov = 2.0,
+                                  denovo_min_blast_identity = 90, match_level = "genotype")
+if (role_of(r_err507_strict, "3a_ref") != "background")
+  fail("Test10 precondition: at the old 1000bp floor the 829bp contig should be refuted")
+ok("Test10 (D5): 829bp minor contig -> co-infection/corroborated at 500bp; refuted_denovo at old 1000bp floor")
 
 cat("\nALL PASS\n")

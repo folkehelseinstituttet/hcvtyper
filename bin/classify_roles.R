@@ -43,8 +43,8 @@
 #         background => "monoinfection"; no candidate passes the gate => "indeterminate".
 #   T-08-01 / CLASS-03  zero-row / NULL input => typed zero-row frame, never stop().
 #
-# The defaults 1000 / 2.0 / 90 / "genotype" are calibration-VALIDATED (03-RESEARCH);
-# the runtime ext.args (reconciled to 1000/2.0/90 in nextflow.config, Plan 01 Task 1)
+# The defaults 500 / 2.0 / 90 / "genotype" are calibration-VALIDATED (03-RESEARCH);
+# the runtime ext.args (reconciled to 500/2.0/90 in nextflow.config, Plan 01 Task 1)
 # overrides them.
 # -------------------------------------------------------------------------
 
@@ -184,7 +184,7 @@ score_candidates <- function(df, score_weights = .default_score_weights(),
 # (coded vocabulary), and `overall_sample_call` (monoinfection/co-infection/
 # indeterminate). Pure; never stop() on empty input (T-08-01 / CLASS-03).
 classify_roles <- function(scored_df, minRead, minCov,
-                           denovo_min_contig_length = 1000,
+                           denovo_min_contig_length = 500,
                            denovo_min_kmer_cov = 2.0,
                            denovo_min_blast_identity = 90,
                            match_level = "genotype") {

@@ -346,7 +346,7 @@ mk_helper_cand <- function(sample, ref, subtype, reads, cov, even,
 }
 classify_helper <- function(df) {
   classify_roles(score_candidates(df), minRead = 500, minCov = 30,
-                 denovo_min_contig_length = 1000, denovo_min_kmer_cov = 2.0,
+                 denovo_min_contig_length = 500, denovo_min_kmer_cov = 2.0,
                  denovo_min_blast_identity = 90, match_level = "genotype")
 }
 role_of   <- function(r, ref) r %>% filter(candidate_ref == ref) %>% pull(role)
