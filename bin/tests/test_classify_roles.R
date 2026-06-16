@@ -237,4 +237,62 @@ if (role_of(r_err507_strict, "3a_ref") != "background")
   fail("Test10 precondition: at the old 1000bp floor the 829bp contig should be refuted")
 ok("Test10 (D5): 829bp minor contig -> co-infection/corroborated at 500bp; refuted_denovo at old 1000bp floor")
 
+# --- Test 11: apply_concordance() three-way check (D8) -----------------------
+suppressPackageStartupMessages(library(tidyverse))
+source(file.path(bin_dir, "genotype_utils.R"))
+source(file.path(bin_dir, "classify_roles.R"))
+
+mk_conc <- function(sample, subtype, glue_gt, supp, supp_subtype) {
+  tibble(
+    sampleName              = sample,
+    candidate_ref           = paste0(subtype, "_ref"),
+    candidate_subtype       = subtype,
+    candidate_genotype      = genotype_from_subtype(subtype),
+    candidate_glue_genotype = glue_gt,
+    assembly_support        = supp,
+    assembly_support_subtype = supp_subtype
+  )
+}
+
+conc_df <- bind_rows(
+  # confirmed: mapping 1a + GLUE gt1 + de novo 1a -> confirmed
+  mk_conc("S1", "1a", "1", "supported", "1a"),
+  # discordant (mapping vs GLUE): mapping 4g + GLUE gt1 -> discordant
+  mk_conc("S2", "4g", "1", "none",       NA),
+  # discordant (mapping vs de novo): mapping 1a + de novo 3a -> discordant
+  mk_conc("S3", "1a", NA,  "supported", "3a"),
+  # unconfirmed: mapping 1a + no GLUE + no de novo
+  mk_conc("S4", "1a", NA,  "none",       NA),
+  # unconfirmed: mapping 1a + GLUE agrees + no de novo
+  mk_conc("S5", "1a", "1", "none",       NA)
+)
+conc_out <- apply_concordance(conc_df)
+
+status_of <- function(r, s) r %>% filter(sampleName == s) %>% pull(concordance_status)
+reason_of_c <- function(r, s) r %>% filter(sampleName == s) %>% pull(concordance_reason)
+
+if (status_of(conc_out, "S1") != "confirmed")
+  fail(sprintf("Test11: S1 (all legs agree) must be confirmed, got '%s'", status_of(conc_out, "S1")))
+if (status_of(conc_out, "S2") != "discordant")
+  fail(sprintf("Test11: S2 (4g vs GLUE gt1) must be discordant, got '%s'", status_of(conc_out, "S2")))
+if (reason_of_c(conc_out, "S2") != "discordant_mapping_vs_glue")
+  fail(sprintf("Test11: S2 reason must be discordant_mapping_vs_glue, got '%s'", reason_of_c(conc_out, "S2")))
+if (status_of(conc_out, "S3") != "discordant")
+  fail(sprintf("Test11: S3 (mapping 1a vs de novo 3a) must be discordant, got '%s'", status_of(conc_out, "S3")))
+if (reason_of_c(conc_out, "S3") != "discordant_mapping_vs_denovo")
+  fail(sprintf("Test11: S3 reason must be discordant_mapping_vs_denovo, got '%s'", reason_of_c(conc_out, "S3")))
+if (status_of(conc_out, "S4") != "unconfirmed")
+  fail(sprintf("Test11: S4 (no corroborating legs) must be unconfirmed, got '%s'", status_of(conc_out, "S4")))
+if (reason_of_c(conc_out, "S4") != "no_corroborating_legs")
+  fail(sprintf("Test11: S4 reason must be no_corroborating_legs, got '%s'", reason_of_c(conc_out, "S4")))
+if (status_of(conc_out, "S5") != "unconfirmed")
+  fail(sprintf("Test11: S5 (GLUE only, no de novo) must be unconfirmed, got '%s'", status_of(conc_out, "S5")))
+if (reason_of_c(conc_out, "S5") != "two_legs_glue_only")
+  fail(sprintf("Test11: S5 reason must be two_legs_glue_only, got '%s'", reason_of_c(conc_out, "S5")))
+
+# NULL input must not abort.
+conc_null <- apply_concordance(NULL)
+if (nrow(conc_null) != 0) fail("Test11: NULL input must yield zero-row frame")
+ok("Test11 (D8): apply_concordance() correctly classifies confirmed/unconfirmed/discordant cases")
+
 cat("\nALL PASS\n")

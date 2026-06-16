@@ -634,6 +634,41 @@ if (length(blast_out_files) > 0) {
 # no-candidate run NA-fills the new support columns and never aborts (T-07-03 DoS
 # guard). candidates_long is the LEFT side of the genotype-level join (criterion #3,
 # no row loss); support_df is the per-subtype RIGHT side.
+# GLUE per-candidate (D8): read the major/minor collected reports early so the
+# per-candidate GLUE genotype is available for apply_concordance() after the
+# assembly-support join. These objects are also reused by the same-genotype check
+# and the final Summary.csv join further below (the blocks there remain in place;
+# they read glue_report / glue_report_minor which are now defined here).
+glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
+glue_report <- if (length(glue_file) > 0) read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) else tibble()
+glue_file_minor <- list.files(path = path_8, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
+glue_report_minor <- if (length(glue_file_minor) > 0) read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character())) else tibble()
+
+# Build the per-candidate GLUE frame (rank 1 = major report, rank 2 = minor report)
+# and join candidate_glue_genotype + candidate_glue_subtype onto candidates_long so
+# assembly_support_join() passes them through into candidate_support.
+glue_cand1 <- if (nrow(glue_report) > 0) {
+  glue_report %>% transmute(sampleName = Sample, candidate_rank = 1L,
+                             candidate_glue_genotype = GLUE_genotype,
+                             candidate_glue_subtype  = GLUE_subtype)
+} else {
+  tibble(sampleName = character(), candidate_rank = integer(),
+         candidate_glue_genotype = character(), candidate_glue_subtype = character())
+}
+
+glue_cand2 <- if (nrow(glue_report_minor) > 0) {
+  glue_report_minor %>% transmute(sampleName = Sample, candidate_rank = 2L,
+                                   candidate_glue_genotype = GLUE_genotype,
+                                   candidate_glue_subtype  = GLUE_subtype)
+} else {
+  tibble(sampleName = character(), candidate_rank = integer(),
+         candidate_glue_genotype = character(), candidate_glue_subtype = character())
+}
+
+glue_per_cand <- bind_rows(glue_cand1, glue_cand2)
+candidates_long <- candidates_long %>%
+  left_join(glue_per_cand, by = c("sampleName", "candidate_rank"))
+
 support_files <- list.files(path = path_denovo, pattern = "\\.assembly_support.csv$", full.names = TRUE)
 
 if (length(support_files) > 0) {
@@ -682,6 +717,11 @@ candidate_support <- join_assembly_support(candidates_long, support_df, denovo_m
 # (the classifier's typed zero-row guard handles the empty frame, T-08-01/CLASS-03).
 candidate_support <- candidate_support %>%
   left_join(cv_by_ref, by = c("sampleName", "candidate_ref"))
+
+# D8 concordance pre-annotation: annotate each candidate with concordance_status
+# (confirmed/unconfirmed/discordant) + concordance_reason BEFORE scoring and role
+# classification. classify_roles() will consume concordance_status in Task 4.
+candidate_support <- apply_concordance(candidate_support)
 
 candidate_support <- score_candidates(
   candidate_support,
@@ -847,16 +887,9 @@ if (nrow(candidate_support) > 0) {
 }
 
 # GLUE --------------------------------------------------------------------
-
-glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
-# Guard the read so an empty glue/ dir (ch_glue -> [], D-07 caveat) does not abort.
-# nrow(tibble()) == 0 reproduces the GLUE-absent branch exactly, leaving the existing
-# `if (nrow(glue_report) > 0)` guards inert when GLUE is present (PLUMB-04, T-02-03).
-glue_report <- if (length(glue_file) > 0) read_tsv(glue_file, col_types = cols(GLUE_subtype = col_character())) else tibble()
-
-# Collect also the minor GLUE report
-glue_file_minor <- list.files(path = path_8, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
-glue_report_minor <- if (length(glue_file_minor) > 0) read_tsv(glue_file_minor, col_types = cols(GLUE_subtype = col_character())) else tibble()
+# glue_report / glue_report_minor are read earlier (before the assembly-support
+# section) so apply_concordance() has the GLUE leg available. The same-genotype
+# check and the final Summary.csv join below consume these already-defined objects.
 
 # Extract the GLUE genotypes and subtypes for major and minor and compare them
 

@@ -55,6 +55,74 @@ if (!exists("group_by")) {
   library(tidyverse)
 }
 
+# apply_concordance(df) — D8 pre-annotation helper.
+# Compares three identity legs at genotype level and annotates each candidate with:
+#   concordance_status : "confirmed" (all legs present and agree),
+#                        "unconfirmed" (no conflict, but a leg is absent),
+#                        "discordant" (mapping vs GLUE or mapping vs de novo conflict)
+#   concordance_reason : short coded reason string
+# Inputs required in df:
+#   candidate_genotype          : mapping-derived genotype (character, always present)
+#   candidate_glue_genotype     : GLUE-derived genotype (character, NA when GLUE absent)
+#   assembly_support            : "supported" or "none" (from assembly_support_join)
+#   assembly_support_subtype    : subtype of best de novo contig (character, NA when none)
+# Pure — no file I/O, no side effects. Safe on NULL/zero-row input.
+apply_concordance <- function(df) {
+  if (is.null(df) || nrow(df) == 0) {
+    out <- if (is.null(df)) tibble() else df
+    return(out %>% mutate(concordance_status = character(), concordance_reason = character()))
+  }
+
+  # Ensure expected columns exist with NA defaults when absent (robustness for unit tests
+  # that may not supply all three legs).
+  if (!"candidate_glue_genotype"  %in% names(df)) df$candidate_glue_genotype  <- NA_character_
+  if (!"assembly_support"         %in% names(df)) df$assembly_support         <- "none"
+  if (!"assembly_support_subtype" %in% names(df)) df$assembly_support_subtype <- NA_character_
+
+  has_glue   <- !is.na(df$candidate_glue_genotype) & nzchar(as.character(df$candidate_glue_genotype))
+  has_denovo <- df$assembly_support == "supported" & !is.na(df$assembly_support_subtype)
+
+  map_gt   <- as.character(df$candidate_genotype)
+  glue_gt  <- as.character(df$candidate_glue_genotype)
+  denovo_gt <- ifelse(
+    has_denovo,
+    vapply(df$assembly_support_subtype, function(s) {
+      if (is.na(s) || !nzchar(s)) NA_character_ else as.character(genotype_from_subtype(s))
+    }, character(1L)),
+    NA_character_
+  )
+
+  glue_conflict   <- has_glue   & !is.na(glue_gt)   & map_gt != glue_gt
+  denovo_conflict <- has_denovo & !is.na(denovo_gt) & map_gt != denovo_gt
+
+  status <- character(nrow(df))
+  reason <- character(nrow(df))
+
+  for (i in seq_len(nrow(df))) {
+    if (glue_conflict[i] || denovo_conflict[i]) {
+      status[i] <- "discordant"
+      reason[i] <- if (glue_conflict[i] && denovo_conflict[i]) {
+        "discordant_all_legs"
+      } else if (glue_conflict[i]) {
+        "discordant_mapping_vs_glue"
+      } else {
+        "discordant_mapping_vs_denovo"
+      }
+    } else if (has_glue[i] && has_denovo[i]) {
+      status[i] <- "confirmed"
+      reason[i] <- "all_legs_concordant"
+    } else if (has_glue[i] || has_denovo[i]) {
+      status[i] <- "unconfirmed"
+      reason[i] <- if (has_glue[i]) "two_legs_glue_only" else "two_legs_denovo_only"
+    } else {
+      status[i] <- "unconfirmed"
+      reason[i] <- "no_corroborating_legs"
+    }
+  }
+
+  df %>% mutate(concordance_status = status, concordance_reason = reason)
+}
+
 # is_valid_minor() — D-12, recovered VERBATIM from git 43904de~1:
 # bin/summarize_mapping_to_all_references.R (removed in 43904de "feat(06-01)").
 # Reconstructed as a PURE function taking explicit candidate/dominant subtype +
