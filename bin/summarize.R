@@ -400,6 +400,10 @@ tmp_df <- tmp_df %>%
   mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
   left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref"))
 
+targeted_nodup_per_cand <- tmp_df %>%
+  filter(!is.na(candidate_rank)) %>%
+  select(sampleName, candidate_ref, targeted_reads_nodup = trimmed_reads_nodups_mapped)
+
 df_nodups <- tmp_df %>%
   # Create columns for major and minor
   separate(candidate_ref, into = c("genotype", NA), sep = "_", remove = F) %>%
@@ -716,7 +720,8 @@ candidate_support <- join_assembly_support(candidates_long, support_df, denovo_m
 # left_join (not inner) so a no-cov / no-candidate batch keeps every candidate row
 # (the classifier's typed zero-row guard handles the empty frame, T-08-01/CLASS-03).
 candidate_support <- candidate_support %>%
-  left_join(cv_by_ref, by = c("sampleName", "candidate_ref"))
+  left_join(cv_by_ref,               by = c("sampleName", "candidate_ref")) %>%
+  left_join(targeted_nodup_per_cand, by = c("sampleName", "candidate_ref"))
 
 # D8 concordance pre-annotation: annotate each candidate with concordance_status
 # (confirmed/unconfirmed/discordant) + concordance_reason BEFORE scoring and role
@@ -1289,15 +1294,19 @@ if (nrow(candidate_support) > 0) {
   role_review <- candidate_support %>%
     group_by(sampleName) %>%
     summarise(
-      any_refuted_denovo     = any(role_reason == "refuted_denovo", na.rm = TRUE),
-      any_uncorroborated     = any(role_reason == "uncorroborated_kept", na.rm = TRUE),
+      any_refuted_denovo   = any(role_reason == "refuted_denovo",      na.rm = TRUE),
+      any_uncorroborated   = any(role_reason == "uncorroborated_kept", na.rm = TRUE),
+      dominant_unconfirmed = any(role == "dominant" &
+                                 !is.na(concordance_status) &
+                                 concordance_status == "unconfirmed",  na.rm = TRUE),
       .groups = "drop"
     )
 } else {
   role_review <- tibble(
-    sampleName         = character(),
-    any_refuted_denovo = logical(),
-    any_uncorroborated = logical()
+    sampleName           = character(),
+    any_refuted_denovo   = logical(),
+    any_uncorroborated   = logical(),
+    dominant_unconfirmed = logical()
   )
 }
 
@@ -1336,18 +1345,24 @@ final <- final %>%
         overall_sample_call,
         any_refuted_denovo,
         any_uncorroborated,
+        dominant_unconfirmed,
         gate_flag
       ),
-      function(maj_match, min_match, sample_call, refuted, uncorr, gflag) {
+      function(maj_match, min_match, sample_call, refuted, uncorr, dom_unconf, gflag) {
         msgs        <- character(0)
         is_coinf    <- !is.na(sample_call) && sample_call == "co-infection"
         is_mono     <- !is.na(sample_call) && sample_call == "monoinfection"
         is_indet    <- !is.na(sample_call) && sample_call == "indeterminate"
         subtype_dis <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
+        is_indet_dom <- !is.na(sample_call) && sample_call == "co-infection (indeterminate dominance)"
+        if (is_indet_dom)
+          msgs <- c(msgs, "Dominance ordering uncertain — read-count and k-mer-coverage rankings disagree. Both genotypes reported as present; co-infection vs contamination agnostic. Please review.")
         if (is_coinf && subtype_dis)
           msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
         if (is_mono && !is.na(maj_match) && maj_match == "NO")
           msgs <- c(msgs, "Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review.")
+        if (isTRUE(dom_unconf) && is_mono)
+          msgs <- c(msgs, "Genotype call is provisional — identity not corroborated (mapping evidence only; no GLUE or de novo confirmation). Please review.")
         if (isTRUE(refuted))
           msgs <- c(msgs, "Minor strain candidate refuted by de novo assembly — likely single infection.")
         if (isTRUE(uncorr))
@@ -1361,7 +1376,7 @@ final <- final %>%
     )
   }) %>%
   # Drop the per-sample role-review helper booleans now they have been consumed.
-  select(-any_refuted_denovo, -any_uncorroborated)
+  select(-any_refuted_denovo, -any_uncorroborated, -dominant_unconfirmed)
 
 # Reorder columns
 final <- final %>%

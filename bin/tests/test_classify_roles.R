@@ -221,14 +221,52 @@ if ((rc %>% pull(overall_sample_call) %>% unique()) != "untypable")
 
 ok("Test7 (D1/D3): discordant->background/discordant_identity; all-discordant->indeterminate; no-cov->untypable")
 
+# --- Test 12: D2 indeterminate dominance trigger (§7.6 Q2) ------------------
+
+# Scenario A — trigger fires (ERR1810469-class).
+# targeted reads favour 1a (1030 > 248); k-mer favours 3a (60x > 5.4x).
+err469 <- bind_rows(
+  mk_cand("E469", "1a_ref", "1a", 1069, 69, 0.78, sup_len = 4503, sup_kmer =  5.4, sup_pid = 93) %>%
+    mutate(concordance_status = "confirmed", targeted_reads_nodup = 1030L),
+  mk_cand("E469", "3a_ref", "3a", 5009, 46, 0.15, sup_len =  972, sup_kmer = 60.0, sup_pid = 95) %>%
+    mutate(concordance_status = "confirmed", targeted_reads_nodup =  248L)
+)
+r12a <- classify(err469)
+if (!all(r12a$role == "indeterminate"))
+  fail("Test12A both candidates must be indeterminate when reads and k-mer rankings disagree")
+if (!all(r12a$role_reason == "indeterminate_dominance_conflict"))
+  fail("Test12A role_reason must be indeterminate_dominance_conflict for both")
+if ((r12a %>% pull(overall_sample_call) %>% unique()) != "co-infection (indeterminate dominance)")
+  fail("Test12A overall_sample_call must be 'co-infection (indeterminate dominance)'")
+
+# Scenario B — trigger does NOT fire (ERR1810447-class: reads and k-mer agree).
+# 1b leads on both reads (300000 >> 4199) and k-mer (45x >> 30x).
+err447_12 <- bind_rows(
+  mk_cand("E447", "1b_ref", "1b", 300000, 98, 0.92, sup_len = 8900, sup_kmer = 45, sup_pid = 99) %>%
+    mutate(concordance_status = "confirmed", targeted_reads_nodup = 200000L),
+  mk_cand("E447", "2b_ref", "2b",   4199, 90, 0.78, sup_len = 9207, sup_kmer = 30, sup_pid = 91) %>%
+    mutate(concordance_status = "confirmed", targeted_reads_nodup =   3000L)
+)
+r12b <- classify(err447_12)
+if (role_of(r12b, "1b_ref") != "dominant")
+  fail("Test12B 1b must be dominant when reads and k-mer agree")
+if (role_of(r12b, "2b_ref") != "co-infection")
+  fail("Test12B 2b must be co-infection; trigger must NOT fire when rankings agree")
+if ((r12b %>% pull(overall_sample_call) %>% unique()) != "co-infection")
+  fail("Test12B overall_sample_call must be plain 'co-infection' when trigger is silent")
+
+ok("Test12 (D2/§7.6 Q2): reads-vs-kmer disagreement -> indeterminate; agreement -> dominant/co-infection")
+
 # --- Test 8: every candidate gets exactly one role (CLASS-01) ---------------
-all_rows <- bind_rows(r1, r2, r3, r4, r5, r6, r7, r8, ra, rb, rc)
+all_rows <- bind_rows(r1, r2, r3, r4, r5, r6, r7, r8, ra, rb, rc, r12a, r12b)
 if (any(is.na(all_rows$role))) fail("Test8 every candidate must carry a non-NA role (CLASS-01)")
-if (!all(all_rows$role %in% c("dominant", "co-infection", "background")))
-  fail("Test8 role must be exactly one of dominant/co-infection/background")
-if (!all(all_rows$overall_sample_call %in% c("monoinfection", "co-infection", "indeterminate", "untypable")))
-  fail("Test8 overall_sample_call must be one of monoinfection/co-infection/indeterminate/untypable")
-ok("Test8 (CLASS-01/CLASS-04): every candidate has exactly one valid role + 4-value sample call")
+if (!all(all_rows$role %in% c("dominant", "co-infection", "background", "indeterminate")))
+  fail("Test8 role must be one of dominant/co-infection/background/indeterminate")
+if (!all(all_rows$overall_sample_call %in%
+         c("monoinfection", "co-infection", "indeterminate", "untypable",
+           "co-infection (indeterminate dominance)")))
+  fail("Test8 overall_sample_call must be one of the five valid values")
+ok("Test8 (CLASS-01/CLASS-04): every candidate has exactly one valid role + 5-value sample call")
 
 # --- Test 9: zero-row input -> typed frame, no abort (CLASS-03) -------------
 empty_in <- mk_cand("S", "x", "1a", 1, 1, 0)[0, ]

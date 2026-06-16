@@ -401,6 +401,34 @@ classify_roles <- function(scored_df, minRead, minCov,
     } else {
       call <- "monoinfection"
     }
+
+    # D2: per-candidate indeterminate role trigger (§7.6 Q2).
+    # Among non-background candidates, rank by (a) targeted nodup reads and
+    # (b) best-contig k-mer coverage. If the #1 candidate differs -> both become
+    # "indeterminate"; overall_sample_call -> "co-infection (indeterminate dominance)".
+    non_bg <- which(!is.na(g$role) & g$role != "background")
+    if (length(non_bg) >= 2 && !is.na(dom_idx)) {
+      reads_col  <- if ("targeted_reads_nodup" %in% names(g)) "targeted_reads_nodup" else "candidate_reads"
+      reads_vals <- g[[reads_col]][non_bg]
+      kmer_vals  <- if ("assembly_support_best_contig_kmer_cov" %in% names(g))
+                      g$assembly_support_best_contig_kmer_cov[non_bg]
+                    else rep(NA_real_, length(non_bg))
+      any_kmer   <- any(!is.na(kmer_vals) & kmer_vals > 0)
+      if (any_kmer && !all(is.na(reads_vals))) {
+        top_reads_local <- which.max(ifelse(is.na(reads_vals), -Inf, reads_vals))
+        top_kmer_local  <- which.max(ifelse(!is.na(kmer_vals) & kmer_vals > 0, kmer_vals, -Inf))
+        if (top_reads_local != top_kmer_local) {
+          top_reads_idx <- non_bg[top_reads_local]
+          top_kmer_idx  <- non_bg[top_kmer_local]
+          g$role[top_reads_idx]        <- "indeterminate"
+          g$role_reason[top_reads_idx] <- "indeterminate_dominance_conflict"
+          g$role[top_kmer_idx]         <- "indeterminate"
+          g$role_reason[top_kmer_idx]  <- "indeterminate_dominance_conflict"
+          call <- "co-infection (indeterminate dominance)"
+        }
+      }
+    }
+
     g$overall_sample_call <- call
     g
   }
