@@ -376,4 +376,19 @@ if (!identical(reason_of(r_k2, "2k1b_ref"), "recombinant_2k1b"))
   fail("COMPAT-04 helper: the 2k1b suppression reason must be recombinant_2k1b")
 ok("COMPAT-04 helper (D-12): 2k1b -> background/recombinant_2k1b")
 
+# --- GATE03-REMOVE: removing GATE-03 must NOT suppress minor when major has low nodup reads ---
+# ERR1810469-class: rank-1 candidate has only 248 reads — below minRead=500.
+# Old GATE-03 would flip minor_typable from YES to NO because Reads_nodup_mapped_major
+# (248) <= minRead (500). After D4 removal it must stay YES (minor has good own coverage).
+gate03_cands <- mk_cands(
+  mk_cand(1, "3a_D17763", "3a", 248,  99),
+  mk_cand(2, "1a_M62321", "1a", 1030, 99)
+)
+gate03_summary <- run_summarize("gate03remove", "G03", gate03_cands, minRead = 500, minCov = 30)
+if (is.null(gate03_summary)) fail("GATE03-REMOVE: summarize.R wrote no Summary.csv")
+if (!identical(gate03_summary$minor_typable[1], "YES"))
+  fail(sprintf("GATE03-REMOVE: minor_typable must be YES after GATE-03 removal, got '%s'",
+               gate03_summary$minor_typable[1]))
+ok("GATE03-REMOVE: minor_typable stays YES despite low-nodup-read major (GATE-03 removed per D4)")
+
 cat("\nALL PASS\n")

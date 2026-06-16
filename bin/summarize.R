@@ -43,8 +43,9 @@ denovo_match_level        <- if (length(args) >= 7 && nchar(args[7]) > 0) args[7
 # misinterpreting any non-"subtype" value as "genotype" downstream.
 stopifnot(denovo_match_level %in% c("genotype", "subtype"))
 denovo_confirm_minor      <- if (length(args) >= 8 && nchar(args[8]) > 0) as.logical(args[8]) else TRUE
-# Secondary targeted-mapping gate thresholds (GATE-03). Mirror parsefirstmapping
-# minRead/minCov so both gates use the same configured values.
+# First-mapping candidate prune thresholds; reused as the classify_roles()
+# dominance-gate floor (D-07/D-09). GATE-03 (the v1.2.0 dedup-targeted minor
+# suppressor) removed per D4 — these are no longer applied to minor_typable here.
 min_targeted_read <- if (length(args) >= 9  && nchar(args[9])  > 0) as.numeric(args[9])  else NA_real_
 min_targeted_cov  <- if (length(args) >= 10 && nchar(args[10]) > 0) as.numeric(args[10]) else NA_real_
 # Number of neutrally-ranked candidate slots (cand_1..cand_n). Used to give the
@@ -1139,28 +1140,6 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
       identical_geno == "YES" & identical_subgeno == "NO" ~ "NO",  # If the genotype is the same and subtypes are different, but not 1a and 1b combination. Then not typable Minor
       identical_geno == "YES" & identical_subgeno == "YES" ~ "NO", # Same genotype & same subtype → not typable
       is.na(identical_geno) ~ "UNKNOWN"
-    ))
-}
-
-# Secondary targeted-mapping gate (GATE-03): re-check major quality against
-# per-sample targeted-mapping stats. The first-mapping gate in
-# parsefirstmapping.R uses raw read counts from the initial alignment to ALL
-# references; cross-mapping can inflate these for the true minor genome (e.g.
-# ERR1810469 where 1a reads cross-map to 3a, inflating 3a first-mapping counts
-# even though targeted 3a mapping yields only 248 deduplicated reads / 24% cov).
-# If Reads_nodup_mapped_major <= min_targeted_read OR Major_cov_breadth_min_5 <=
-# min_targeted_cov the major is considered below threshold and the minor is
-# suppressed, matching the same thresholds used at the parsefirstmapping gate.
-# NA major stats are treated as passing (never gate on missing data).
-if (!is.na(min_targeted_read) && !is.na(min_targeted_cov)) {
-  final <- final %>%
-    mutate(minor_typable = if_else(
-      minor_typable == "YES" & (
-        (!is.na(Reads_nodup_mapped_major) & Reads_nodup_mapped_major <= min_targeted_read) |
-        (!is.na(Major_cov_breadth_min_5)  & Major_cov_breadth_min_5  <= min_targeted_cov)
-      ),
-      "NO",
-      minor_typable
     ))
 }
 
