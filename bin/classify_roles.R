@@ -289,15 +289,22 @@ classify_roles <- function(scored_df, minRead, minCov,
     has_kmer >= denovo_min_kmer_cov &
     has_pid  >= denovo_min_blast_identity
 
-  # Per-candidate floor pass (D-07/D-09: same minRead/minCov as the dominant gate).
+  # Per-candidate floor pass (D-07/D-09: now informational annotation only, not a hard gate).
   reads <- scored_df$candidate_reads
   cov   <- if ("candidate_cov" %in% names(scored_df)) scored_df$candidate_cov else rep(NA_real_, nrow(scored_df))
   clears_floor <- !is.na(reads) & !is.na(cov) & reads > minRead & cov > minCov
 
+  # New eligible pool: not discordant + has any coverage (breadth@>=1x sanity).
+  has_concordance_outer <- "concordance_status" %in% names(scored_df)
+  concordance_ok_outer <- if (!has_concordance_outer) rep(TRUE, nrow(scored_df)) else
+    (is.na(scored_df$concordance_status) | scored_df$concordance_status != "discordant")
+  eligible <- concordance_ok_outer & !is.na(cov) & cov > 0
+
   scored_df <- scored_df %>%
     mutate(
       .own_substantial = own_substantial,
-      .clears_floor    = clears_floor,
+      below_floor      = clears_floor,
+      .eligible        = eligible,
       .row_order       = row_number()
     )
 
@@ -309,9 +316,15 @@ classify_roles <- function(scored_df, minRead, minCov,
     g$role <- NA_character_
     g$role_reason <- NA_character_
 
-    # D-01: dominant = highest dominance_score among floor-passing candidates,
+    has_concordance <- "concordance_status" %in% names(g)
+    cov_vec <- if ("candidate_cov" %in% names(g)) g$candidate_cov else rep(NA_real_, nrow(g))
+    concordance_ok <- if (!has_concordance) rep(TRUE, nrow(g)) else
+      (is.na(g$concordance_status) | g$concordance_status != "discordant")
+    eligible <- concordance_ok & !is.na(cov_vec) & cov_vec > 0
+
+    # D-01: dominant = highest dominance_score among eligible candidates,
     # deterministic tie-break score -> reads -> ref name (D-06).
-    gated <- which(g$.clears_floor)
+    gated <- which(eligible)
     dom_idx <- NA_integer_
     if (length(gated) > 0) {
       ord <- order(
@@ -334,14 +347,14 @@ classify_roles <- function(scored_df, minRead, minCov,
         next
       }
 
-      # Below floor => background/below_floor (never promote).
-      if (!isTRUE(g$.clears_floor[i])) {
-        g$role[i] <- "background"
-        g$role_reason[i] <- "below_floor"
+      if (has_concordance && !is.na(g$concordance_status[i]) &&
+          g$concordance_status[i] == "discordant") {
+        g$role[i]        <- "background"
+        g$role_reason[i] <- "discordant_identity"
         next
       }
 
-      # Cleared the floor. Provisional corroboration verdict (D-10/D-11):
+      # Provisional corroboration verdict (D-10/D-11):
       if (isTRUE(g$.own_substantial[i])) {
         role <- "co-infection"
         reason <- "corroborated"
@@ -379,9 +392,10 @@ classify_roles <- function(scored_df, minRead, minCov,
       g$role_reason[i] <- reason
     }
 
-    # D-14 overall sample call.
+    # D-14 updated (D3 fallback ladder).
     if (is.na(dom_idx)) {
-      call <- "indeterminate"
+      has_any_cov <- any(!is.na(cov_vec) & cov_vec > 0)
+      call <- if (!has_any_cov) "untypable" else "indeterminate"
     } else if (any(g$role == "co-infection")) {
       call <- "co-infection"
     } else {
@@ -401,5 +415,5 @@ classify_roles <- function(scored_df, minRead, minCov,
 
   out %>%
     arrange(.row_order) %>%
-    select(-.own_substantial, -.clears_floor, -.row_order)
+    select(-.own_substantial, -.eligible, -.row_order)
 }

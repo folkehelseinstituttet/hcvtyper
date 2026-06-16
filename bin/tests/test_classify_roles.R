@@ -183,26 +183,52 @@ if (reason_of(r8, "2k1b_ref") != "recombinant_2k1b")
   fail("Test6 2k1b demotion reason must be recombinant_2k1b")
 ok("Test6 (D-12): 2k1b pair -> background/recombinant_2k1b")
 
-# --- Test 7: no candidate passes the gate -> indeterminate (D-01/D-14) -------
-# ERR1810469-style: the 3a major failed coverage; nothing clears minRead/minCov.
-no_gate <- bind_rows(
-  mk_cand("ERR1810469", "3a_ref", "3a", 248,  8.8, 0.15),
-  mk_cand("ERR1810469", "1a_ref", "1a", 1030, 28,  0.40)  # cov below 30 -> fails gate
+# --- Test 7 (D1/D3): concordance gate and fallback calls --------------------
+
+# Scenario A: discordant candidate demoted regardless of abundance (D1).
+# No concordance_status on 1a -> treated as eligible -> becomes dominant.
+disc_a <- bind_rows(
+  mk_cand("SA", "1a_ref", "1a", 200000, 90, 0.85) %>%
+    mutate(concordance_status = "unconfirmed"),
+  mk_cand("SA", "4g_ref", "4g",  80000, 70, 0.60) %>%
+    mutate(concordance_status = "discordant")
 )
-r9 <- classify(no_gate)
-if ((r9 %>% pull(overall_sample_call) %>% unique()) != "indeterminate")
-  fail("Test7 no candidate passing the gate must yield overall_sample_call=indeterminate")
-if (any(r9$role == "dominant")) fail("Test7 there must be NO dominant when none passes the gate")
-ok("Test7 (D-01/D-14): no-gate-pass -> no dominant, overall_sample_call=indeterminate")
+ra <- classify(disc_a)
+if (role_of(ra, "4g_ref") != "background")
+  fail("Test7A discordant candidate must be background regardless of reads/cov")
+if (reason_of(ra, "4g_ref") != "discordant_identity")
+  fail("Test7A discordant reason must be discordant_identity")
+if (role_of(ra, "1a_ref") != "dominant")
+  fail("Test7A unconfirmed eligible 1a must become dominant (no floor gate)")
+
+# Scenario B: all discordant -> overall_sample_call == "indeterminate" (D-14 new fallback).
+disc_b <- bind_rows(
+  mk_cand("SB", "3a_ref", "3a", 248,  8.8, 0.15) %>% mutate(concordance_status = "discordant"),
+  mk_cand("SB", "1a_ref", "1a", 1030, 28,  0.40) %>% mutate(concordance_status = "discordant")
+)
+rb <- classify(disc_b)
+if ((rb %>% pull(overall_sample_call) %>% unique()) != "indeterminate")
+  fail("Test7B all-discordant sample must yield indeterminate")
+
+# Scenario C: all candidates have cov == 0 -> "untypable" (D-14 new fallback).
+no_cov <- bind_rows(
+  mk_cand("SC", "3a_ref", "3a", 248,  0, 0),
+  mk_cand("SC", "1a_ref", "1a", 1030, 0, 0)
+)
+rc <- classify(no_cov)
+if ((rc %>% pull(overall_sample_call) %>% unique()) != "untypable")
+  fail("Test7C zero-cov sample must yield untypable")
+
+ok("Test7 (D1/D3): discordant->background/discordant_identity; all-discordant->indeterminate; no-cov->untypable")
 
 # --- Test 8: every candidate gets exactly one role (CLASS-01) ---------------
-all_rows <- bind_rows(r1, r2, r3, r4, r5, r6, r7, r8, r9)
+all_rows <- bind_rows(r1, r2, r3, r4, r5, r6, r7, r8, ra, rb, rc)
 if (any(is.na(all_rows$role))) fail("Test8 every candidate must carry a non-NA role (CLASS-01)")
 if (!all(all_rows$role %in% c("dominant", "co-infection", "background")))
   fail("Test8 role must be exactly one of dominant/co-infection/background")
-if (!all(all_rows$overall_sample_call %in% c("monoinfection", "co-infection", "indeterminate")))
-  fail("Test8 overall_sample_call must be one of monoinfection/co-infection/indeterminate")
-ok("Test8 (CLASS-01/CLASS-04): every candidate has exactly one valid role + 3-value sample call")
+if (!all(all_rows$overall_sample_call %in% c("monoinfection", "co-infection", "indeterminate", "untypable")))
+  fail("Test8 overall_sample_call must be one of monoinfection/co-infection/indeterminate/untypable")
+ok("Test8 (CLASS-01/CLASS-04): every candidate has exactly one valid role + 4-value sample call")
 
 # --- Test 9: zero-row input -> typed frame, no abort (CLASS-03) -------------
 empty_in <- mk_cand("S", "x", "1a", 1, 1, 0)[0, ]
