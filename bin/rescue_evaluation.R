@@ -279,6 +279,7 @@ if (nrow(out) > 0) {
       out$rescued_from[i]        <- res$rescued_from
       out$candidate_ref[i]       <- res$rescue_ref
       out$candidate_subtype[i]   <- subtype_of(res$rescue_ref)
+      out$candidate_genotype[i]  <- genotype_of(subtype_of(res$rescue_ref))
       out$rescue_trigger[i]      <- res$rescue_trigger
       out$confirmation_status[i] <- "pass"  # D-05 force pass
       write_ref_fasta(res$rescue_ref, paste0("cand", out$candidate_rank[i]))
