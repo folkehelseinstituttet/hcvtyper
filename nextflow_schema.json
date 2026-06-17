@@ -190,8 +190,8 @@
         },
         "denovo_min_contig_length": {
             "type": "integer",
-            "default": 1000,
-            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Reconciled to the 03-RESEARCH-validated 1000 (Phase 8 D-10): the runtime ext.args value overrides the helper default, so the shipped corroboration floor must equal the validated calibration."
+            "default": 500,
+            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Set to 500 (Phase 10 D-02 validation: 500 keeps genuine short minor contigs such as ERR1810507 829bp/30x/92%); effective runtime value comes from nextflow.config."
         },
         "denovo_min_kmer_cov": {
             "type": "number",
