@@ -32,12 +32,12 @@ nextflow_process {
         // path(references)
         input[0] = [
           [ id: 'toy' ],
-          file("${projectDir}/modules/local/parsefirstmapping/tests/data/candidates.csv", checkIfExists: false),
-          file("${projectDir}/modules/local/blastparse/tests/blastout.txt",               checkIfExists: false),
-          file("${projectDir}/modules/local/blastparse/tests/blastout.txt",               checkIfExists: false),
+          file("${projectDir}/modules/local/rescueevaluation/tests/data/candidates.csv",       checkIfExists: true),
+          file("${projectDir}/modules/local/rescueevaluation/tests/data/blastparse.csv",       checkIfExists: true),
+          file("${projectDir}/modules/local/rescueevaluation/tests/data/assembly_support.csv", checkIfExists: true),
           []
         ]
-        input[1] = file("${projectDir}/modules/local/blastparse/tests/references.fa", checkIfExists: false)
+        input[1] = file("${projectDir}/modules/local/blastparse/tests/references.fa", checkIfExists: true)
         """
       }
     }

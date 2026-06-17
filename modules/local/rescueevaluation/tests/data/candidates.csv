@@ -1,0 +1,3 @@
+sample,candidate_rank,candidate_ref,candidate_subtype,candidate_genotype,candidate_reads,candidate_cov,confirmation_status
+toy,1,3a_D17763,3a,3,8079,94,pass
+toy,2,4k_EU392173,4k,4,40,5,below_threshold

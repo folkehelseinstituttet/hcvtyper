@@ -1,1 +1,57 @@
-{}
+{
+    "rescueevaluation: stub": {
+        "content": [
+            {
+                "0": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.candidates.csv:md5,bab34c68898d8553d96fa2c03fff9676"
+                    ]
+                ],
+                "1": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        [
+                            "toy.stubref_cand1.fa:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "toy.stubref_cand2.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ]
+                    ]
+                ],
+                "2": [
+                    "versions.yml:md5,7b91ddb119c0bb785d0f1723816e2d98"
+                ],
+                "candidate_fasta": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        [
+                            "toy.stubref_cand1.fa:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "toy.stubref_cand2.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ]
+                    ]
+                ],
+                "candidates": [
+                    [
+                        {
+                            "id": "toy"
+                        },
+                        "toy.candidates.csv:md5,bab34c68898d8553d96fa2c03fff9676"
+                    ]
+                ],
+                "versions": [
+                    "versions.yml:md5,7b91ddb119c0bb785d0f1723816e2d98"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
+        },
+        "timestamp": "2026-06-17T15:53:49.727889465"
+    }
+}
