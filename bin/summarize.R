@@ -1476,11 +1476,12 @@ final <- final %>%
 write_csv(final, file = "Summary.csv")
 
 # Write file for MultiQC
-# Add MultiQC info lines
-header <- c("# id: 'summary'",
-            "# section_name: 'Summary'",
-            "# description: 'These statistics are generated from the process SUMMARIZE and the R script summarize.R",
-            "# format: 'csv'")
+# Note: MultiQC section routing is handled entirely by multiqc_config.yml
+# (file_format: tsv, fn: "*/summary_mqc.tsv", section_name, id etc.).
+# Embedding comment-header lines in the file is NOT done here — omitting them
+# avoids a dead variable and keeps the TSV parseable by strict TSV readers.
+# A deployment without a matching multiqc_config.yml will cause MultiQC to
+# silently ignore the TSV; ensure the config ships alongside this pipeline.
 
 # Convert final data to data frame
 tt <- as.data.frame(final)
