@@ -447,14 +447,25 @@ workflow HCVTYPER {
     // sample (including its passing first candidate). A null/absent FASTA is tolerated and the
     // candidate guarded out below.
     ch_candidate_mapping = RESCUE_EVALUATION.out.candidates
-        // RESCUE_EVALUATION.out.candidate_fasta is tuple(meta, fasta_list) -- one element
-        // SHORTER than the former PARSEFIRSTMAPPING.out.candidate_fasta (meta, csv, fastas).
-        // Re-pad with a placeholder middle element so the downstream join produces the SAME
-        // 5-tuple the flatMap destructures (meta, candidates_csv, _parsefirstmapping_csv,
-        // fasta_list, classified_reads) -- the flatMap body stays UNCHANGED (D-11).
-        .join(RESCUE_EVALUATION.out.candidate_fasta.map { meta, fastas -> tuple(meta, [], fastas) }, remainder: true) // meta, candidates_csv, _placeholder?, fasta_list?
-        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // ..., classified_reads
-        .flatMap { meta, candidates_csv, _parsefirstmapping_csv, fasta_list, classified_reads ->
+        // RESCUE_EVALUATION.out.candidate_fasta is tuple(meta, fasta_list) and is
+        // `optional: true`: a no-candidate sample emits nothing, so the remainder:true join
+        // pads the missing side with a SINGLE null (not a tuple), and a matched side
+        // contributes ONE element (the fasta_list). A direct destructure of the join output
+        // therefore has a VARIABLE arity (3 when matched, fewer when padded), which would
+        // crash the flatMap's fixed-arity closure (MissingMethodException). Normalize the
+        // join result to a FIXED 2-tuple (meta, fastas_or_empty) in a .map first, so the
+        // downstream join + flatMap have a stable shape regardless of optional emit (D-11).
+        .join(RESCUE_EVALUATION.out.candidate_fasta, remainder: true)      // meta, candidates_csv, fasta_list?
+        .map { tup ->
+            // tup = [meta, candidates_csv, fasta_list?]. remainder:true gives [meta, csv, null]
+            // when no FASTA matched; a matched item gives [meta, csv, fasta_list].
+            def meta           = tup[0]
+            def candidates_csv = tup[1]
+            def fasta_list     = (tup.size() > 2) ? tup[2] : null
+            tuple(meta, candidates_csv, fasta_list)
+        }
+        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // meta, candidates_csv, fasta_list, classified_reads
+        .flatMap { meta, candidates_csv, fasta_list, classified_reads ->
             // candidate_fasta collects per-sample FASTAs into a single list element. A single
             // FASTA may arrive bare (not wrapped in a list); normalize to a list so the
             // rank-indexed lookup below is uniform. A no-candidate sample yields null.
