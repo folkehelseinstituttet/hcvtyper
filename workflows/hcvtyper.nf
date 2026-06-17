@@ -62,6 +62,7 @@ include { UNTAR as UNTAR_KRAKEN_FOCUSED      } from '../modules/nf-core/untar/ma
 include { INSTRUMENTID                       } from '../modules/local/instrumentid/main'
 include { BLASTPARSE                         } from '../modules/local/blastparse/main'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
+include { RESCUE_EVALUATION                  } from '../modules/local/rescueevaluation/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { HCVGLUE                            } from '../modules/local/hcvglue/main'
 include { SUMMARIZE                          } from '../modules/local/summarize/main'
@@ -375,6 +376,55 @@ workflow HCVTYPER {
     )
 
     //
+    // MODULE: De-novo subtype rescue (Phase 10, denovo-subtype-rescue, D-09..D-12)
+    //
+    // RESCUE_EVALUATION sits BETWEEN the de-novo BLAST evidence (BLASTPARSE) and the
+    // candidate-mapping builder. It may REPLACE a mapped candidate's reference with the
+    // de-novo-derived reference when the mapped subtype disagrees with the de-novo top hit
+    // and the contig clears the four quality floors, and forces that candidate's
+    // confirmation_status to 'pass' so the builder routes it to TARGETED_MAPPING.
+    //
+    // BLASTPARSE is invoked ONLY inside if (!params.skip_assembly), so BLASTPARSE.out is
+    // UNDEFINED on a skip-assembly run -- referencing it unconditionally is a hard Nextflow
+    // error (Pitfall 1 / T-10-05). Mirror the same guard the SUMMARIZE staging uses below:
+    // skip-assembly yields empty channels, fed via remainder:true so samples pass through
+    // unchanged (rescue columns NA-filled).
+    if (!params.skip_assembly) {
+        ch_blastparse_csv     = BLASTPARSE.out.csv
+        ch_blastparse_support = BLASTPARSE.out.support
+    } else {
+        ch_blastparse_csv     = Channel.empty()
+        ch_blastparse_support = Channel.empty()
+    }
+
+    // Build the RESCUE_EVALUATION input tuple (meta, candidates_csv, blastparse_csv,
+    // support_csv, cand_fastas) by joining on meta.id. PARSEFIRSTMAPPING.out.candidate_fasta
+    // is tuple(meta, parsefirstmapping_csv, cand_fastas) -- extract cand_fastas. The de-novo
+    // legs use remainder:true (D-10) so a skip-assembly run with empty BLASTPARSE channels
+    // does not drop samples; the R script's typed-empty guard handles the missing files.
+    ch_rescue_input = PARSEFIRSTMAPPING.out.candidates
+        .join(PARSEFIRSTMAPPING.out.candidate_fasta, remainder: true)       // meta, candidates_csv, parsefirstmapping_csv?, cand_fastas?
+        .join(ch_blastparse_csv, remainder: true)                           // ..., blastparse_csv?
+        .join(ch_blastparse_support, remainder: true)                       // ..., support_csv?
+        .map { meta, candidates_csv, _parsefirstmapping_csv, cand_fastas, blastparse_csv, support_csv ->
+            // remainder:true fills absent legs with null. The module's path() inputs accept []
+            // for a missing optional file; normalize null -> [] so staging never NPEs.
+            tuple(
+                meta,
+                candidates_csv,
+                blastparse_csv ?: [],
+                support_csv ?: [],
+                cand_fastas ?: []
+            )
+        }
+
+    RESCUE_EVALUATION (
+        ch_rescue_input,
+        file(params.references)
+    )
+    ch_versions = ch_versions.mix(RESCUE_EVALUATION.out.versions.first())
+
+    //
     // SUBWORKFLOW: Map reads against EACH neutrally-ranked candidate reference (D-04 / REFSEL-03)
     //
     // The two asymmetric major/minor alias routes are collapsed into ONE
@@ -396,8 +446,13 @@ workflow HCVTYPER {
     // `remainder: true` — otherwise a missing optional emit would silently DROP the whole
     // sample (including its passing first candidate). A null/absent FASTA is tolerated and the
     // candidate guarded out below.
-    ch_candidate_mapping = PARSEFIRSTMAPPING.out.candidates
-        .join(PARSEFIRSTMAPPING.out.candidate_fasta, remainder: true)      // meta, candidates_csv, parsefirstmapping_csv?, fasta_list?
+    ch_candidate_mapping = RESCUE_EVALUATION.out.candidates
+        // RESCUE_EVALUATION.out.candidate_fasta is tuple(meta, fasta_list) -- one element
+        // SHORTER than the former PARSEFIRSTMAPPING.out.candidate_fasta (meta, csv, fastas).
+        // Re-pad with a placeholder middle element so the downstream join produces the SAME
+        // 5-tuple the flatMap destructures (meta, candidates_csv, _parsefirstmapping_csv,
+        // fasta_list, classified_reads) -- the flatMap body stays UNCHANGED (D-11).
+        .join(RESCUE_EVALUATION.out.candidate_fasta.map { meta, fastas -> tuple(meta, [], fastas) }, remainder: true) // meta, candidates_csv, _placeholder?, fasta_list?
         .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // ..., classified_reads
         .flatMap { meta, candidates_csv, _parsefirstmapping_csv, fasta_list, classified_reads ->
             // candidate_fasta collects per-sample FASTAs into a single list element. A single
@@ -478,7 +533,10 @@ workflow HCVTYPER {
     // Phase 7 (ASUP-02): stage the Phase-6 long-format *.candidates.csv alongside
     // the legacy *.parsefirstmapping.csv into parsefirst_mapping/ so summarize.R
     // can read it for the genotype-level assembly-support join.
-    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]}).mix(PARSEFIRSTMAPPING.out.candidates.collect({it[1]})).collect()
+    // D-08: stage the RESCUE_EVALUATION candidates CSV (carrying rescued_from /
+    // rescue_trigger) instead of the raw PARSEFIRSTMAPPING candidates, so summarize.R
+    // reads the rescue audit columns. The legacy *.parsefirstmapping.csv leg is unchanged.
+    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]}).mix(RESCUE_EVALUATION.out.candidates.collect({it[1]})).collect()
     // T-2 lockstep: the single per-candidate fan-out already contains ALL candidate
     // stats/depth/consensus, so each former .mix(MAJOR..., MINOR...) pair collapses to the
     // single TARGETED_MAPPING.out.* . Missing any one would silently halve the stats.
