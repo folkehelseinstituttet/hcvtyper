@@ -231,7 +231,7 @@ evaluate_row <- function(row) {
                         cand_match <- cand_match[!is.na(cand_match)]
                         if (length(cand_match) > 0) cand_match[1] else denovo_ref
                       }
-        if (!is.na(rescue_ref)) {
+        if (!is.na(rescue_ref) && rescue_ref != orig_ref) {
           trig <- sprintf(
             "2k1b-rule denovo %s contig %gbp pident=%g aln=%gbp kmer_cov=%g (replaced %s)",
             rescue_ref, g2_row$best_contig_length[1], g2_row$best_contig_pident[1],
