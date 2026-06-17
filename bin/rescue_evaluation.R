@@ -293,4 +293,9 @@ out_cols <- c("sample", "candidate_rank", "candidate_ref", "candidate_subtype",
               "candidate_genotype", "candidate_reads", "candidate_cov",
               "confirmation_status", "rescued_from", "rescue_trigger")
 out <- out %>% select(all_of(out_cols))
-write_csv(out, paste0(prefix, ".candidates.csv"))
+# Output name MUST differ from the input candidates CSV ({prefix}.candidates.csv,
+# the PARSEFIRSTMAPPING emit staged as our input): Nextflow excludes input-named
+# files from output matching, so an identically-named output is reported MISSING.
+# Use a distinct {prefix}.rescued.candidates.csv that still matches the downstream
+# `\\.candidates.csv$` glob in summarize.R and the module's *.candidates.csv emit.
+write_csv(out, paste0(prefix, ".rescued.candidates.csv"))

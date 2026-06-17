@@ -264,12 +264,25 @@ if (length(candidates_files) > 0) {
     candidate_genotype  = col_character(),
     candidate_reads     = col_double(),
     candidate_cov       = col_double(),
-    confirmation_status = col_character()
+    confirmation_status = col_character(),
+    # Phase-10 rescue audit columns (RESCUE_EVALUATION emits them on every candidates
+    # CSV; declare as character so an all-NA column is not inferred to <logical>).
+    rescued_from        = col_character(),
+    rescue_trigger      = col_character()
   ))) %>%
     rename(sampleName = sample)
+  # A pre-Phase-10 / skip-assembly candidates CSV may lack the rescue columns entirely;
+  # add them NA-filled so the wide pivot + rescue_flag rollup below always find them.
+  if (!"rescued_from" %in% names(candidates_long)) {
+    candidates_long <- candidates_long %>% mutate(rescued_from = NA_character_)
+  }
+  if (!"rescue_trigger" %in% names(candidates_long)) {
+    candidates_long <- candidates_long %>% mutate(rescue_trigger = NA_character_)
+  }
 } else {
-  # Declare all eight Phase-6 candidate columns with their types so a no-candidate
-  # run yields a typed zero-row frame (the join then returns a typed zero-row frame).
+  # Declare all eight Phase-6 candidate columns + the two Phase-10 rescue audit
+  # columns with their types so a no-candidate run yields a typed zero-row frame
+  # (the join then returns a typed zero-row frame; rescue columns never vanish).
   candidates_long <- tibble(
     sampleName          = character(),
     candidate_rank      = integer(),
@@ -278,7 +291,9 @@ if (length(candidates_files) > 0) {
     candidate_genotype  = character(),
     candidate_reads     = double(),
     candidate_cov       = double(),
-    confirmation_status = character()
+    confirmation_status = character(),
+    rescued_from        = character(),
+    rescue_trigger      = character()
   )
 }
 
@@ -835,11 +850,16 @@ support_value_cols <- c(
   "assembly_support_best_contig_length",
   "assembly_support_best_contig_pident",
   "assembly_support_best_contig_aln_length",
-  "assembly_support_best_contig_kmer_cov"
+  "assembly_support_best_contig_kmer_cov",
+  # Phase-10 rescue audit columns: pivot to cand_{rank}_rescued_from /
+  # cand_{rank}_rescue_trigger (D-12 intent, in-file cand_{rank}_ underscore spelling).
+  "rescued_from",
+  "rescue_trigger"
 )
 # Column types per support value, in support_value_cols order: the two status/
-# subtype columns are character, the four metrics are double.
-support_value_is_character <- c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE)
+# subtype columns are character, the four metrics are double, and the two rescue
+# audit columns are character.
+support_value_is_character <- c(TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE)
 
 # The complete, deterministic set of wide column names (cand_<rank>_<value>) for
 # ranks 1..n_candidates. names_glue below emits "cand_{rank}_{value}".
@@ -1312,6 +1332,31 @@ if (nrow(candidate_support) > 0) {
 
 final <- final %>%
   left_join(role_review, join_by(sampleName))
+
+# Phase-10 rescue_flag (D-08): a per-sample boolean, NEW and INDEPENDENT of review_flag.
+# TRUE iff ANY candidate of the sample had its mapped reference REPLACED by a de-novo
+# rescue (rescued_from non-NA). Copies the role_review group_by/summarise/left_join
+# structure; placed ALONGSIDE review_flag (NOT coupled into its pmap_chr logic, and
+# classify_roles.R / apply_concordance() are untouched, per D-08). NA-safe: a no-rescue
+# / skip-assembly sample yields FALSE; a no-candidate batch yields a typed zero-row frame.
+if (nrow(candidate_support) > 0) {
+  rescue_review <- candidate_support %>%
+    group_by(sampleName) %>%
+    summarise(
+      rescue_flag = any(!is.na(rescued_from), na.rm = TRUE),
+      .groups = "drop"
+    )
+} else {
+  rescue_review <- tibble(
+    sampleName  = character(),
+    rescue_flag = logical()
+  )
+}
+
+final <- final %>%
+  left_join(rescue_review, join_by(sampleName)) %>%
+  # A sample with no candidate_support row (left_join NA) is, by definition, not rescued.
+  mutate(rescue_flag = if_else(is.na(rescue_flag), FALSE, rescue_flag))
 
 # Review flag (REVIEW-01), rewired onto the Phase-8 roles (D-13/D-15). Human-readable
 # inspection prompts for samples that warrant manual review, joined with " | ". NA

@@ -7,7 +7,7 @@
                         {
                             "id": "toy"
                         },
-                        "toy.candidates.csv:md5,bab34c68898d8553d96fa2c03fff9676"
+                        "toy.rescued.candidates.csv:md5,bab34c68898d8553d96fa2c03fff9676"
                     ]
                 ],
                 "1": [
@@ -40,7 +40,7 @@
                         {
                             "id": "toy"
                         },
-                        "toy.candidates.csv:md5,bab34c68898d8553d96fa2c03fff9676"
+                        "toy.rescued.candidates.csv:md5,bab34c68898d8553d96fa2c03fff9676"
                     ]
                 ],
                 "versions": [
@@ -52,6 +52,6 @@
             "nf-test": "0.9.2",
             "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-17T15:53:49.727889465"
+        "timestamp": "2026-06-17T16:18:03.231883291"
     }
 }

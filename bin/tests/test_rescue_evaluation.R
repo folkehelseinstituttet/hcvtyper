@@ -130,7 +130,10 @@ run_rescue <- function(case, prefix, cands, support, bparse, refs) {
     stdout = FALSE, stderr = FALSE
   )
 
-  out_path <- file.path(wd, paste0(prefix, ".candidates.csv"))
+  # Output name is {prefix}.rescued.candidates.csv (distinct from the input
+  # candidates CSV so Nextflow's input-exclusion does not report it as a missing
+  # output in the live pipeline; see bin/rescue_evaluation.R write_csv comment).
+  out_path <- file.path(wd, paste0(prefix, ".rescued.candidates.csv"))
   cands_out <- if (file.exists(out_path)) {
     read_csv(out_path, show_col_types = FALSE)
   } else {

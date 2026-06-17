@@ -12,7 +12,12 @@ process RESCUE_EVALUATION {
         'community.wave.seqera.io/library/r-seqinr_r-tidyverse:5358395134867368' }"
 
     input:
-    tuple val(meta), path(candidates_csv), path(blastparse_csv), path(support_csv), path(cand_fastas)
+    // cand_fastas are staged into a SUBDIR (input_fastas/) via stageAs so their
+    // basenames do NOT collide with the *_cand*.fa OUTPUT names. Nextflow excludes
+    // input files from output matching BY NAME, so a pass-through copied back to the
+    // top level under its own name would otherwise be shadowed by the input and the
+    // candidate_fasta emit would collect NOTHING (#10-03 integration bug).
+    tuple val(meta), path(candidates_csv), path(blastparse_csv), path(support_csv), path(cand_fastas, stageAs: 'input_fastas/*')
     path(references)
 
     output:
@@ -28,20 +33,41 @@ process RESCUE_EVALUATION {
     def prefix = task.ext.prefix ?: "${meta.id}"
 
     """
-    # Stage pass-through per-rank FASTAs into the work dir first (D-07): the
-    # Rscript writes ONLY the replaced rescue FASTA, so unchanged ranks must be
-    # copied here so the *_cand*.fa emit collects BOTH. `cp -n` never clobbers,
-    # and the rescue FASTA is written AFTER (below) so it replaces the same-rank
-    # pass-through by matching the _cand{rank}. basename.
+    # Stage pass-through per-rank FASTAs as REAL top-level files (D-07): the Rscript
+    # writes ONLY the replaced rescue FASTA, so unchanged ranks must be materialised
+    # here so the *_cand*.fa emit collects BOTH. The inputs live in input_fastas/
+    # (stageAs above), so copying each up to the top level under its own basename
+    # produces a GENUINE task output whose name is not shadowed by an input. The
+    # rescue FASTA written by the Rscript below (same _cand{rank}. basename)
+    # then OVERWRITES the corresponding same-rank pass-through.
     for f in ${cand_fastas}; do
-        [ -e "\$f" ] && cp -n "\$f" "./\$(basename \$f)" 2>/dev/null || true
+        if [ -e "\$f" ]; then
+            cp -L "\$f" "./\$(basename \$f)"
+        fi
     done
+
+    # Skip-assembly path (D-10): blastparse_csv / support_csv arrive as EMPTY path
+    # inputs ([]), so the staged variable expands to an empty string and the
+    # positional thresholds would shift into the missing slots ("Usage:" error).
+    # Materialise a header-only placeholder for any empty leg so the 10 positional
+    # args stay aligned; rescue_evaluation.R's read_csv_guarded() treats a zero-row
+    # file as a typed-empty frame -> candidates pass through, rescue columns NA.
+    bp='${blastparse_csv}'
+    sup='${support_csv}'
+    if [ -z "\$bp" ]; then
+        bp="${prefix}.EMPTY.blastparse.csv"
+        : > "\$bp"
+    fi
+    if [ -z "\$sup" ]; then
+        sup="${prefix}.EMPTY.assembly_support.csv"
+        : > "\$sup"
+    fi
 
     rescue_evaluation.R \\
         $prefix \\
         $candidates_csv \\
-        $blastparse_csv \\
-        $support_csv \\
+        "\$bp" \\
+        "\$sup" \\
         $references \\
         $args
 
@@ -63,9 +89,9 @@ process RESCUE_EVALUATION {
     # two rescue audit columns (rescued_from, rescue_trigger) + 2 rows so a
     # -stub-run fans out into cand_1/cand_2. Must byte-match the *.candidates.csv
     # emit glob.
-    printf "sample,candidate_rank,candidate_ref,candidate_subtype,candidate_genotype,candidate_reads,candidate_cov,confirmation_status,rescued_from,rescue_trigger\n" > ${prefix}.candidates.csv
-    printf "${prefix},1,3a_D17763,3a,3,8079,94,pass,NA,NA\n" >> ${prefix}.candidates.csv
-    printf "${prefix},2,4k_EU392173,4k,4,40,5,below_threshold,NA,NA\n" >> ${prefix}.candidates.csv
+    printf "sample,candidate_rank,candidate_ref,candidate_subtype,candidate_genotype,candidate_reads,candidate_cov,confirmation_status,rescued_from,rescue_trigger\n" > ${prefix}.rescued.candidates.csv
+    printf "${prefix},1,3a_D17763,3a,3,8079,94,pass,NA,NA\n" >> ${prefix}.rescued.candidates.csv
+    printf "${prefix},2,4k_EU392173,4k,4,40,5,below_threshold,NA,NA\n" >> ${prefix}.rescued.candidates.csv
 
     # Per-rank cand FASTA outputs (one per stub candidates.csv row). Filenames
     # match the declared emit glob "*_cand*.fa" (underscore before cand).
