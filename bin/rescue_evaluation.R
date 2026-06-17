@@ -213,9 +213,13 @@ evaluate_row <- function(row) {
                     rescue_trigger = NA_character_)
 
   # ---- 2k1b special rule (D-03) ---------------------------------------------
-  # If 2k1b appears anywhere for the sample and a genotype-2 contig meets the
-  # floors, rescue this slot to the corresponding genotype-2 reference.
-  if (sample_has_2k1b(sample_id)) {
+  # Fire only when THIS slot is 2k1b: the candidate ref is 2k1b OR the de-novo
+  # hit for this specific slot is 2k1b.  A sample-level check (sample_has_2k1b)
+  # would over-rescue unrelated slots (e.g. a 1a major candidate when only the
+  # minor denovo hit is 2k1b), exceeding the D-03 intent.
+  slot_is_2k1b <- (!is.na(cand_sub) && cand_sub == "2k1b") ||
+                  (!is.na(denovo_sub) && denovo_sub == "2k1b")
+  if (slot_is_2k1b) {
     g2_support <- support %>%
       filter(sample == sample_id, genotype_of(subtype) == "2") %>%
       arrange(desc(best_contig_length))
