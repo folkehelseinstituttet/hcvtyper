@@ -391,4 +391,46 @@ if (!identical(gate03_summary$minor_typable[1], "YES"))
                gate03_summary$minor_typable[1]))
 ok("GATE03-REMOVE: minor_typable stays YES despite low-nodup-read major (GATE-03 removed per D4)")
 
+# =========================================================================
+# RESCUE-AUDIT (Phase 10, D-08): Summary.csv carries the rescue audit columns,
+# NA-filled on a no-rescue input. Drives the REAL summarize.R via the same
+# run_summarize() harness. The candidates fixture written by run_summarize()
+# has NO rescued_from/rescue_trigger columns (a no-rescue / pre-rescue input),
+# so summarize.R must (a) surface the wide audit columns regardless and
+# (b) leave them NA and rescue_flag FALSE when nothing was rescued.
+#
+# Column spelling uses the in-file cand_{rank}_{value} pivot convention
+# (bin/summarize.R candidate_support_wide, names_glue "cand_{candidate_rank}_{.value}"),
+# locked in Plan 03 — NOT the cand2_ literal from CONTEXT D-12.
+#
+# RED until Plan 03 adds rescued_from/rescue_trigger to the candidate_support
+# pivot and the rescue_flag rollup in summarize.R.
+# -------------------------------------------------------------------------
+rescue_cands <- mk_cands(
+  mk_cand(1, "1a_M62321", "1a", 200000, 99),
+  mk_cand(2, "1b_D90208", "1b", 150000, 97)
+)
+rescue_summary <- run_summarize("rescueaudit", "RESCUEAUDIT", rescue_cands)
+if (is.null(rescue_summary)) fail("RESCUE-AUDIT: summarize.R wrote no Summary.csv")
+
+rescue_audit_cols <- c("rescue_flag",
+                       "cand_1_rescued_from", "cand_2_rescued_from",
+                       "cand_1_rescue_trigger", "cand_2_rescue_trigger")
+missing_rescue <- setdiff(rescue_audit_cols, colnames(rescue_summary))
+if (length(missing_rescue) > 0)
+  fail(paste("RESCUE-AUDIT: Summary.csv missing rescue audit columns:",
+             paste(missing_rescue, collapse = ",")))
+
+# On a no-rescue input, rescue_flag must be FALSE and every cand_*_rescued_from NA.
+if (!cell_equal(rescue_summary$rescue_flag[1], FALSE) &&
+    !identical(as.logical(rescue_summary$rescue_flag[1]), FALSE))
+  fail(sprintf("RESCUE-AUDIT: rescue_flag must be FALSE on a no-rescue input, got '%s'",
+               rescue_summary$rescue_flag[1]))
+for (col in c("cand_1_rescued_from", "cand_2_rescued_from")) {
+  v <- rescue_summary[[col]][1]
+  if (!(is.na(v) || (is.character(v) && v %in% c("NA", ""))))
+    fail(sprintf("RESCUE-AUDIT: %s must be NA on a no-rescue input, got '%s'", col, v))
+}
+ok("RESCUE-AUDIT (D-08): Summary.csv carries rescue_flag + cand_{rank}_rescued_from/rescue_trigger, NA on no-rescue")
+
 cat("\nALL PASS\n")
