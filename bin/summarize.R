@@ -380,8 +380,8 @@ df_with_dups <- tmp_df %>%
 stats_files <- list.files(path = path_5, pattern = "nodup.stats$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 3))
-colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_nodups_mapped")
+tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
+colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_nodups_mapped", "candidate_rank")
 
 for (i in 1:length(stats_files)) {
   try(rm(mapped_reads))
@@ -392,8 +392,14 @@ for (i in 1:length(stats_files)) {
   # Get reference name
   tmp_df$reference[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][2]
 
-  # Phase-9 (COMPAT-02 / D-02): candidate rank recovered by join below, not from
-  # filename position 3.
+  # Phase-10: extract candidate rank directly from filename position [3] ("cand1",
+  # "cand2"). This is safer than the lookup-based path when two rescued candidates
+  # share the same reference — the lookup collapses both to rank 1, creating
+  # duplicate (sampleName, candidate_ref) rows in targeted_nodup_per_cand and a
+  # many-to-many join into candidate_support that turns all pivot value cols to
+  # list-cols. "firstmapping" files have "nodup" at position [3] → NA rank.
+  cand_slot <- str_split(basename(stats_files[i]), "\\.")[[1]][3]
+  tmp_df$candidate_rank[i] <- as.integer(str_extract(cand_slot, "[0-9]+"))
 
   # Read the mapping stats
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
@@ -405,19 +411,18 @@ for (i in 1:length(stats_files)) {
   tmp_df$trimmed_reads_nodups_mapped[i] <- mapped_reads
 
 }
-tmp_df <- as_tibble(tmp_df)
+tmp_df <- as_tibble(tmp_df) %>%
+  mutate(
+    candidate_ref  = str_remove(reference, "_cand[0-9]+$"),
+    candidate_rank = suppressWarnings(as.integer(candidate_rank))
+  )
 
-# Phase-9 (COMPAT-02 / D-02): recover candidate_rank by join. Strip the `_cand{rank}`
-# slot suffix to get candidate_ref; the `first_mapping` reference has no suffix and
-# no candidate_rank, so it survives the join with candidate_rank == NA and is matched
-# below by `reference == "first_mapping"`.
-tmp_df <- tmp_df %>%
-  mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
-  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref"))
-
+# Phase-10: targeted_nodup_per_cand now joins by candidate_rank (not candidate_ref)
+# so that rescued samples where two slots share the same reference do not create
+# a many-to-many join. The rank is read directly from filename position [3] above.
 targeted_nodup_per_cand <- tmp_df %>%
   filter(!is.na(candidate_rank)) %>%
-  select(sampleName, candidate_ref, targeted_reads_nodup = trimmed_reads_nodups_mapped)
+  select(sampleName, candidate_rank, targeted_reads_nodup = trimmed_reads_nodups_mapped)
 
 df_nodups <- tmp_df %>%
   # Create columns for major and minor
@@ -736,7 +741,7 @@ candidate_support <- join_assembly_support(candidates_long, support_df, denovo_m
 # (the classifier's typed zero-row guard handles the empty frame, T-08-01/CLASS-03).
 candidate_support <- candidate_support %>%
   left_join(cv_by_ref,               by = c("sampleName", "candidate_ref")) %>%
-  left_join(targeted_nodup_per_cand, by = c("sampleName", "candidate_ref"))
+  left_join(targeted_nodup_per_cand, by = c("sampleName", "candidate_rank"))
 
 # D8 concordance pre-annotation: annotate each candidate with concordance_status
 # (confirmed/unconfirmed/discordant) + concordance_reason BEFORE scoring and role
