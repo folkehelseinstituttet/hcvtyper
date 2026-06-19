@@ -1429,9 +1429,34 @@ final <- final %>%
   # Drop the per-sample role-review helper booleans now they have been consumed.
   select(-any_refuted_denovo, -any_uncorroborated, -dominant_unconfirmed)
 
+# Ensure the GLUE-derived Major_subtype / Minor_subtype columns are always present
+# before we alias them. They only reach `final` when the GLUE reports had rows
+# (gt_check left_join), so on skip-assembly / no-GLUE batches they are absent.
+# Mirror the denovo_* guard above (NA-fill when missing) so the shorthand aliases
+# below never error and the columns are never dropped (BM2-01).
+if (!"Major_subtype" %in% colnames(final)) {
+  final <- final %>%
+    add_column("Major_subtype" = NA_character_)
+}
+if (!"Minor_subtype" %in% colnames(final)) {
+  final <- final %>%
+    add_column("Minor_subtype" = NA_character_)
+}
+
+# Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
+# Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no
+# subtype is recomputed or re-derived here (BM2-01).
+final <- final %>%
+  mutate(
+    Major = Major_subtype,
+    Minor = Minor_subtype
+  )
+
 # Reorder columns
 final <- final %>%
   select(sampleName,
+         Major,
+         Minor,
          total_raw_reads,
          total_trimmed_reads,
          total_classified_reads,
