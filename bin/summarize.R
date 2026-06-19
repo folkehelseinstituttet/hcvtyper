@@ -309,8 +309,8 @@ candidate_rank_lookup <- candidates_long %>%
 stats_files <- list.files(path = path_4, pattern = "\\withdup.stats$", full.names = TRUE)
 
 # Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 3))
-colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_withdups_mapped")
+tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
+colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_withdups_mapped", "candidate_rank")
 
 for (i in 1:length(stats_files)) {
   try(rm(map_stats))
@@ -320,9 +320,13 @@ for (i in 1:length(stats_files)) {
   # Get reference name
   tmp_df$reference[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][2]
 
-  # Phase-9 (COMPAT-02 / D-02): the candidate rank is no longer parsed from
-  # filename position 3 (.major./.minor./.cand{rank}.). It is recovered by joining
-  # the cleaned reference token to candidate_rank below.
+  # Phase-10: same fix as nodup loop — extract rank from filename pos [3] so
+  # df_with_dups and df_nodups use identical rank assignments. The lookup-based
+  # path breaks when two rescued candidates share a reference (rank collapses to 1
+  # for both slots), causing a Minor_reference mismatch in the full_join that
+  # duplicates sample rows in Summary.csv. "firstmapping" files → NA rank.
+  cand_slot <- str_split(basename(stats_files[i]), "\\.")[[1]][3]
+  tmp_df$candidate_rank[i] <- as.integer(str_extract(cand_slot, "[0-9]+"))
 
   # Read the mapping stats
   map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
@@ -333,14 +337,11 @@ for (i in 1:length(stats_files)) {
   mapped_reads <- as.numeric(mapped_reads)
   tmp_df$trimmed_reads_withdups_mapped[i] <- mapped_reads
 }
-tmp_df <- as_tibble(tmp_df)
-
-# Phase-9 (COMPAT-02 / D-02): recover candidate_rank by join. Strip the new
-# `_cand{rank}` slot suffix off the reference token to get the cleaned candidate_ref
-# (e.g. `3a_D17763`), then join to the per-sample candidate_rank_lookup.
-tmp_df <- tmp_df %>%
-  mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
-  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref"))
+tmp_df <- as_tibble(tmp_df) %>%
+  mutate(
+    candidate_ref  = str_remove(reference, "_cand[0-9]+$"),
+    candidate_rank = suppressWarnings(as.integer(candidate_rank))
+  )
 
 # Add number of raw and trimmed reads - needed for calculation of percentages
 tmp_df <- left_join(tmp_df, trimmed_df, by = "sampleName")
