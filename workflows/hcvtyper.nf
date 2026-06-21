@@ -24,7 +24,7 @@ include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-schema'
 include { softwareVersionsToYAML                         } from '../subworkflows/nf-core/utils_nfcore_pipeline/main.nf'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows/local/get_mapping_stats'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
-include { TARGETED_MAPPING                               } from '../subworkflows/local/targeted_mapping'
+include { JOINT_MAPPING                                  } from '../subworkflows/local/joint_mapping/main'
 include { CONTAMINATION_CHECK                            } from '../subworkflows/local/contamination_check/main'
 
 /*
@@ -382,7 +382,7 @@ workflow HCVTYPER {
     // candidate-mapping builder. It may REPLACE a mapped candidate's reference with the
     // de-novo-derived reference when the mapped subtype disagrees with the de-novo top hit
     // and the contig clears the four quality floors, and forces that candidate's
-    // confirmation_status to 'pass' so the builder routes it to TARGETED_MAPPING.
+    // confirmation_status to 'pass' so the builder routes it to JOINT_MAPPING.
     //
     // BLASTPARSE is invoked ONLY inside if (!params.skip_assembly), so BLASTPARSE.out is
     // UNDEFINED on a skip-assembly run -- referencing it unconditionally is a hard Nextflow
@@ -425,36 +425,27 @@ workflow HCVTYPER {
     ch_versions = ch_versions.mix(RESCUE_EVALUATION.out.versions.first())
 
     //
-    // SUBWORKFLOW: Map reads against EACH neutrally-ranked candidate reference (D-04 / REFSEL-03)
+    // SUBWORKFLOW: Competitive joint mapping (D-01/D-02/D-03 — replaces TARGETED_MAPPING)
     //
-    // The two asymmetric major/minor alias routes are collapsed into ONE
-    // uniform per-candidate fan-out over the long-format candidates CSV. We splitCsv ALL rows
-    // (NOT elements[0] — the legacy code only read row[0] because the wide CSV was single-row;
-    // the long-format candidates CSV is one row PER candidate, Assumption A2) and emit one
-    // channel element per candidate. Each candidate carries its own per-rank meta + FASTA.
+    // JOINT_MAPPING takes ONE element per SAMPLE — NOT a per-candidate flatMap. The
+    // per-candidate fan-out now happens INSIDE JOINT_MAPPING, AFTER the combined dedup BAM is
+    // split by reference (D-03). So here we build a simple per-sample tuple:
+    //   tuple(meta, cand_fastas_list, classified_reads, candidates_csv)
+    // and pass the full collected candidate-FASTA list directly (no splitCsv / no
+    // confirmation_status filter at this level — that all moves into the subworkflow).
     //
-    // The per-rank FASTAs come from PARSEFIRSTMAPPING.out.candidate_fasta — a single N-FASTA
-    // emit `tuple(meta, parsefirstmapping_csv, [*_cand{rank}.fa, ...])` (D-01/D-04). Each
-    // candidate's FASTA is picked from the collected list by matching `_cand${rank}` in the
-    // basename (rank 1 -> *_cand1.fa, rank 2 -> *_cand2.fa, ... generalizes to N candidates),
-    // replacing the hard two-slot `rank == '1' ? major : minor` pick. The TARGETED_MAPPING
-    // `meta.reference` enrichment (fasta basename split) keeps the cand-slot filenames.
-    //
-    // Join all per-sample inputs by meta.id: the candidates CSV, the candidate FASTAs, and the
-    // classified reads. The candidate_fasta emit is `optional: true` (a no-candidate sample
-    // emits no FASTAs, a single-candidate sample emits only `_cand1.fa`), so its join uses
-    // `remainder: true` — otherwise a missing optional emit would silently DROP the whole
-    // sample (including its passing first candidate). A null/absent FASTA is tolerated and the
-    // candidate guarded out below.
-    ch_candidate_mapping = RESCUE_EVALUATION.out.candidates
-        // RESCUE_EVALUATION.out.candidate_fasta is tuple(meta, fasta_list) and is
-        // `optional: true`: a no-candidate sample emits nothing, so the remainder:true join
-        // pads the missing side with a SINGLE null (not a tuple), and a matched side
-        // contributes ONE element (the fasta_list). A direct destructure of the join output
-        // therefore has a VARIABLE arity (3 when matched, fewer when padded), which would
-        // crash the flatMap's fixed-arity closure (MissingMethodException). Normalize the
-        // join result to a FIXED 2-tuple (meta, fastas_or_empty) in a .map first, so the
-        // downstream join + flatMap have a stable shape regardless of optional emit (D-11).
+    // Join the per-sample inputs by meta.id: the RESCUE_EVALUATION candidates CSV, the
+    // collected candidate FASTAs (RESCUE_EVALUATION.out.candidate_fasta), and the classified
+    // reads. candidate_fasta is `optional: true` (a no-candidate sample emits nothing, a
+    // single-candidate sample emits only `_cand1.fa`), so its join uses `remainder: true` —
+    // otherwise a missing optional emit would silently DROP the whole sample. remainder:true
+    // pads the absent side with a single null (not a tuple), giving a VARIABLE-arity join
+    // output; normalize to a FIXED 2-tuple (meta, fastas_or_empty) in a .map first so the
+    // downstream shape is stable regardless of the optional emit. A single bare FASTA is
+    // normalized to a list so the subworkflow's rank-indexed lookup is uniform (mirrors the
+    // legacy line-472 normalization). candidate_rank stays a STRING throughout — never
+    // .toInteger() in channel logic (NA would crash, Pitfall 4).
+    ch_joint_mapping = RESCUE_EVALUATION.out.candidates
         .join(RESCUE_EVALUATION.out.candidate_fasta, remainder: true)      // meta, candidates_csv, fasta_list?
         .map { tup ->
             // tup = [meta, candidates_csv, fasta_list?]. remainder:true gives [meta, csv, null]
@@ -462,62 +453,27 @@ workflow HCVTYPER {
             def meta           = tup[0]
             def candidates_csv = tup[1]
             def fasta_list     = (tup.size() > 2) ? tup[2] : null
-            tuple(meta, candidates_csv, fasta_list)
-        }
-        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // meta, candidates_csv, fasta_list, classified_reads
-        .flatMap { meta, candidates_csv, fasta_list, classified_reads ->
-            // candidate_fasta collects per-sample FASTAs into a single list element. A single
-            // FASTA may arrive bare (not wrapped in a list); normalize to a list so the
-            // rank-indexed lookup below is uniform. A no-candidate sample yields null.
+            // Normalize: no-candidate sample -> [] ; single bare FASTA -> [fasta] ; list -> as-is.
             def fastas = (fasta_list == null) ? [] : (fasta_list instanceof List ? fasta_list : [fasta_list])
-
-            // Iterate ALL candidate rows (one element per candidate), not just row[0].
-            def rows = candidates_csv.splitCsv( header: true, sep:',' )
-            rows.collect { row ->
-                // Lift the candidate row into the meta map. Carry candidate_rank,
-                // candidate_ref and confirmation_status (R-emitted STRINGS — never coerced
-                // to Integer here, so a single/no-candidate NA field can never crash, Pitfall 3).
-                def new_meta = meta + row
-
-                // Fail loudly if the candidate row's sample disagrees with the pipeline meta.id.
-                assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
-
-                // Per-candidate meta uniqueness: same-sample candidates share meta.id, so an
-                // id-only join inside TARGETED_MAPPING would cross-pair index/fasta/reads (Pitfall 2).
-                // We KEEP meta.id == sample (so output filenames stay <sample>.<ref>... for summarize.R),
-                // and rely on TARGETED_MAPPING joining by the FULL meta map: candidate_rank + candidate_ref
-                // (and the `reference` enrichment inside the subworkflow) differ per candidate, so the
-                // whole-meta join key is distinct for every candidate of a sample.
-                def rank = new_meta.candidate_rank.toString()
-
-                // Pick this candidate's FASTA from the collected N-FASTA list by rank-indexed
-                // basename match (`_cand${rank}.`), generalizing the old two-slot major/minor pick.
-                def fasta = fastas?.find { it.toString().contains("_cand${rank}.") }
-
-                tuple(new_meta, fasta, classified_reads)
-            }
+            tuple(meta, candidates_csv, fastas)
         }
-        // Route on the R-emitted per-candidate STRING (confirmation_status), never a Groovy
-        // numeric coercion of possibly-NA fields (Pitfall 3 — avoids NA.toInteger() crash).
-        // confirmation_status == 'pass' generalizes the legacy gate: a candidate is mapped only
-        // when its own reads>minRead && cov>minCov comparison passed (rank 1 == the major gate,
-        // rank 2 == a passing second candidate). At default N=2 on a single-strain fixture the
-        // second candidate is 'below_threshold', so the two-slot topology is preserved (D-06).
-        // A passing candidate always has its per-rank FASTA written by the selection script, so
-        // the null-FASTA guard only drops below-threshold/absent candidates (defensive).
-        .filter { entry -> entry[0]['confirmation_status'] == 'pass' && entry[1] != null }
+        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // meta, candidates_csv, fastas, classified_reads
+        .map { meta, candidates_csv, fastas, classified_reads ->
+            // JOINT_MAPPING take: tuple(meta, cand_fastas, reads, candidates_csv)
+            tuple(meta, fastas, classified_reads, candidates_csv)
+        }
 
-    TARGETED_MAPPING(
-        ch_candidate_mapping, // val(meta), path(fasta), path(reads)
+    JOINT_MAPPING(
+        ch_joint_mapping, // val(meta), path(cand_fastas), path(reads), path(candidates_csv)
     )
-    ch_versions = ch_versions.mix(TARGETED_MAPPING.out.versions)
+    ch_versions = ch_versions.mix(JOINT_MAPPING.out.versions)
 
     //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
         HCVGLUE (
-            TARGETED_MAPPING.out.aligned.collect({it[1]}).collect(), // Collect all candidate BAMs (T-2 lockstep). Can only have one GLUE process running
+            JOINT_MAPPING.out.aligned.collect({it[1]}).collect(), // Collect all candidate BAMs (T-2 lockstep). Can only have one GLUE process running
             params.hcvglue_threshold
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
@@ -548,12 +504,15 @@ workflow HCVTYPER {
     // rescue_trigger) instead of the raw PARSEFIRSTMAPPING candidates, so summarize.R
     // reads the rescue audit columns. The legacy *.parsefirstmapping.csv leg is unchanged.
     ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]}).mix(RESCUE_EVALUATION.out.candidates.collect({it[1]})).collect()
-    // T-2 lockstep: the single per-candidate fan-out already contains ALL candidate
-    // stats/depth/consensus, so each former .mix(MAJOR..., MINOR...) pair collapses to the
-    // single TARGETED_MAPPING.out.* . Missing any one would silently halve the stats.
-    ch_stats_withdup    = TARGETED_MAPPING.out.stats_withdup.collect({it[1]})
-    ch_stats_markdup    = TARGETED_MAPPING.out.stats_markdup.collect({it[1]})
-    ch_depth            = TARGETED_MAPPING.out.depth.collect({it[1]})
+    // Phase 11 (JMAP-03, D-07/D-09/D-15): read counts now come from SAMTOOLS_IDXSTATS on the
+    // COMBINED BAM (pre- and post-dedup), ONE idxstats file per sample carrying every candidate
+    // reference as a row. SAMTOOLS_STATS is removed. The variable names ch_stats_withdup /
+    // ch_stats_markdup are KEPT so the SUMMARIZE call signature is unchanged; their content is
+    // now idxstats TSV (.withdup.idxstats / .nodup.idxstats), staged into stats_withdup/ and
+    // stats_markdup/. Plan 03 migrates summarize.R's two STATS loops to the idxstats format.
+    ch_stats_withdup    = JOINT_MAPPING.out.idxstats_withdup.collect({it[1]})
+    ch_stats_markdup    = JOINT_MAPPING.out.idxstats_nodup.collect({it[1]})
+    ch_depth            = JOINT_MAPPING.out.depth.collect({it[1]})
     // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
     // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
     // staged channel. BLASTPARSE is invoked only inside if (!params.skip_assembly),
@@ -574,8 +533,8 @@ workflow HCVTYPER {
     } else {
         ch_glue = []
     }
-    ch_variation = TARGETED_MAPPING.out.variation.collect()
-    ch_consensus_distance = TARGETED_MAPPING.out.consensus_distance.collect({it[1]})
+    ch_variation = JOINT_MAPPING.out.variation.collect()
+    ch_consensus_distance = JOINT_MAPPING.out.consensus_distance.collect({it[1]})
 
     SUMMARIZE (
         workflow.manifest.version,
