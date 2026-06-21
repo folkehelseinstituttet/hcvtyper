@@ -13,6 +13,7 @@
 //
 
 include { CAT_CANDIDATES                         } from '../../../modules/local/cat_candidates/main'
+include { REHEADER_CANDIDATE                     } from '../../../modules/local/reheader_candidate/main'
 include { BOWTIE2_BUILD                          } from '../../../modules/nf-core/bowtie2/build/main'
 include { BOWTIE2_ALIGN                          } from '../../../modules/nf-core/bowtie2/align/main'
 include { SAMTOOLS_INDEX as INDEX_COMBINED       } from '../../../modules/nf-core/samtools/index/main'
@@ -164,12 +165,24 @@ workflow JOINT_MAPPING {
         [],         // qname / readnames — not used
         []          // index_format — no on-the-fly index
     )
-    ch_percand = SAMTOOLS_VIEW.out.bam                 // per-candidate dedup BAM
     ch_versions = ch_versions.mix(SAMTOOLS_VIEW.out.versions.first())
 
     // Per-candidate reference FASTA channel, keyed by full meta (carries candidate_rank/ref),
     // so it joins back to the split BAM without cross-pairing same-sample candidates.
     ch_percand_fasta = ch_split.map { meta, _bam, _bai, fasta -> tuple(meta, fasta) }
+
+    //
+    // MODULE: Rebuild a SINGLE-reference per-candidate BAM. The region split removed
+    //         cross-reference reads but left every @SQ line in the header, which would corrupt
+    //         per-candidate depth breadth / cv_evenness (Pitfall 2) and abort bam_coverage.R.
+    //         REHEADER_CANDIDATE re-encodes the reads against a header carrying only this
+    //         candidate's reference, yielding a true single-reference BAM (JMAP-02).
+    //
+    REHEADER_CANDIDATE (
+        SAMTOOLS_VIEW.out.bam.join(ch_percand_fasta) // meta, split_bam, reference_fasta
+    )
+    ch_percand = REHEADER_CANDIDATE.out.bam            // per-candidate single-reference dedup BAM
+    ch_versions = ch_versions.mix(REHEADER_CANDIDATE.out.versions.first())
 
     //
     // MODULE: Per-candidate depth — MUST run on the split (per-candidate) BAM, never the
