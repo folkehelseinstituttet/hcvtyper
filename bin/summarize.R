@@ -298,50 +298,71 @@ if (length(candidates_files) > 0) {
 }
 
 # Phase-9 (COMPAT-02 / D-02): per-sample (candidate_ref -> candidate_rank) lookup
-# used by all three stats loops to recover the slot by join. Built once from the
-# hoisted candidates_long frame.
+# used by the idxstats read-count loops + the coverage loop to recover the slot
+# by join. Built once from the hoisted candidates_long frame.
+#
+# Phase-11 (JMAP-03 / Pitfall 4): the read-count loops now parse SAMTOOLS_IDXSTATS
+# on the COMBINED BAM — ONE file per sample, keyed only on the bare reference name
+# (no `.cand{rank}.` filename slot to carry the rank). Rank is therefore recovered
+# ENTIRELY by joining the idxstats refname to this lookup. The lookup must keep
+# EVERY (sampleName, candidate_rank) row — NOT collapse duplicate refs — so that
+# when two candidates share one reference (the commit-1d1a051 scenario) BOTH ranks
+# survive the join. A previous `distinct(sampleName, candidate_ref, .keep_all)`
+# collapsed a shared ref to a single rank, silently dropping the minor candidate.
+# distinct() over ALL three key columns only de-duplicates true duplicate rows.
 candidate_rank_lookup <- candidates_long %>%
   select(sampleName, candidate_ref, candidate_rank) %>%
-  distinct(sampleName, candidate_ref, .keep_all = TRUE)
+  filter(!is.na(candidate_rank)) %>%
+  distinct(sampleName, candidate_ref, candidate_rank)
 
 # Second mapping, reads mapped with duplicates ----------------------------
+# Phase-11 (JMAP-03 / D-15): read counts now come from SAMTOOLS_IDXSTATS on the
+# COMBINED withdup BAM — ONE file per sample (<sample>.withdup.idxstats), a
+# 4-column no-header TSV (refname, seqlen, mapped, unmapped) with one DATA row per
+# candidate reference plus a trailing `*` unmapped row. This replaces the former
+# per-candidate SAMTOOLS_STATS text files parsed via `X2 == "reads mapped:"`.
+# The withdup loop therefore changes from one-file-per-candidate to
+# one-file-per-sample, emitting one row per candidate.
+#
+# The glob pins `\.withdup\.idxstats$` so the PARSEFIRSTMAPPING
+# `*.firstmapping.withdup.idxstats` files (if ever co-staged) do NOT match — only
+# JOINT_MAPPING's per-sample `<sample>.withdup.idxstats` is consumed here.
 # List files
-stats_files <- list.files(path = path_4, pattern = "\\withdup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_4, pattern = "\\.withdup\\.idxstats$", full.names = TRUE)
+# Exclude any PARSEFIRSTMAPPING `*.firstmapping.withdup.idxstats` that may share the
+# dir — only JOINT_MAPPING's per-sample `<sample>.withdup.idxstats` is consumed here.
+stats_files <- stats_files[!str_detect(basename(stats_files), "\\.firstmapping\\.")]
 
-# Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_withdups_mapped", "candidate_rank")
-
-for (i in 1:length(stats_files)) {
-  try(rm(map_stats))
-  # Get sample name
-  tmp_df$sampleName[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][1]
-
-  # Get reference name
-  tmp_df$reference[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][2]
-
-  # Phase-10: same fix as nodup loop — extract rank from filename pos [3] so
-  # df_with_dups and df_nodups use identical rank assignments. The lookup-based
-  # path breaks when two rescued candidates share a reference (rank collapses to 1
-  # for both slots), causing a Minor_reference mismatch in the full_join that
-  # duplicates sample rows in Summary.csv. "firstmapping" files → NA rank.
-  cand_slot <- str_split(basename(stats_files[i]), "\\.")[[1]][3]
-  tmp_df$candidate_rank[i] <- as.integer(str_extract(cand_slot, "[0-9]+"))
-
-  # Read the mapping stats
-  map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
-
-  # Get number of mapped reads before duplicate removal
-  mapped_reads <- map_stats %>% filter(X2 == "reads mapped:") %>% pull(X3)
-
-  mapped_reads <- as.numeric(mapped_reads)
-  tmp_df$trimmed_reads_withdups_mapped[i] <- mapped_reads
+if (length(stats_files) > 0) {
+  tmp_df <- purrr::map_dfr(stats_files, function(f) {
+    # Sample name = first dot-delimited basename token.
+    sampleName <- str_split(basename(f), "\\.")[[1]][1]
+    # 4-col no-header idxstats TSV: refname, seqlen, mapped, unmapped.
+    read_tsv(f, col_names = c("candidate_ref", "seqlen", "mapped", "unmapped"),
+             comment = "", show_col_types = FALSE) %>%
+      # Drop the `*` unmapped trailer row and any zero-read references.
+      filter(candidate_ref != "*", mapped > 0) %>%
+      # idxstats refnames are already the bare candidate reference; strip a
+      # `_cand{rank}` slot defensively (no-op for combined-BAM idxstats).
+      mutate(candidate_ref = str_remove(candidate_ref, "_cand[0-9]+$")) %>%
+      transmute(sampleName, candidate_ref,
+                trimmed_reads_withdups_mapped = as.numeric(mapped))
+  })
+} else {
+  tmp_df <- tibble(sampleName = character(), candidate_ref = character(),
+                   trimmed_reads_withdups_mapped = numeric())
 }
-tmp_df <- as_tibble(tmp_df) %>%
-  mutate(
-    candidate_ref  = str_remove(reference, "_cand[0-9]+$"),
-    candidate_rank = suppressWarnings(as.integer(candidate_rank))
-  )
+# Phase-11 (JMAP-03 / Pitfall 4): recover candidate_rank by joining the idxstats
+# refname to candidate_rank_lookup. idxstats is per-sample so the filename carries
+# NO per-candidate slot — the lookup is the ONLY rank source. When two candidates
+# share a reference, the lookup holds both ranks for that ref, so the join yields
+# one row per rank (each with the same per-reference mapped count); the per-sample
+# group/fill/slice below collapses them to a single Summary.csv row without a
+# many-to-many explosion (the full_join keys on Major_/Minor_reference, identical
+# across df_with_dups/df_nodups).
+tmp_df <- tmp_df %>%
+  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref")) %>%
+  mutate(candidate_rank = suppressWarnings(as.integer(candidate_rank)))
 
 # Add number of raw and trimmed reads - needed for calculation of percentages
 tmp_df <- left_join(tmp_df, trimmed_df, by = "sampleName")
@@ -360,7 +381,7 @@ df_with_dups <- tmp_df %>%
   # slot suffix — so it stays byte-identical to the legacy join key, COMPAT-02 D-02).
   mutate(Major_reference = case_when(candidate_rank == 1 ~ candidate_ref)) %>%
   mutate(Minor_reference = case_when(candidate_rank == 2 ~ candidate_ref)) %>%
-  select(-reference, -candidate_ref) %>%
+  select(-candidate_ref) %>%
   # Calculate percent of the trimmed reads mapped
   #mutate(total_trimmed_reads_with_dups = as.integer(total_trimmed_reads_with_dups),
   #       Reads_withdup_mapped_major = as.integer(Reads_withdup_mapped_major),
@@ -377,52 +398,47 @@ df_with_dups <- tmp_df %>%
   slice(1)
 
 # Reads mapped no duplicates ----------------------------------------------
+# Phase-11 (JMAP-03 / D-15): symmetric idxstats migration of the nodup loop.
+# Read counts come from SAMTOOLS_IDXSTATS on the COMBINED dedup BAM — ONE file per
+# sample (<sample>.nodup.idxstats), same 4-column no-header TSV (refname, seqlen,
+# mapped, unmapped) with one row per candidate + a `*` trailer. Replaces the
+# per-candidate SAMTOOLS_STATS `X2 == "reads mapped:"` parse. The glob pins
+# `\.nodup\.idxstats$` and excludes any `*.firstmapping.nodup.idxstats` so only
+# JOINT_MAPPING's per-sample nodup idxstats is consumed.
 # List files
-stats_files <- list.files(path = path_5, pattern = "nodup.stats$", full.names = TRUE)
+stats_files <- list.files(path = path_5, pattern = "\\.nodup\\.idxstats$", full.names = TRUE)
+# Exclude any PARSEFIRSTMAPPING `*.firstmapping.nodup.idxstats` that may share the dir.
+stats_files <- stats_files[!str_detect(basename(stats_files), "\\.firstmapping\\.")]
 
-# Empty df
-tmp_df <- as.data.frame(matrix(nrow = length(stats_files), ncol = 4))
-colnames(tmp_df) <- c("sampleName", "reference", "trimmed_reads_nodups_mapped", "candidate_rank")
-
-for (i in 1:length(stats_files)) {
-  try(rm(mapped_reads))
-
-  # Get sample name
-  tmp_df$sampleName[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][1]
-
-  # Get reference name
-  tmp_df$reference[i] <- str_split(basename(stats_files[i]), "\\.")[[1]][2]
-
-  # Phase-10: extract candidate rank directly from filename position [3] ("cand1",
-  # "cand2"). This is safer than the lookup-based path when two rescued candidates
-  # share the same reference — the lookup collapses both to rank 1, creating
-  # duplicate (sampleName, candidate_ref) rows in targeted_nodup_per_cand and a
-  # many-to-many join into candidate_support that turns all pivot value cols to
-  # list-cols. "firstmapping" files have "nodup" at position [3] → NA rank.
-  cand_slot <- str_split(basename(stats_files[i]), "\\.")[[1]][3]
-  tmp_df$candidate_rank[i] <- as.integer(str_extract(cand_slot, "[0-9]+"))
-
-  # Read the mapping stats
-  map_stats <- read_tsv(stats_files[i], col_names = FALSE, comment = "#")
-
-  # Get number of mapped reads after duplicate removal
-  mapped_reads <- map_stats %>% filter(X2 == "reads mapped:") %>% pull(X3)
-
-  mapped_reads <- as.numeric(mapped_reads)
-  tmp_df$trimmed_reads_nodups_mapped[i] <- mapped_reads
-
+if (length(stats_files) > 0) {
+  tmp_df <- purrr::map_dfr(stats_files, function(f) {
+    sampleName <- str_split(basename(f), "\\.")[[1]][1]
+    read_tsv(f, col_names = c("candidate_ref", "seqlen", "mapped", "unmapped"),
+             comment = "", show_col_types = FALSE) %>%
+      filter(candidate_ref != "*", mapped > 0) %>%
+      mutate(candidate_ref = str_remove(candidate_ref, "_cand[0-9]+$")) %>%
+      transmute(sampleName, candidate_ref,
+                trimmed_reads_nodups_mapped = as.numeric(mapped))
+  })
+} else {
+  tmp_df <- tibble(sampleName = character(), candidate_ref = character(),
+                   trimmed_reads_nodups_mapped = numeric())
 }
-tmp_df <- as_tibble(tmp_df) %>%
-  mutate(
-    candidate_ref  = str_remove(reference, "_cand[0-9]+$"),
-    candidate_rank = suppressWarnings(as.integer(candidate_rank))
-  )
+# Phase-11 (JMAP-03 / Pitfall 4): rank recovered via candidate_rank_lookup (the
+# only rank source — idxstats is per-sample, no filename slot). Both ranks of a
+# shared reference survive (the lookup keeps every (ref, rank) pair), so
+# targeted_nodup_per_cand below stays keyed on candidate_rank with no duplicate
+# (sampleName, candidate_rank) rows and no many-to-many join downstream.
+tmp_df <- tmp_df %>%
+  left_join(candidate_rank_lookup, by = c("sampleName", "candidate_ref")) %>%
+  mutate(candidate_rank = suppressWarnings(as.integer(candidate_rank)))
 
-# Phase-10: targeted_nodup_per_cand now joins by candidate_rank (not candidate_ref)
-# so that rescued samples where two slots share the same reference do not create
-# a many-to-many join. The rank is read directly from filename position [3] above.
+# Phase-10/11: targeted_nodup_per_cand joins by candidate_rank (not candidate_ref)
+# so rescued samples where two slots share a reference do not create a many-to-many
+# join. With the idxstats migration the rank comes from candidate_rank_lookup.
 targeted_nodup_per_cand <- tmp_df %>%
   filter(!is.na(candidate_rank)) %>%
+  distinct(sampleName, candidate_rank, .keep_all = TRUE) %>%
   select(sampleName, candidate_rank, targeted_reads_nodup = trimmed_reads_nodups_mapped)
 
 df_nodups <- tmp_df %>%
@@ -434,7 +450,11 @@ df_nodups <- tmp_df %>%
   # Create columns for reads mapped to major and minor genotype
   mutate(Reads_nodup_mapped_major = case_when(candidate_rank == 1 ~ trimmed_reads_nodups_mapped)) %>%
   mutate(Reads_nodup_mapped_minor = case_when(candidate_rank == 2 ~ trimmed_reads_nodups_mapped)) %>%
-  mutate(Reads_nodup_mapped_first_mapping = case_when(reference == "first_mapping" ~ trimmed_reads_nodups_mapped)) %>%
+  # Phase-11 (JMAP-03): the combined-BAM nodup idxstats carries ONLY candidate
+  # references (no `first_mapping` row), so this vestigial column is always NA —
+  # kept NA-filled to preserve the Summary.csv header contract. The legacy
+  # `reference == "first_mapping"` source no longer exists post-migration.
+  mutate(Reads_nodup_mapped_first_mapping = NA_real_) %>%
   select(-trimmed_reads_nodups_mapped) %>%
   #mutate(Percent_mapped_major = case_when(candidate_rank == 1 ~ Percent_trimmed_reads_mapped)) %>%
   #mutate(Percent_mapped_minor = case_when(candidate_rank == 2 ~ Percent_trimmed_reads_mapped)) %>%
@@ -443,7 +463,7 @@ df_nodups <- tmp_df %>%
   mutate(Major_reference = case_when(candidate_rank == 1 ~ candidate_ref)) %>%
   mutate(Minor_reference = case_when(candidate_rank == 2 ~ candidate_ref)) %>%
   # Create one row per sample
-  select(-reference, -candidate_ref, -candidate_rank) %>%
+  select(-candidate_ref, -candidate_rank) %>%
   group_by(sampleName) %>%
   # Fill missing values per group (i.e. sampleName. Direction "downup" fill values from both rows)
   fill(everything(), .direction = "downup") %>%
