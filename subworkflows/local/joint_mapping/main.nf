@@ -8,8 +8,8 @@
 // per-candidate BAMs that feed the existing per-candidate downstream steps unchanged.
 //
 // Read-count metrics now come from SAMTOOLS_IDXSTATS on the combined BAM, pre- and
-// post-dedup (D-07/D-09). SAMTOOLS_STATS is removed (D-15) — summarize.R consumed only
-// `reads mapped:`, which maps to idxstats column 3.
+// post-dedup (D-07/D-09). The legacy samtools-stats step is removed (D-15) — summarize.R
+// consumed only `reads mapped:`, which maps to idxstats column 3.
 //
 
 include { CAT_CANDIDATES                         } from '../../../modules/local/cat_candidates/main'
