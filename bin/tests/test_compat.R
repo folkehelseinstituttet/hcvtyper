@@ -146,26 +146,43 @@ run_summarize <- function(case, sampleName, cands,
   write_csv(legacy, file.path(wd, "parsefirst_mapping",
                               paste0(sampleName, ".parsefirstmapping.csv")))
 
-  # --- per-candidate stats + depth fixtures using the NEW cand-slot naming ---
-  # samtools-stats text: the loops pull `SN<TAB>reads mapped:<TAB><N>`.
+  # --- read-count + depth fixtures (Plan 03 / JMAP-03: idxstats format) -------
+  # Read counts now come from SAMTOOLS_IDXSTATS on the COMBINED BAM (pre/post
+  # dedup), staged as ONE file PER SAMPLE: <sample>.withdup.idxstats /
+  # <sample>.nodup.idxstats. Each is a 4-column no-header TSV
+  # (refname, seqlen, mapped, unmapped) with ONE data row per candidate ref plus
+  # a trailing `*` unmapped row. The idxstats refnames are the BARE candidate
+  # reference (no `.cand{rank}.` filename slot — idxstats is per-sample, so rank
+  # is recovered via the candidate_rank_lookup join in summarize.R, NOT a
+  # filename parse). `withdup_reads`/`nodup_reads` optionally override the read
+  # count written per candidate (defaults to candidate_reads).
+  idx_seqlen <- 9456L  # representative HCV genome length; value is unused downstream
+
+  withdup_rows <- character(0)
+  nodup_rows   <- character(0)
+  for (i in seq_len(nrow(cands))) {
+    ref      <- cands$candidate_ref[i]
+    wd_reads <- if (!is.null(cands$withdup_reads)) cands$withdup_reads[i] else cands$candidate_reads[i]
+    nd_reads <- if (!is.null(cands$nodup_reads))   cands$nodup_reads[i]   else cands$candidate_reads[i]
+    withdup_rows <- c(withdup_rows, paste(ref, idx_seqlen, wd_reads, 0, sep = "\t"))
+    nodup_rows   <- c(nodup_rows,   paste(ref, idx_seqlen, nd_reads, 0, sep = "\t"))
+  }
+  # Trailing `*` unmapped row (must be dropped by the loop's candidate_ref != "*").
+  withdup_rows <- c(withdup_rows, paste("*", 0, 0, 190, sep = "\t"))
+  nodup_rows   <- c(nodup_rows,   paste("*", 0, 0, 190, sep = "\t"))
+  writeLines(withdup_rows, file.path(wd, "stats_withdup",
+                                     paste0(sampleName, ".withdup.idxstats")))
+  writeLines(nodup_rows, file.path(wd, "stats_markdup",
+                                   paste0(sampleName, ".nodup.idxstats")))
+
+  # depth tsv: <ref> <pos> <cov>, 3-col no header (summarize.R coverage loop).
+  # Depth is still per-candidate (post-split BAM) so it keeps the `.cand{rank}.`
+  # slot the coverage loop recovers rank from via the lookup join.
   for (i in seq_len(nrow(cands))) {
     rk   <- cands$candidate_rank[i]
     ref  <- cands$candidate_ref[i]
-    rds  <- cands$candidate_reads[i]
     base <- paste0(sampleName, ".", ref, ".cand", rk)
-
-    stats_text <- c(
-      "# This file was produced by samtools stats",
-      paste("SN", "raw total sequences:", rds, sep = "\t"),
-      paste("SN", "reads mapped:", rds, sep = "\t")
-    )
-    writeLines(stats_text, file.path(wd, "stats_withdup",
-                                     paste0(base, ".withdup.stats")))
-    writeLines(stats_text, file.path(wd, "stats_markdup",
-                                     paste0(base, ".nodup.stats")))
-
-    # depth tsv: <ref> <pos> <cov>, 3-col no header (summarize.R L457). Constant
-    # coverage across ref_length positions; high enough to clear the typable gate.
+    # Constant coverage across ref_length positions; high enough to clear gate.
     depth_lines <- paste(ref, seq_len(ref_length), 60, sep = "\t")
     writeLines(depth_lines, file.path(wd, "depth",
                                       paste0(base, ".nodup.tsv")))
@@ -199,7 +216,8 @@ run_summarize <- function(case, sampleName, cands,
 mk_cands <- function(...) {
   bind_rows(...)
 }
-mk_cand <- function(rank, ref, subtype, reads, cov) {
+mk_cand <- function(rank, ref, subtype, reads, cov,
+                    withdup_reads = NA_real_, nodup_reads = NA_real_) {
   tibble(
     candidate_rank     = as.integer(rank),
     candidate_ref      = ref,
@@ -208,7 +226,12 @@ mk_cand <- function(rank, ref, subtype, reads, cov) {
     # plain candidates.csv value summarize.R reads as character.
     candidate_genotype = if (subtype == "2k1b") "2k1b" else substr(subtype, 1, 1),
     candidate_reads    = reads,
-    candidate_cov      = cov
+    candidate_cov      = cov,
+    # JMAP-03: optional per-rank read-count overrides written into the idxstats
+    # fixtures (default to candidate_reads). Lets a test assert that rank 1 -> major
+    # and rank 2 -> minor pick up the right idxstats column-3 value independently.
+    withdup_reads      = ifelse(is.na(withdup_reads), reads, withdup_reads),
+    nodup_reads        = ifelse(is.na(nodup_reads),   reads, nodup_reads)
   )
 }
 
@@ -432,5 +455,68 @@ for (col in c("cand_1_rescued_from", "cand_2_rescued_from")) {
     fail(sprintf("RESCUE-AUDIT: %s must be NA on a no-rescue input, got '%s'", col, v))
 }
 ok("RESCUE-AUDIT (D-08): Summary.csv carries rescue_flag + cand_{rank}_rescued_from/rescue_trigger, NA on no-rescue")
+
+# =========================================================================
+# JMAP-03 (Phase 11, D-15): read-count columns are sourced from SAMTOOLS_IDXSTATS
+# (combined BAM, one file per sample) instead of the removed SAMTOOLS_STATS.
+# The run_summarize() harness now stages <sample>.withdup.idxstats /
+# <sample>.nodup.idxstats 4-column TSV fixtures (one row per candidate + a `*`
+# trailer). Assert the four read-count columns populate from idxstats column 3,
+# rank 1 -> *_major, rank 2 -> *_minor, with the withdup/nodup values distinct.
+#
+# RED until Plan 03 migrates summarize.R's path_4/path_5 loops to parse idxstats.
+# -------------------------------------------------------------------------
+jmap_cands <- mk_cands(
+  mk_cand(1, "3a_D17763",   "3a", 200000, 99, withdup_reads = 17257, nodup_reads = 1007),
+  mk_cand(2, "3i_JX227955", "3i", 150000, 97, withdup_reads = 227,   nodup_reads = 47)
+)
+jmap_summary <- run_summarize("jmapidx", "JMAPIDX", jmap_cands)
+if (is.null(jmap_summary)) fail("JMAP-03: summarize.R wrote no Summary.csv")
+if (nrow(jmap_summary) != 1) fail("JMAP-03: expected exactly 1 Summary.csv row")
+
+read_cols <- c("Reads_withdup_mapped_major", "Reads_withdup_mapped_minor",
+               "Reads_nodup_mapped_major",   "Reads_nodup_mapped_minor")
+for (col in read_cols) {
+  if (!col %in% names(jmap_summary))
+    fail(paste("JMAP-03: Summary.csv missing read-count column", col))
+  v <- jmap_summary[[col]][1]
+  if (is.na(v))
+    fail(paste("JMAP-03:", col, "is NA — idxstats read counts did not populate"))
+}
+# Exact idxstats column-3 values, rank 1 -> major, rank 2 -> minor.
+if (as.numeric(jmap_summary$Reads_withdup_mapped_major[1]) != 17257)
+  fail(sprintf("JMAP-03: Reads_withdup_mapped_major = %s, expected 17257 (idxstats col 3, rank 1)",
+               jmap_summary$Reads_withdup_mapped_major[1]))
+if (as.numeric(jmap_summary$Reads_withdup_mapped_minor[1]) != 227)
+  fail(sprintf("JMAP-03: Reads_withdup_mapped_minor = %s, expected 227 (idxstats col 3, rank 2)",
+               jmap_summary$Reads_withdup_mapped_minor[1]))
+if (as.numeric(jmap_summary$Reads_nodup_mapped_major[1]) != 1007)
+  fail(sprintf("JMAP-03: Reads_nodup_mapped_major = %s, expected 1007 (idxstats col 3, rank 1)",
+               jmap_summary$Reads_nodup_mapped_major[1]))
+if (as.numeric(jmap_summary$Reads_nodup_mapped_minor[1]) != 47)
+  fail(sprintf("JMAP-03: Reads_nodup_mapped_minor = %s, expected 47 (idxstats col 3, rank 2)",
+               jmap_summary$Reads_nodup_mapped_minor[1]))
+ok("JMAP-03: Reads_withdup/nodup_mapped_major/minor sourced from idxstats column 3 (rank 1->major, rank 2->minor)")
+
+# =========================================================================
+# JMAP-03 shared-reference guard (Pitfall 4 / commit 1d1a051): when two
+# candidates share ONE reference name, the combined-BAM idxstats has a single
+# row for that ref. The candidate_rank_lookup join must still disambiguate the
+# two ranks WITHOUT exploding into a many-to-many join — exactly ONE Summary.csv
+# row per sample (no duplicated sample rows in df_mapped_reads).
+#
+# RED until Plan 03 builds the lookup so both ranks of a shared ref survive and
+# the df_with_dups/df_nodups full_join collapses to one row per sample.
+# -------------------------------------------------------------------------
+shared_cands <- mk_cands(
+  mk_cand(1, "3a_D17763", "3a", 200000, 99, withdup_reads = 5000, nodup_reads = 400),
+  mk_cand(2, "3a_D17763", "3a", 150000, 97, withdup_reads = 5000, nodup_reads = 400)
+)
+shared_summary <- run_summarize("jmapshared", "JMAPSHARED", shared_cands)
+if (is.null(shared_summary)) fail("JMAP-03 shared-ref: summarize.R wrote no Summary.csv")
+if (nrow(shared_summary) != 1)
+  fail(sprintf("JMAP-03 shared-ref: expected exactly 1 Summary.csv row, got %d (many-to-many join, 1d1a051 regression)",
+               nrow(shared_summary)))
+ok("JMAP-03 shared-ref: two candidates sharing one reference yield exactly one Summary.csv row (many-to-many guard)")
 
 cat("\nALL PASS\n")
