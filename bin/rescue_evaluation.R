@@ -287,6 +287,19 @@ if (nrow(out) > 0) {
       out$rescue_trigger[i]      <- res$rescue_trigger
       out$confirmation_status[i] <- "pass"  # D-05 force pass
       write_ref_fasta(res$rescue_ref, paste0("cand", out$candidate_rank[i]))
+      # Remove the now-stale pass-through FASTA for the REPLACED ref at this rank.
+      # The module materialised it as {prefix}.{orig_ref}_cand{rank}.fa, but the
+      # rescue FASTA written above embeds the NEW ref name and so has a DIFFERENT
+      # basename — it does NOT overwrite the pass-through. Without this removal both
+      # files match the *_cand*.fa emit, and the per-sample combined reference ends
+      # up with a duplicate @SQ line that crashes BOWTIE2_BUILD / samtools sort
+      # ("Duplicate entry ... in sam header"). The rank suffix scopes the deletion,
+      # so a ref legitimately shared by another rank is never touched.
+      stale_fa <- paste0(prefix, ".", res$rescued_from, "_cand",
+                         out$candidate_rank[i], ".fa")
+      if (!identical(res$rescued_from, res$rescue_ref) && file.exists(stale_fa)) {
+        file.remove(stale_fa)
+      }
     }
     # else: membership guard failed or no rescue → leave NA, status unchanged.
   }

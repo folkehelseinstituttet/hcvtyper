@@ -37,9 +37,13 @@ process RESCUE_EVALUATION {
     # writes ONLY the replaced rescue FASTA, so unchanged ranks must be materialised
     # here so the *_cand*.fa emit collects BOTH. The inputs live in input_fastas/
     # (stageAs above), so copying each up to the top level under its own basename
-    # produces a GENUINE task output whose name is not shadowed by an input. The
-    # rescue FASTA written by the Rscript below (same _cand{rank}. basename)
-    # then OVERWRITES the corresponding same-rank pass-through.
+    # produces a GENUINE task output whose name is not shadowed by an input. When a
+    # rank IS rescued, the rescue FASTA embeds the NEW ref name in its basename
+    # ({prefix}.{rescue_ref}_cand{rank}.fa) and therefore does NOT overwrite the
+    # pass-through ({prefix}.{orig_ref}_cand{rank}.fa); rescue_evaluation.R deletes
+    # that stale pass-through itself, so only one FASTA per rank survives. (A stale
+    # pass-through left behind would duplicate an @SQ line in the combined per-sample
+    # reference and crash BOWTIE2_BUILD / samtools sort.)
     for f in ${cand_fastas}; do
         if [ -e "\$f" ]; then
             cp -L "\$f" "./\$(basename \$f)"
