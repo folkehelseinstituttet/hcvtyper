@@ -103,8 +103,13 @@ TH_1A1B_LEN  <- 5000
 #
 # Returns list(exit, cands_out, fastas, path).
 # -------------------------------------------------------------------------
-run_rescue <- function(case, prefix, cands, support, bparse, refs) {
+run_rescue <- function(case, prefix, cands, support, bparse, refs, prestage = character(0)) {
   wd <- tempfile(paste0("rescue_", case, "_")); dir.create(wd)
+
+  # Mirror the RESCUE_EVALUATION module's pass-through staging (the `cp` loop that
+  # materialises each input {prefix}.{orig_ref}_cand{rank}.fa as a top-level file)
+  # so the script's stale-pass-through removal on a ref-changing rescue is exercised.
+  for (f in prestage) writeLines(c(paste0(">stub"), "ACGT"), file.path(wd, f))
 
   cand_path <- file.path(wd, paste0(prefix, ".candidates.in.csv"))
   write_csv(cands, cand_path)
@@ -377,5 +382,43 @@ if (!any(grepl("_cand2\\.", r6$fastas)))
   fail(paste("forced-pass: the rescued FASTA basename must match '_cand2.'; got:",
              paste(r6$fastas, collapse = ",")))
 ok("forced-pass -> below_threshold row rescued, status forced pass, _cand2. FASTA written (D-05/D-06)")
+
+# =========================================================================
+# Subtest 7: ref-changing rescue removes the stale pass-through FASTA (no dup @SQ)
+# =========================================================================
+# Regression for the JOINT_MAPPING "Duplicate entry ... in sam header" crash: when
+# a rank is rescued to a DIFFERENT reference, the rescue FASTA embeds the new ref
+# name and so does NOT overwrite the module-staged pass-through ({orig_ref}_cand1.fa).
+# Both surviving would duplicate an @SQ line in the per-sample combined reference and
+# crash BOWTIE2_BUILD / samtools sort. The script must delete the stale pass-through,
+# leaving exactly ONE FASTA per rank.
+r7 <- run_rescue(
+  "stale", "STALE",
+  cands = mk_cands("STALE",
+    mk_cand(1, "1a_M62321", "1a", "1", 80000, 95, "pass")),
+  support = mk_support("STALE",
+    mk_support_row("2b", 4120, 96.2, 3840, 4.1)),
+  bparse = tibble(sample = "STALE", major_ref = "2b_AY232748",
+                  major_contig_length = 4120, minor_ref = NA_character_,
+                  minor_contig_length = NA_real_),
+  refs = REFS,
+  # The module would have staged this pass-through for the original candidate ref.
+  prestage = "STALE.1a_M62321_cand1.fa"
+)
+assert_schema("stale", r7$cands_out)
+s7 <- r7$cands_out %>% filter(candidate_rank == 1)
+if (is.na(s7$rescued_from[1]))
+  fail("stale-passthrough: the rank-1 candidate must be rescued to set up the dedup check")
+cand1_fastas <- grep("_cand1\\.", r7$fastas, value = TRUE)
+if (any(grepl("1a_M62321_cand1\\.", cand1_fastas)))
+  fail(paste("stale-passthrough: the stale {orig_ref} pass-through must be removed on a ref-changing rescue; got:",
+             paste(cand1_fastas, collapse = ",")))
+if (!any(grepl("2b_AY232748_cand1\\.", cand1_fastas)))
+  fail(paste("stale-passthrough: the rescued {rescue_ref} FASTA must remain; got:",
+             paste(cand1_fastas, collapse = ",")))
+if (length(cand1_fastas) != 1)
+  fail(paste("stale-passthrough: exactly ONE _cand1. FASTA must survive (no duplicate @SQ); got:",
+             paste(cand1_fastas, collapse = ",")))
+ok("stale-passthrough -> ref-changing rescue removes the {orig_ref} FASTA, one _cand1. survives (dup-@SQ regression)")
 
 cat("\nALL PASS\n")
