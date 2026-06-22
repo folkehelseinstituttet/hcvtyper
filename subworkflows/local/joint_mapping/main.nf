@@ -109,10 +109,15 @@ workflow JOINT_MAPPING {
     // MODULE: Mark/remove duplicates on the combined BAM (D-08). Competitive mapping has already
     //         assigned each read to one candidate, so dedup is correctly scoped per reference
     //         sequence within the combined BAM.
+    //         Join by meta key: CAT_CANDIDATES completes quickly (shell cat) while BOWTIE2_ALIGN
+    //         takes minutes, so positional pairing would cross-pair FASTAs across parallel samples.
     //
+    ch_sormadup_input = ch_withdup.join(CAT_CANDIDATES.out.fasta)
+    // meta, combined.bam, combined.fa
+
     SAMTOOLS_SORMADUP (
-        ch_withdup,
-        CAT_CANDIDATES.out.fasta                       // meta, combined.fa
+        ch_sormadup_input.map { meta, bam, _fa -> tuple(meta, bam) },
+        ch_sormadup_input.map { meta, _bam, fa  -> tuple(meta, fa) }
     )
     ch_dedup = SAMTOOLS_SORMADUP.out.bam               // combined dedup BAM
     ch_versions = ch_versions.mix(SAMTOOLS_SORMADUP.out.versions.first())
@@ -214,20 +219,29 @@ workflow JOINT_MAPPING {
     //
     // MODULE: Per-candidate consensus sequence. IVAR_CONSENSUS takes the reference FASTA as a
     //         bare positional path; supply this candidate's own reference FASTA.
+    //         Join ch_percand and ch_percand_fasta by meta key BEFORE stripping, so that
+    //         the bare path is position-safe even when REHEADER_CANDIDATE emits in async order.
     //
+    ch_ivar_input = ch_percand.join(ch_percand_fasta)  // meta, bam, fasta
+
     IVAR_CONSENSUS (
-        ch_percand,
-        ch_percand_fasta.map { _meta, fasta -> fasta }, // bare path, positional
+        ch_ivar_input.map { meta, bam, _fasta -> tuple(meta, bam) },
+        ch_ivar_input.map { _meta, _bam, fasta -> fasta },   // now position-safe
         false // Don't need the mpileup file
     )
     ch_versions = ch_versions.mix(IVAR_CONSENSUS.out.versions.first())
 
     //
     // MODULE: Compare per-candidate consensus to its own reference and compute distance.
+    //         Join IVAR_CONSENSUS.out.fasta and ch_percand_fasta by meta key so that async
+    //         IVAR_CONSENSUS completion order does not cross-pair consensus with wrong reference.
     //
+    ch_dist_input = IVAR_CONSENSUS.out.fasta.join(ch_percand_fasta)
+    // meta, consensus.fa, reference.fa
+
     CONSENSUS_DISTANCE (
-        IVAR_CONSENSUS.out.fasta, // tuple val(meta), path(consensus.fa)
-        ch_percand_fasta          // tuple val(meta), path(reference.fa)
+        ch_dist_input.map { meta, cons, _ref -> tuple(meta, cons) },
+        ch_dist_input.map { meta, _cons, ref  -> tuple(meta, ref) }
     )
     ch_versions = ch_versions.mix(CONSENSUS_DISTANCE.out.versions.first())
 
