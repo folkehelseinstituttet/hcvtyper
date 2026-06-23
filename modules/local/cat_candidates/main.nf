@@ -23,8 +23,15 @@ process CAT_CANDIDATES {
     def prefix = task.ext.prefix ?: "${meta.id}"
     // Per-sample concatenation: cat of one FASTA is identity (single-candidate degenerate
     // case, D-14). Distinct from CAT_FILTERED_CONTIGS which collects ACROSS samples.
+    // Deduplicate by sequence ID across all candidate FASTAs (JMAP-DEDUP-01): keep the first
+    // record per ID (first whitespace-delimited token after '>', i.e. the @SQ name samtools
+    // uses) and drop any later record whose ID was already emitted. This is the single
+    // chokepoint where all candidate FASTAs converge, so it neutralizes every collision path
+    // (rescue-new-ref collision, shared-ref candidates, residual stale passthrough) without
+    // touching selection/scoring/rescue. When all IDs are distinct the output is byte-identical
+    // to the old `cat` (same order, headers, wrapping). awk ships in the BLAST container.
     """
-    cat ${fastas} > ${prefix}.combined.fa
+    awk '/^>/{id=\$1; if(seen[id]++){skip=1;next} skip=0} skip{next} {print}' ${fastas} > ${prefix}.combined.fa
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
