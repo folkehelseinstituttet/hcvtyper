@@ -1227,6 +1227,17 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
     ))
 }
 
+# gt_check derives Major_subtype / Minor_subtype from glue_report / glue_report_minor,
+# which map to cand1 / cand2 by file-system slot name. When the dominant candidate is
+# not in cand1 (rescue or neutral-ranking flip), Major_subtype carries the wrong strain.
+# Override here with the role-based subtypes, which are correctly assigned by the
+# Phase-8 role classifier regardless of slot order.
+final <- final %>%
+  mutate(
+    Major_subtype = coalesce(Major_role_subtype, Major_subtype),
+    Minor_subtype = coalesce(Minor_role_subtype, Minor_subtype)
+  )
+
 # De novo confirmation of the reported minor — RETIRED (D-15). The legacy
 # apply_denovo_layer() / minor_denovo_status / coinfection_flag chokepoint has been
 # REPLACED by the Phase-8 N-candidate role classifier (score_candidates() +
