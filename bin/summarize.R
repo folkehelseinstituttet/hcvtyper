@@ -795,6 +795,21 @@ candidate_support <- classify_roles(
   match_level               = denovo_match_level
 )
 
+# Per-sample candidate_rank of the role-dominant. Used below to swap Major_*/Minor_*
+# stat/coverage/consensus/GLUE columns when the role classifier's dominant is at
+# candidate_rank 2 (i.e. the mapping-minor carried the true dominant strain, as in
+# a co-infection where first-mapping read mis-recruitment inverted the abundance order).
+role_dominant_rank <- if (nrow(candidate_support) > 0) {
+  candidate_support %>%
+    filter(role == "dominant") %>%
+    group_by(sampleName) %>%
+    slice(1) %>%
+    ungroup() %>%
+    transmute(sampleName, dominant_cand_rank = as.integer(candidate_rank))
+} else {
+  tibble(sampleName = character(), dominant_cand_rank = integer())
+}
+
 # Enriched long *.candidates.csv (D-16, CLASS-03). Write EVERY candidate — incl.
 # background / refuted — carrying the new role / dominance_score / role_reason +
 # overall_sample_call alongside the original Phase-6 candidate columns and the
@@ -1189,10 +1204,65 @@ final <- input_samplesheet %>%
   # below carries the role columns through.
   left_join(candidate_roles_wide, join_by(sampleName))
 
-if (nrow(glue_report) > 0) {
+# Attach the per-sample dominant_cand_rank so the swap and GLUE join below can
+# use it. Samples with no classified candidate (no-mapping) get NA → no swap.
+final <- final %>%
+  left_join(role_dominant_rank, by = "sampleName")
+
+# Re-key Major_*/Minor_* stat/coverage/consensus columns to the role-dominant strain.
+# All stats loops above key by candidate_rank (1=mapping-major, 2=mapping-minor).
+# When classify_roles() assigns dominance to candidate_rank 2 (e.g. sim2 70:30 2a:3a
+# where first-mapping mis-recruits reads to 3a), every "Major_*" column currently
+# describes the wrong strain. Swap the pairs for those samples so the Summary.csv
+# row is internally consistent: Major_* ↔ the role-dominant, Minor_* ↔ the co-infection.
+swap_col_pairs <- list(
+  c("Major_reference",                                 "Minor_reference"),
+  c("Major_genotype_mapping",                          "Minor_genotype_mapping"),
+  c("Reads_withdup_mapped_major",                      "Reads_withdup_mapped_minor"),
+  c("Reads_nodup_mapped_major",                        "Reads_nodup_mapped_minor"),
+  c("Percent_reads_mapped_of_trimmed_with_dups_major", "Percent_reads_mapped_of_trimmed_with_dups_minor"),
+  c("percent_mapped_reads_major_firstmapping",         "percent_mapped_reads_minor_firstmapping"),
+  c("Major_cov_breadth_min_1",                         "Minor_cov_breadth_min_1"),
+  c("Major_cov_breadth_min_5",                         "Minor_cov_breadth_min_5"),
+  c("Major_cov_breadth_min_10",                        "Minor_cov_breadth_min_10"),
+  c("Major_avg_depth",                                 "Minor_avg_depth"),
+  c("Major_consensus_similarity_pct",                  "Minor_consensus_similarity_pct"),
+  c("Major_consensus_n_differences",                   "Minor_consensus_n_differences")
+)
+
+needs_swap <- !is.na(final$dominant_cand_rank) & final$dominant_cand_rank == 2L
+
+if (any(needs_swap, na.rm = TRUE)) {
+  for (pair in swap_col_pairs) {
+    maj_col <- pair[1]; min_col <- pair[2]
+    if (!maj_col %in% names(final) || !min_col %in% names(final)) next
+    tmp <- final[[maj_col]]
+    final[[maj_col]][needs_swap] <- final[[min_col]][needs_swap]
+    final[[min_col]][needs_swap] <- tmp[needs_swap]
+  }
+}
+
+# Join GLUE results keyed to the ROLE-DOMINANT candidate, not always candidate_rank 1
+# (the mapping-major). When classify_roles() assigns dominance to candidate_rank 2,
+# glue_report_minor describes the dominant strain's resistance profile.
+# Build a rank-keyed combined GLUE frame; join via dominant_cand_rank so
+# GLUE_subtype and drug-resistance columns follow the role assignment.
+# Samples with no role result fall back to rank-1 GLUE (dominant_cand_rank NA → 1L).
+if (nrow(glue_report) > 0 || nrow(glue_report_minor) > 0) {
+  glue_by_rank <- bind_rows(
+    if (nrow(glue_report) > 0)
+      glue_report %>% rename(sampleName = Sample) %>% mutate(.dom_rank = 1L)
+    else
+      tibble(sampleName = character(), .dom_rank = integer()),
+    if (nrow(glue_report_minor) > 0)
+      glue_report_minor %>% rename(sampleName = Sample) %>% mutate(.dom_rank = 2L)
+    else
+      tibble(sampleName = character(), .dom_rank = integer())
+  )
   final <- final %>%
-    # Add glue result. Only Majority currently
-    left_join(glue_report, by = c("sampleName" = "Sample"))
+    mutate(.dom_rank = coalesce(dominant_cand_rank, 1L)) %>%
+    left_join(glue_by_rank, by = c("sampleName", ".dom_rank")) %>%
+    select(-.dom_rank)
 }
 
 # Add script name and version
@@ -1532,7 +1602,7 @@ final <- final %>%
          everything()) %>%
   distinct() %>% # Remove any duplicated rows from the different joins
   # If there are no minor genotype reports, then the identical_geno and identical_subgeno columns will not exist. Therefore use any_of in case they are not there
-  select(-any_of(c("Major_minor", "identical_geno", "identical_subgeno")))
+  select(-any_of(c("Major_minor", "identical_geno", "identical_subgeno", "dominant_cand_rank")))
 
 # Write file
 write_csv(final, file = "Summary.csv")
