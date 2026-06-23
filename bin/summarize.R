@@ -1248,6 +1248,18 @@ if (any(needs_swap, na.rm = TRUE)) {
 # Build a rank-keyed combined GLUE frame; join via dominant_cand_rank so
 # GLUE_subtype and drug-resistance columns follow the role assignment.
 # Samples with no role result fall back to rank-1 GLUE (dominant_cand_rank NA → 1L).
+#
+# Design decision — resistance reporting for co-infections (D-GLUE-COINFECTION):
+# HCVGLUE is run on ALL candidate BAMs (cand1 + cand2), so a resistance profile
+# exists for both strains when a co-infection is confirmed. However, the primary
+# output columns (GLUE_genotype, GLUE_subtype, drug-resistance columns) carry
+# only the role-DOMINANT strain's profile. The role-MINOR strain's resistance
+# data lives in the opposing GLUE report file but is not surfaced as separate
+# columns in Summary.csv.  Rationale: clinical guidance is anchored to the
+# dominant strain; adding a second resistance column set would double the column
+# count and complicate downstream parsing for the common (monoinfection) case.
+# If per-strain resistance for co-infections is needed in future, expose the
+# non-dominant GLUE report as supplementary output rather than widening Summary.csv.
 if (nrow(glue_report) > 0 || nrow(glue_report_minor) > 0) {
   glue_by_rank <- bind_rows(
     if (nrow(glue_report) > 0)
@@ -1296,6 +1308,20 @@ if (nrow(glue_report) > 0 & exists("gt_check")) {
       is.na(identical_geno) ~ "UNKNOWN"
     ))
 }
+
+# Consistency override: monoinfection samples always get minor_typable = NO.
+# The gt_check block above produces UNKNOWN when identical_geno is NA (the minor
+# GLUE subtype is absent for that sample). Whether gt_check ran or not depends on
+# whether glue_report_minor was present — so refuted spurious minors ended up as
+# UNKNOWN or NO depending on unrelated pipeline state. Both cases represent the
+# same biology: no real minor strain. "UNKNOWN" implies ambiguity that doesn't
+# exist once the role classifier has called monoinfection.
+final <- final %>%
+  mutate(minor_typable = if_else(
+    !is.na(overall_sample_call) & overall_sample_call == "monoinfection",
+    "NO",
+    minor_typable
+  ))
 
 # gt_check derives Major_subtype / Minor_subtype from glue_report / glue_report_minor,
 # which map to cand1 / cand2 by file-system slot name. When the dominant candidate is
