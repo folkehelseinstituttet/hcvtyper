@@ -6,7 +6,7 @@ library(jsonlite)
 # Define json parser function
 parse_json_files <- function(major_minor) {
   
-  json_files <- list.files(pattern = paste0("(", major_minor, ")\\.nodup\\.json$"),
+  json_files <- list.files(pattern = paste0("(", major_minor, ")\\.nodup\\.(single\\.)?json$"),
                            full.names = TRUE)
   
 # Create final data file
