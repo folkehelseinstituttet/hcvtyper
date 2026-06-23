@@ -1328,6 +1328,13 @@ final <- final %>%
 # not in cand1 (rescue or neutral-ranking flip), Major_subtype carries the wrong strain.
 # Override here with the role-based subtypes, which are correctly assigned by the
 # Phase-8 role classifier regardless of slot order.
+# Guard: when GLUE reports are absent (no-GLUE batches) gt_check never runs and
+# Major_subtype / Minor_subtype are never added to final. NA-fill them here so
+# the coalesce below never errors (BM2-01; guard moved from post-review_flag).
+if (!"Major_subtype" %in% colnames(final))
+  final <- final %>% add_column("Major_subtype" = NA_character_)
+if (!"Minor_subtype" %in% colnames(final))
+  final <- final %>% add_column("Minor_subtype" = NA_character_)
 final <- final %>%
   mutate(
     Major_subtype = coalesce(Major_role_subtype, Major_subtype),
@@ -1555,20 +1562,6 @@ final <- final %>%
   }) %>%
   # Drop the per-sample role-review helper booleans now they have been consumed.
   select(-any_refuted_denovo, -any_uncorroborated, -dominant_unconfirmed)
-
-# Ensure the GLUE-derived Major_subtype / Minor_subtype columns are always present
-# before we alias them. They only reach `final` when the GLUE reports had rows
-# (gt_check left_join), so on skip-assembly / no-GLUE batches they are absent.
-# Mirror the denovo_* guard above (NA-fill when missing) so the shorthand aliases
-# below never error and the columns are never dropped (BM2-01).
-if (!"Major_subtype" %in% colnames(final)) {
-  final <- final %>%
-    add_column("Major_subtype" = NA_character_)
-}
-if (!"Minor_subtype" %in% colnames(final)) {
-  final <- final %>%
-    add_column("Minor_subtype" = NA_character_)
-}
 
 # Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
 # Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no
