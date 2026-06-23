@@ -165,7 +165,10 @@ is_valid_minor <- function(cand_subtype, cand_genotype, dom_subtype, dom_genotyp
 
 # score_candidates(df, score_weights, evenness_const, kmercov_cap)
 #   df             : candidate frame. Expected columns (NA-tolerant):
-#                    candidate_reads (numeric), the per-candidate breadth fraction
+#                    candidate_reads (numeric) AND/OR targeted_reads_nodup (numeric,
+#                    preferred for the reads term — the deduplicated targeted count;
+#                    candidate_reads is the neutral first-mapping count which can be
+#                    inverted by co-infection read mis-recruitment), the per-candidate breadth fraction
 #                    (cand_cov_breadth as a 0-100 percent OR candidate_cov; coerced
 #                    to a 0-1 fraction), cv_evenness (0-1 factor, supplied by the
 #                    Plan-02 cov loop), and assembly_support_best_contig_kmer_cov
@@ -215,7 +218,22 @@ score_candidates <- function(df, score_weights = .default_score_weights(),
     even_fac <- rep(0, nrow(df))
   }
 
-  reads <- df$candidate_reads
+  # Reads term: prefer the deduplicated TARGETED read count over candidate_reads.
+  # candidate_reads is the neutral all-reference first-mapping count (with
+  # duplicates). In a co-infection that competitive mapping mis-recruits reads
+  # between similar references, inverting the true abundance (sim2 70:30 case:
+  # candidate_reads ranks the 30% minor above the 70% major). targeted_reads_nodup
+  # is the deduplicated targeted re-mapping count and reflects true abundance, so
+  # use it whenever it is present and valid. This mirrors the D2 tie-break in
+  # classify_roles(), which already prefers targeted_reads_nodup over candidate_reads.
+  # Fall back to candidate_reads per-row only where the targeted count is absent.
+  cand_reads <- if ("candidate_reads" %in% names(df)) df$candidate_reads else rep(NA_real_, nrow(df))
+  if ("targeted_reads_nodup" %in% names(df)) {
+    tnodup <- df$targeted_reads_nodup
+    reads <- ifelse(!is.na(tnodup) & tnodup > 0, tnodup, cand_reads)
+  } else {
+    reads <- cand_reads
+  }
   reads_term <- ifelse(is.na(reads) | reads <= 0, 0, log10(reads))
 
   # k-mer-cov: bonus-ONLY, capped (D-05). NA / none => 0 boost, never a penalty.

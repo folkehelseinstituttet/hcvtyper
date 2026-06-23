@@ -141,6 +141,35 @@ if (nrow(nondom2) != 1 || nondom2$role != "co-infection")
   fail("Test3 sim2 2a:3a must be preserved as a co-infection")
 ok("Test3: sim1 1a:1b and sim2 2a:3a true co-infections preserved")
 
+# --- Test 3b: dominance reads term uses targeted_reads_nodup, not candidate_reads ---
+# Regression for the sim2 dominance-score inversion. In a real 2a:3a 70:30
+# co-infection the neutral all-reference first-mapping (candidate_reads, WITH
+# duplicates) MIS-RECRUITS reads and INVERTS the true abundance: it ranks the 30%
+# minor (3a, 624520) above the 70% major (2a, 273886). The deduplicated targeted
+# count (targeted_reads_nodup) is the truth: 2a 507708 > 3a 231132. The dominant
+# must be selected on the targeted count, so 2a (the true major) wins.
+# Values are the verbatim sim2 candidates.csv numbers.
+sim2_inverted <- bind_rows(
+  mk_cand("sim2inv", "3a_D17763", "3a", 624520, 100, 0.8114415381340713,
+          sup_len = 9446, sup_kmer = 4184.394999, sup_pid = 100) %>%
+    mutate(targeted_reads_nodup = 231132),
+  mk_cand("sim2inv", "2a_D00944", "2a", 273886, 100, 0.8315985489939417,
+          sup_len = 9695, sup_kmer = 9918.197952, sup_pid = 96.041) %>%
+    mutate(targeted_reads_nodup = 507708)
+)
+r5b <- classify(sim2_inverted)
+if (role_of(r5b, "2a_D00944") != "dominant")
+  fail("Test3b: the true major 2a (higher targeted_reads_nodup) must be dominant, NOT the mis-recruited 3a candidate_reads leader")
+if (role_of(r5b, "3a_D17763") != "co-infection")
+  fail("Test3b: the true minor 3a must be co-infection, not dominant")
+# Direct score check: scoring on targeted_reads_nodup must rank 2a above 3a.
+sc5b <- score_candidates(sim2_inverted)
+sc_2a <- sc5b %>% filter(candidate_ref == "2a_D00944") %>% pull(dominance_score)
+sc_3a <- sc5b %>% filter(candidate_ref == "3a_D17763") %>% pull(dominance_score)
+if (!(sc_2a > sc_3a))
+  fail(sprintf("Test3b: 2a score (%.4f) must exceed 3a score (%.4f) when scoring on targeted_reads_nodup", sc_2a, sc_3a))
+ok("Test3b: dominance reads term uses targeted_reads_nodup -> true major 2a wins despite inverted candidate_reads")
+
 # --- Test 4: IVT extreme-ratio genuine minor, de novo failed for BOTH -------
 # Genuine low-yield minor clears the floor but assembled nothing; the DOMINANT
 # also assembled nothing substantial -> de novo inconclusive -> keep, do not refute.
@@ -258,7 +287,7 @@ if ((r12b %>% pull(overall_sample_call) %>% unique()) != "co-infection")
 ok("Test12 (D2/§7.6 Q2): reads-vs-kmer disagreement -> indeterminate; agreement -> dominant/co-infection")
 
 # --- Test 8: every candidate gets exactly one role (CLASS-01) ---------------
-all_rows <- bind_rows(r1, r2, r3, r4, r5, r6, r7, r8, ra, rb, rc, r12a, r12b)
+all_rows <- bind_rows(r1, r2, r3, r4, r5, r5b, r6, r7, r8, ra, rb, rc, r12a, r12b)
 if (any(is.na(all_rows$role))) fail("Test8 every candidate must carry a non-NA role (CLASS-01)")
 if (!all(all_rows$role %in% c("dominant", "co-infection", "background", "indeterminate")))
   fail("Test8 role must be one of dominant/co-infection/background/indeterminate")
