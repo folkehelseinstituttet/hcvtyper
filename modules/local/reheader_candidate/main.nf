@@ -41,9 +41,11 @@ process REHEADER_CANDIDATE {
     {
         # Preserve the original @HD (sort order), then a single @SQ, then non-@SQ/@HD header
         # lines (e.g. @PG, @RG), then the read records re-encoded against this header.
-        samtools view -H ${bam} | grep -P '^@HD' || true
+        # grep -E instead of grep -P: the patterns use no Perl-specific features and -E is
+        # POSIX standard, supported by BusyBox grep (which rejects -P with a fatal error).
+        samtools view -H ${bam} | grep -E '^@HD' || true
         awk 'BEGIN{FS="\\t"; OFS="\\t"}{print "@SQ", "SN:"\$1, "LN:"\$2}' ${fasta}.fai
-        samtools view -H ${bam} | grep -vP '^@HD|^@SQ' || true
+        samtools view -H ${bam} | grep -vE '^@HD|^@SQ' || true
         samtools view ${bam}
     } | samtools view -b -o ${prefix}.bam -
 
