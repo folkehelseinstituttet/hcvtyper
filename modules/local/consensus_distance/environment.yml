@@ -2,5 +2,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/environment-schema.json
 channels:
   - conda-forge
+  - bioconda
 dependencies:
-  - conda-forge::r-seqinr=4.2_36
+  - bioconda::bioconductor-biostrings=2.74.0
+  - bioconda::bioconductor-pwalign=1.2.0
