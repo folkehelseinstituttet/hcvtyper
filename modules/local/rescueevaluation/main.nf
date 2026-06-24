@@ -17,7 +17,7 @@ process RESCUE_EVALUATION {
     // input files from output matching BY NAME, so a pass-through copied back to the
     // top level under its own name would otherwise be shadowed by the input and the
     // candidate_fasta emit would collect NOTHING (#10-03 integration bug).
-    tuple val(meta), path(candidates_csv), path(blastparse_csv), path(support_csv), path(cand_fastas, stageAs: 'input_fastas/*')
+    tuple val(meta), path(candidates_csv), path(support_csv), path(cand_fastas, stageAs: 'input_fastas/*')
     path(references)
 
     output:
@@ -50,18 +50,13 @@ process RESCUE_EVALUATION {
         fi
     done
 
-    # Skip-assembly path (D-10): blastparse_csv / support_csv arrive as EMPTY path
-    # inputs ([]), so the staged variable expands to an empty string and the
-    # positional thresholds would shift into the missing slots ("Usage:" error).
-    # Materialise a header-only placeholder for any empty leg so the 10 positional
-    # args stay aligned; rescue_evaluation.R's read_csv_guarded() treats a zero-row
-    # file as a typed-empty frame -> candidates pass through, rescue columns NA.
-    bp='${blastparse_csv}'
+    # Skip-assembly path (D-10): support_csv arrives as an EMPTY path input ([]),
+    # so the staged variable expands to an empty string and the positional
+    # thresholds would shift into the missing slots ("Usage:" error). Materialise
+    # a header-only placeholder so the 9 positional args stay aligned;
+    # rescue_evaluation.R's read_csv_guarded() treats a zero-row file as a
+    # typed-empty frame -> candidates pass through, rescue columns NA.
     sup='${support_csv}'
-    if [ -z "\$bp" ]; then
-        bp="${prefix}.EMPTY.blastparse.csv"
-        : > "\$bp"
-    fi
     if [ -z "\$sup" ]; then
         sup="${prefix}.EMPTY.assembly_support.csv"
         : > "\$sup"
@@ -70,7 +65,6 @@ process RESCUE_EVALUATION {
     rescue_evaluation.R \\
         $prefix \\
         $candidates_csv \\
-        "\$bp" \\
         "\$sup" \\
         $references \\
         $args

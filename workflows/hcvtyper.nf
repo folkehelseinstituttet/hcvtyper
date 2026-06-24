@@ -390,29 +390,26 @@ workflow HCVTYPER {
     // skip-assembly yields empty channels, fed via remainder:true so samples pass through
     // unchanged (rescue columns NA-filled).
     if (!params.skip_assembly) {
-        ch_blastparse_csv     = BLASTPARSE.out.csv
         ch_blastparse_support = BLASTPARSE.out.support
     } else {
-        ch_blastparse_csv     = Channel.empty()
         ch_blastparse_support = Channel.empty()
     }
 
-    // Build the RESCUE_EVALUATION input tuple (meta, candidates_csv, blastparse_csv,
-    // support_csv, cand_fastas) by joining on meta.id. PARSEFIRSTMAPPING.out.candidate_fasta
-    // is tuple(meta, parsefirstmapping_csv, cand_fastas) -- extract cand_fastas. The de-novo
-    // legs use remainder:true (D-10) so a skip-assembly run with empty BLASTPARSE channels
-    // does not drop samples; the R script's typed-empty guard handles the missing files.
+    // Build the RESCUE_EVALUATION input tuple (meta, candidates_csv, support_csv,
+    // cand_fastas) by joining on meta.id. PARSEFIRSTMAPPING.out.candidate_fasta
+    // is tuple(meta, parsefirstmapping_csv, cand_fastas) -- extract cand_fastas. The
+    // support leg uses remainder:true (D-10) so a skip-assembly run with an empty
+    // BLASTPARSE channel does not drop samples; the R script's typed-empty guard
+    // handles the missing file.
     ch_rescue_input = PARSEFIRSTMAPPING.out.candidates
         .join(PARSEFIRSTMAPPING.out.candidate_fasta, remainder: true)       // meta, candidates_csv, parsefirstmapping_csv?, cand_fastas?
-        .join(ch_blastparse_csv, remainder: true)                           // ..., blastparse_csv?
         .join(ch_blastparse_support, remainder: true)                       // ..., support_csv?
-        .map { meta, candidates_csv, _parsefirstmapping_csv, cand_fastas, blastparse_csv, support_csv ->
+        .map { meta, candidates_csv, _parsefirstmapping_csv, cand_fastas, support_csv ->
             // remainder:true fills absent legs with null. The module's path() inputs accept []
             // for a missing optional file; normalize null -> [] so staging never NPEs.
             tuple(
                 meta,
                 candidates_csv,
-                blastparse_csv ?: [],
                 support_csv ?: [],
                 cand_fastas ?: []
             )

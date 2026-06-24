@@ -4,35 +4,46 @@
 # De-novo subtype-rescue evaluator (Phase 10, denovo-subtype-rescue).
 #
 # Reads the long-format candidates table (one row per ranked candidate) together
-# with the de-novo BLAST top-hit summary (blastparse.csv) and the four-floor
-# assembly_support.csv, and decides — per candidate slot — whether the reference
-# the reads were mapped to should be REPLACED by the de-novo-derived reference
-# (a "rescue"). A rescue fires when the candidate subtype disagrees with the
-# de-novo top-hit subtype AND the de-novo contig clears all four quality floors,
-# with two special cases:
+# with the per-subtype assembly_support.csv (blastparse.R §4b), and decides —
+# per candidate slot — whether the reference the reads were mapped to should be
+# REPLACED by the de-novo-derived reference (a "rescue").
 #
-#   * 2k1b special rule (D-03): a 2k1b candidate (or 2k1b de-novo hit) over a
-#     genotype-2 contig meeting the floors rescues to that genotype-2 reference,
-#     regardless of the normal mismatch check.
-#   * 1a/1b boundary (D-04): when both the candidate and de-novo subtypes are in
-#     {1a, 1b}, the contig-length floor is the stricter rescue_1a1b_length.
+# Rescue logic uses subtype-level matching from assembly_support.csv rather than
+# the legacy major/minor rank-slot assignment from blastparse.csv. A rescue fires
+# when:
+#   (a) the candidate's own subtype has no or weak assembly support (fails the
+#       standard four floors), AND
+#   (b) a different subtype has strong support (passes the floors).
+# The rescue reference is taken from the best_ref column of assembly_support.csv
+# (the closest database reference for that contig), keeping the decision fully
+# within the assembly evidence without rank-to-slot assumptions.
+#
+# Two special cases apply on top of this:
+#   * 2k1b special rule (D-03): a 2k1b candidate (or a sample where the best
+#     alternative contig is 2k1b) over a genotype-2 contig meeting the floors
+#     rescues to that genotype-2 reference regardless of the own-support guard.
+#   * 1a/1b boundary (D-04): when both the candidate and alternative subtypes are
+#     in {1a, 1b}, the contig-length floor is the stricter rescue_1a1b_length.
+#
+# Collapse guard: a rescue is blocked if its target reference is already the
+# original reference of another candidate slot in the same sample, OR has already
+# been committed as a rescue target for a previous slot. This prevents two
+# distinct biological slots collapsing into the same reference and silently
+# discarding a genuine strain signal.
 #
 # On rescue: rescued_from records the ORIGINAL candidate ref, candidate_ref is
 # overwritten with the rescue reference, rescue_trigger gets a human-readable
 # evidence string, confirmation_status is forced to "pass" (D-05; the downstream
 # hcvtyper.nf filter drops non-pass rows), and the rescue reference is re-written
 # as {prefix}.{ref}_cand{rank}.fa via the verbatim write_ref_fasta() membership
-# guard copied from blast_parse.R (V5 / T-10-02: a ref absent from
-# params.references writes NO FASTA → candidate guarded out, never a wrong map).
+# guard (V5 / T-10-02: a ref absent from params.references writes NO FASTA).
 #
-# Empty / skip-assembly inputs (zero-row blastparse/support) are handled by typed
-# -empty tibbles so the joins yield zero matches → candidates pass through with
-# rescued_from / rescue_trigger NA-filled, and the script ALWAYS exits 0
-# (T-10-03 DoS guard). The output preserves the 8 original candidate columns and
-# adds exactly rescued_from + rescue_trigger.
+# Empty / skip-assembly inputs (zero-row support) are handled by typed-empty
+# tibbles so joins yield zero matches → candidates pass through with rescued_from
+# / rescue_trigger NA-filled, and the script ALWAYS exits 0 (T-10-03 DoS guard).
 #
-# Positional args (PARSEFIRSTMAPPING convention):
-#   prefix candidates_csv blastparse_csv support_csv references \
+# Positional args:
+#   prefix candidates_csv support_csv references \
 #   rescue_min_length rescue_min_pident rescue_min_aln_length \
 #   rescue_min_kmer_cov rescue_1a1b_length
 # -----------------------------------------------------------------------------
@@ -43,8 +54,8 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) < 10) {
-  stop("Usage: rescue_evaluation.R <prefix> <candidates.csv> <blastparse.csv> ",
+if (length(args) < 9) {
+  stop("Usage: rescue_evaluation.R <prefix> <candidates.csv> ",
        "<assembly_support.csv> <references.fa> <rescue_min_length> ",
        "<rescue_min_pident> <rescue_min_aln_length> <rescue_min_kmer_cov> ",
        "<rescue_1a1b_length>")
@@ -52,25 +63,20 @@ if (length(args) < 10) {
 
 prefix          <- args[1]
 candidates_csv  <- args[2]
-blastparse_csv  <- args[3]
-support_csv     <- args[4]
-references      <- args[5]
-rescue_min_length     <- as.numeric(args[6])
-rescue_min_pident     <- as.numeric(args[7])
-rescue_min_aln_length <- as.numeric(args[8])
-rescue_min_kmer_cov   <- as.numeric(args[9])
-rescue_1a1b_length    <- as.numeric(args[10])
+support_csv     <- args[3]
+references      <- args[4]
+rescue_min_length     <- as.numeric(args[5])
+rescue_min_pident     <- as.numeric(args[6])
+rescue_min_aln_length <- as.numeric(args[7])
+rescue_min_kmer_cov   <- as.numeric(args[8])
+rescue_1a1b_length    <- as.numeric(args[9])
 
 # --- Subtype-token helper -----------------------------------------------------
-# Extract the subtype token from a {subtype}_{accession} reference name
-# (bin/summarize.R:1203 convention). NA-safe.
 subtype_of <- function(ref) {
   ifelse(is.na(ref), NA_character_, str_extract(ref, "^[^_]+"))
 }
 
 # --- Typed-empty guards (T-10-03 DoS guard) -----------------------------------
-# Build typed-empty frames mirroring blast_parse.R:184-197 so downstream joins
-# never abort on zero-row / unreadable input — candidates simply pass through.
 empty_candidates <- tibble(
   sample              = character(0),
   candidate_rank      = integer(0),
@@ -81,16 +87,10 @@ empty_candidates <- tibble(
   candidate_cov       = double(0),
   confirmation_status = character(0)
 )
-empty_blastparse <- tibble(
-  sample              = character(0),
-  major_ref           = character(0),
-  major_contig_length = double(0),
-  minor_ref           = character(0),
-  minor_contig_length = double(0)
-)
 empty_support <- tibble(
   sample                 = character(0),
   subtype                = character(0),
+  best_ref               = character(0),
   best_contig_length     = double(0),
   best_contig_pident     = double(0),
   best_contig_aln_length = double(0),
@@ -104,7 +104,6 @@ read_csv_guarded <- function(path, empty_tbl, col_types) {
     error = function(e) NULL
   )
   if (is.null(tbl) || nrow(tbl) == 0) return(empty_tbl)
-  # Ensure all expected columns are present; missing ones become typed NA.
   missing <- setdiff(colnames(empty_tbl), colnames(tbl))
   for (m in missing) tbl[[m]] <- empty_tbl[[m]][NA_integer_][seq_len(nrow(tbl))]
   tbl
@@ -124,22 +123,12 @@ candidates <- read_csv_guarded(
     .default            = col_character()
   )
 )
-blastparse <- read_csv_guarded(
-  blastparse_csv, empty_blastparse,
-  cols(
-    sample              = col_character(),
-    major_ref           = col_character(),
-    major_contig_length = col_double(),
-    minor_ref           = col_character(),
-    minor_contig_length = col_double(),
-    .default            = col_character()
-  )
-)
 support <- read_csv_guarded(
   support_csv, empty_support,
   cols(
     sample                 = col_character(),
     subtype                = col_character(),
+    best_ref               = col_character(),
     best_contig_length     = col_double(),
     best_contig_pident     = col_double(),
     best_contig_aln_length = col_double(),
@@ -148,9 +137,7 @@ support <- read_csv_guarded(
   )
 )
 
-# --- Reference FASTA re-extraction (COPY VERBATIM from blast_parse.R:319-327) --
-# The `ref %in% names(ref_fa)` membership guard is the V5 / T-10-02 integrity
-# control: a reference absent from params.references writes NO FASTA.
+# --- Reference FASTA re-extraction -------------------------------------------
 ref_fa <- if (!is.na(references) && file.exists(references)) {
   tryCatch(read.fasta(file = references), error = function(e) list())
 } else {
@@ -167,7 +154,6 @@ write_ref_fasta <- function(ref_name, tag) {
 }
 
 # --- Floor evaluation ---------------------------------------------------------
-# >  for length / pident, >= for aln_length / kmer_cov, exactly per D-02.
 floors_ok <- function(srow, length_floor) {
   if (nrow(srow) == 0) return(FALSE)
   isTRUE(
@@ -178,63 +164,63 @@ floors_ok <- function(srow, length_floor) {
   )
 }
 
-# Find the genotype of a subtype token (leading character, e.g. "2a" -> "2").
 genotype_of <- function(subtype) {
   ifelse(is.na(subtype), NA_character_, str_sub(subtype, 1, 1))
 }
 
-# Per-sample set of subtypes that look 2k1b (candidate OR de-novo hit) for D-03.
-sample_has_2k1b <- function(sample_id) {
-  cand_subs   <- candidates %>% filter(sample == sample_id) %>% pull(candidate_subtype)
-  bp          <- blastparse %>% filter(sample == sample_id)
-  denovo_subs <- c(subtype_of(bp$major_ref), subtype_of(bp$minor_ref))
-  any(c(cand_subs, denovo_subs) == "2k1b", na.rm = TRUE)
-}
-
 # --- Per-candidate rescue evaluation -----------------------------------------
+# Uses assembly_support.csv with subtype-level matching. For each candidate:
+#   1. If the candidate's own subtype has strong assembly support (passes
+#      floors), the de novo confirms the reference — no rescue (unless the
+#      candidate is 2k1b, where the special rule takes priority).
+#   2. Find the best-supported alternative subtype (longest contig, different
+#      subtype). Apply 2k1b special rule if applicable, otherwise attempt the
+#      normal four-floor rescue.
 evaluate_row <- function(row) {
   sample_id <- row$sample
-  rank      <- row$candidate_rank
   orig_ref  <- row$candidate_ref
   cand_sub  <- subtype_of(orig_ref)
-
-  bp <- blastparse %>% filter(sample == sample_id)
-
-  # De-novo top-hit ref for this slot: major for rank 1, minor for rank 2.
-  denovo_ref <- NA_character_
-  if (nrow(bp) > 0) {
-    denovo_ref <- if (rank == 1L) bp$major_ref[1]
-                  else if (rank == 2L) bp$minor_ref[1]
-                  else NA_character_
-  }
-  denovo_sub <- subtype_of(denovo_ref)
 
   no_rescue <- list(rescued_from = NA_character_, rescue_ref = NA_character_,
                     rescue_trigger = NA_character_)
 
+  if (is.na(cand_sub)) return(no_rescue)
+
+  sample_support <- support %>% filter(sample == sample_id)
+  if (nrow(sample_support) == 0) return(no_rescue)
+
+  # Own-subtype floor check: if de novo confirms the candidate's own subtype,
+  # no rescue needed. Skipped for 2k1b candidates — the 2k1b special rule
+  # (D-03) fires regardless of own-support quality.
+  if (!isTRUE(cand_sub == "2k1b")) {
+    own_row <- sample_support %>% filter(subtype == cand_sub) %>%
+      arrange(desc(best_contig_length)) %>% slice(1)
+    if (nrow(own_row) > 0 && floors_ok(own_row, rescue_min_length)) return(no_rescue)
+  }
+
+  # Find the best-supported alternative subtype (longest contig, different
+  # from the candidate's own subtype). This is the assembly's primary
+  # disagreement signal.
+  alt_support <- sample_support %>%
+    filter(subtype != cand_sub) %>%
+    arrange(desc(best_contig_length)) %>%
+    slice(1)
+
+  if (nrow(alt_support) == 0) return(no_rescue)
+
+  denovo_sub <- alt_support$subtype[1]
+  denovo_ref <- alt_support$best_ref[1]
+
   # ---- 2k1b special rule (D-03) ---------------------------------------------
-  # Fire only when THIS slot is 2k1b: the candidate ref is 2k1b OR the de-novo
-  # hit for this specific slot is 2k1b.  A sample-level check (sample_has_2k1b)
-  # would over-rescue unrelated slots (e.g. a 1a major candidate when only the
-  # minor denovo hit is 2k1b), exceeding the D-03 intent.
-  slot_is_2k1b <- (!is.na(cand_sub) && cand_sub == "2k1b") ||
-                  (!is.na(denovo_sub) && denovo_sub == "2k1b")
+  slot_is_2k1b <- isTRUE(cand_sub == "2k1b") || isTRUE(denovo_sub == "2k1b")
   if (slot_is_2k1b) {
-    g2_support <- support %>%
-      filter(sample == sample_id, genotype_of(subtype) == "2") %>%
+    g2_support <- sample_support %>%
+      filter(genotype_of(subtype) == "2") %>%
       arrange(desc(best_contig_length))
     if (nrow(g2_support) > 0) {
       g2_row <- g2_support[1, ]
       if (floors_ok(g2_row, rescue_min_length)) {
-        # Pick the de-novo ref whose subtype matches this genotype-2 contig.
-        g2_sub <- g2_row$subtype[1]
-        rescue_ref <- if (!is.na(denovo_sub) && denovo_sub == g2_sub) denovo_ref
-                      else {
-                        cand_match <- c(bp$major_ref, bp$minor_ref)
-                        cand_match <- cand_match[subtype_of(cand_match) == g2_sub]
-                        cand_match <- cand_match[!is.na(cand_match)]
-                        if (length(cand_match) > 0) cand_match[1] else denovo_ref
-                      }
+        rescue_ref <- g2_row$best_ref[1]
         if (!is.na(rescue_ref) && rescue_ref != orig_ref) {
           trig <- sprintf(
             "2k1b-rule denovo %s contig %gbp pident=%g aln=%gbp kmer_cov=%g (replaced %s)",
@@ -247,9 +233,8 @@ evaluate_row <- function(row) {
     }
   }
 
-  # ---- Normal mismatch + four-floor rescue ----------------------------------
-  if (is.na(denovo_ref) || is.na(denovo_sub) || is.na(cand_sub)) return(no_rescue)
-  if (denovo_sub == cand_sub) return(no_rescue)  # no mismatch → no rescue
+  # ---- Normal four-floor rescue ---------------------------------------------
+  if (is.na(denovo_ref) || is.na(denovo_sub)) return(no_rescue)
 
   # 1a/1b boundary: stricter length floor when both subtypes are 1a/1b (D-04).
   length_floor <- rescue_min_length
@@ -257,16 +242,12 @@ evaluate_row <- function(row) {
     length_floor <- rescue_1a1b_length
   }
 
-  srow <- support %>% filter(sample == sample_id, subtype == denovo_sub)
-  if (nrow(srow) == 0) return(no_rescue)
-  srow <- srow %>% arrange(desc(best_contig_length)) %>% slice(1)
-
-  if (!floors_ok(srow, length_floor)) return(no_rescue)
+  if (!floors_ok(alt_support, length_floor)) return(no_rescue)
 
   trig <- sprintf(
     "denovo %s contig %gbp pident=%g aln=%gbp kmer_cov=%g (replaced %s)",
-    denovo_ref, srow$best_contig_length[1], srow$best_contig_pident[1],
-    srow$best_contig_aln_length[1], srow$best_contig_kmer_cov[1], orig_ref)
+    denovo_ref, alt_support$best_contig_length[1], alt_support$best_contig_pident[1],
+    alt_support$best_contig_aln_length[1], alt_support$best_contig_kmer_cov[1], orig_ref)
   list(rescued_from = orig_ref, rescue_ref = denovo_ref, rescue_trigger = trig)
 }
 
@@ -275,11 +256,34 @@ out <- candidates %>%
   mutate(rescued_from = NA_character_, rescue_trigger = NA_character_)
 
 if (nrow(out) > 0) {
+  # Snapshot original candidate refs before any rescue mutations.
+  # The collapse guard checks against both the original refs (ordering-
+  # independent detection of original slot conflicts) and the current
+  # post-rescue state (preventing two candidates being rescued to the same
+  # new reference within the same sample).
+  orig_refs_snap <- candidates %>% select(sample, candidate_rank, candidate_ref)
+
   for (i in seq_len(nrow(out))) {
     res <- evaluate_row(out[i, ])
+
+    # Collapse guard: block rescue if rescue_ref is already held by another
+    # candidate slot — either as its original ref or as an already-committed
+    # rescue target in this run.
+    rescue_would_collapse <- if (!is.na(res$rescue_ref)) {
+      other_orig <- orig_refs_snap %>%
+        filter(sample == out$sample[i], candidate_rank != out$candidate_rank[i]) %>%
+        pull(candidate_ref)
+      current_other <- out %>%
+        filter(sample == out$sample[i], candidate_rank != out$candidate_rank[i]) %>%
+        pull(candidate_ref)
+      res$rescue_ref %in% union(other_orig, current_other)
+    } else {
+      FALSE
+    }
+
     if (!is.na(res$rescued_from) && !is.na(res$rescue_ref) &&
-        res$rescue_ref %in% names(ref_fa)) {
-      # Rescue fires AND the rescue ref exists in the references FASTA (guard).
+        res$rescue_ref %in% names(ref_fa) &&
+        !rescue_would_collapse) {
       out$rescued_from[i]        <- res$rescued_from
       out$candidate_ref[i]       <- res$rescue_ref
       out$candidate_subtype[i]   <- subtype_of(res$rescue_ref)
@@ -288,32 +292,19 @@ if (nrow(out) > 0) {
       out$confirmation_status[i] <- "pass"  # D-05 force pass
       write_ref_fasta(res$rescue_ref, paste0("cand", out$candidate_rank[i]))
       # Remove the now-stale pass-through FASTA for the REPLACED ref at this rank.
-      # The module materialised it as {prefix}.{orig_ref}_cand{rank}.fa, but the
-      # rescue FASTA written above embeds the NEW ref name and so has a DIFFERENT
-      # basename — it does NOT overwrite the pass-through. Without this removal both
-      # files match the *_cand*.fa emit, and the per-sample combined reference ends
-      # up with a duplicate @SQ line that crashes BOWTIE2_BUILD / samtools sort
-      # ("Duplicate entry ... in sam header"). The rank suffix scopes the deletion,
-      # so a ref legitimately shared by another rank is never touched.
       stale_fa <- paste0(prefix, ".", res$rescued_from, "_cand",
                          out$candidate_rank[i], ".fa")
       if (!identical(res$rescued_from, res$rescue_ref) && file.exists(stale_fa)) {
         file.remove(stale_fa)
       }
     }
-    # else: membership guard failed or no rescue → leave NA, status unchanged.
+    # else: membership guard failed, collapse guard blocked, or no rescue → leave NA, status unchanged.
   }
 }
 
 # --- Write the corrected candidates CSV --------------------------------------
-# Preserve the 8 original columns + the 2 rescue audit columns.
 out_cols <- c("sample", "candidate_rank", "candidate_ref", "candidate_subtype",
               "candidate_genotype", "candidate_reads", "candidate_cov",
               "confirmation_status", "rescued_from", "rescue_trigger")
 out <- out %>% select(all_of(out_cols))
-# Output name MUST differ from the input candidates CSV ({prefix}.candidates.csv,
-# the PARSEFIRSTMAPPING emit staged as our input): Nextflow excludes input-named
-# files from output matching, so an identically-named output is reported MISSING.
-# Use a distinct {prefix}.rescued.candidates.csv that still matches the downstream
-# `\\.candidates.csv$` glob in summarize.R and the module's *.candidates.csv emit.
 write_csv(out, paste0(prefix, ".rescued.candidates.csv"))

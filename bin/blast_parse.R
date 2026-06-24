@@ -171,11 +171,12 @@ if (nrow(scaf_top) > 0) {
     # the same reference and would otherwise duplicate the winning row.
     slice_max(sc_length, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
-    select(subtype, qseqid, sc_length, pident, length, kmer_cov) %>%
+    select(subtype, sseqid, qseqid, sc_length, pident, length, kmer_cov) %>%
     distinct() %>%
     transmute(
       sample                = prefix,
       subtype,
+      best_ref              = sseqid,
       best_contig_length    = sc_length,
       best_contig_pident    = pident,
       best_contig_aln_length = length,
@@ -187,6 +188,7 @@ if (nrow(scaf_top) > 0) {
   support_tbl <- tibble(
     sample                 = character(0),
     subtype                = character(0),
+    best_ref               = character(0),
     best_contig_length     = double(0),
     best_contig_pident     = double(0),
     # WR-03: double (not integer) to match the populated path (`length` from
@@ -293,7 +295,7 @@ scaf_top_long %>%
     )
   })
 }
-# --- 7. Major / minor reference summary + FASTA export ---------------------
+# --- 7. Major / minor reference summary (display-only, consumed by summarize.R) ---
 if (nrow(scaf_top) > 0) {
 # a) pick closest major and (optionally) minor reference names
 major_name <- scaf_top$sseqid[1]                 # best overall hit
@@ -314,22 +316,7 @@ minor_name <- if (length(minor_vec) == 0) NA_character_ else minor_vec
   minor_name <- NA_character_
 }
 
-# b) FASTA export -----------------------------------------------------------
-# Helper that writes the sequence only if it exists
-write_ref_fasta <- function(ref_name, tag) {
-  if (!is.na(ref_name) && ref_name %in% names(ref_fa)) {
-    write.fasta(
-      sequences = ref_fa[ref_name],
-      names     = ref_name,
-      file.out  = paste0(prefix, ".", ref_name, "_", tag, ".fa")
-    )
-  }
-}
-
-write_ref_fasta(major_name, "major")
-write_ref_fasta(minor_name, "minor")
-
-# c) summary CSV
+# b) summary CSV
 summary_tbl <- tibble(
   sample       = prefix,
   major_ref    = major_name,
@@ -339,10 +326,9 @@ summary_tbl <- tibble(
                    select(qseqid, sc_length) %>% distinct() %>% pull(sc_length),
   minor_ref    = minor_name,
   minor_contig_length = if (is.na(minor_name)) NA_integer_ else
-                   scaf %>% filter(sseqid == minor_name)  %>%
-                    filter(qseqid != major_contig) %>%  # Exclude the major contig if it is also a minor hit
+                   scaf_top %>% filter(sseqid == minor_name) %>%
+                    filter(qseqid != major_contig) %>%
                     slice_max(sc_length, n = 1) %>%
-                    # If the minor contig have multiple blast hits against the same reference, the length will be duplicated
                     select(qseqid, sc_length) %>% distinct() %>% pull(sc_length)
 )
 write_csv(summary_tbl, paste0(prefix, ".blastparse.csv"))
