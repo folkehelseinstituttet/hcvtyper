@@ -80,8 +80,8 @@ EOF
     printf 'Test_1\tNA\tFALSE\tNA\tNA\t95.59\tNA\tindeterminate\tNA\tNA\tNA\t34446\tNA\tNA\tNA\n' >> summary_mqc.tsv
 
     # glue_resistance_mqc.tsv: resistance section (major row per sample; [minor] row for co-infections)
-    printf 'Sample\tglecaprevir\tglecaprevir_mut\tglecaprevir_mut_short\tgrazoprevir\tgrazoprevir_mut\tgrazoprevir_mut_short\tparitaprevir\tparitaprevir_mut\tparitaprevir_mut_short\tvoxilaprevir\tvoxilaprevir_mut\tvoxilaprevir_mut_short\tNS34A\tNS34A_short\tdaclatasvir\tdaclatasvir_mut\tdaclatasvir_mut_short\telbasvir\telbasvir_mut\telbasvir_mut_short\tledipasvir\tledipasvir_mut\tledipasvir_mut_short\tombitasvir\tombitasvir_mut\tombitasvir_mut_short\tpibrentasvir\tpibrentasvir_mut\tpibrentasvir_mut_short\tvelpatasvir\tvelpatasvir_mut\tvelpatasvir_mut_short\tNS5A\tNS5A_short\tdasabuvir\tdasabuvir_mut\tdasabuvir_mut_short\tsofosbuvir\tsofosbuvir_mut\tsofosbuvir_mut_short\tNS5B\tNS5B_short\n' > glue_resistance_mqc.tsv
-    printf 'Test_1\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n' >> glue_resistance_mqc.tsv
+    printf 'Sample	Resistance	NS34A	glecaprevir	glecaprevir_mut	grazoprevir	grazoprevir_mut	paritaprevir	paritaprevir_mut	voxilaprevir	voxilaprevir_mut	NS5A	daclatasvir	daclatasvir_mut	elbasvir	elbasvir_mut	ledipasvir	ledipasvir_mut	ombitasvir	ombitasvir_mut	pibrentasvir	pibrentasvir_mut	velpatasvir	velpatasvir_mut	NS5B	dasabuvir	dasabuvir_mut	sofosbuvir	sofosbuvir_mut\n' > glue_resistance_mqc.tsv
+    printf 'Test_1	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA\n' >> glue_resistance_mqc.tsv
 
     # Create a minimal PNG plot placeholder
     : > summary_plot.png

@@ -1689,22 +1689,23 @@ write_tsv(triage, triage_file, append = TRUE)
 # Columns follow the order in the design spec (NS3/4A → NS5A → NS5B drug groups).
 # MultiQC config must match: file_format: tsv, fn: "*/glue_resistance_mqc.tsv"
 
+# NS class-summary columns lead each drug group; _short columns are omitted.
 resistance_col_order <- c(
-  "glecaprevir",  "glecaprevir_mut",  "glecaprevir_mut_short",
-  "grazoprevir",  "grazoprevir_mut",  "grazoprevir_mut_short",
-  "paritaprevir", "paritaprevir_mut", "paritaprevir_mut_short",
-  "voxilaprevir", "voxilaprevir_mut", "voxilaprevir_mut_short",
-  "NS34A",        "NS34A_short",
-  "daclatasvir",  "daclatasvir_mut",  "daclatasvir_mut_short",
-  "elbasvir",     "elbasvir_mut",     "elbasvir_mut_short",
-  "ledipasvir",   "ledipasvir_mut",   "ledipasvir_mut_short",
-  "ombitasvir",   "ombitasvir_mut",   "ombitasvir_mut_short",
-  "pibrentasvir", "pibrentasvir_mut", "pibrentasvir_mut_short",
-  "velpatasvir",  "velpatasvir_mut",  "velpatasvir_mut_short",
-  "NS5A",         "NS5A_short",
-  "dasabuvir",    "dasabuvir_mut",    "dasabuvir_mut_short",
-  "sofosbuvir",   "sofosbuvir_mut",   "sofosbuvir_mut_short",
-  "NS5B",         "NS5B_short"
+  "NS34A",
+  "glecaprevir", "glecaprevir_mut",
+  "grazoprevir", "grazoprevir_mut",
+  "paritaprevir", "paritaprevir_mut",
+  "voxilaprevir", "voxilaprevir_mut",
+  "NS5A",
+  "daclatasvir", "daclatasvir_mut",
+  "elbasvir",    "elbasvir_mut",
+  "ledipasvir",  "ledipasvir_mut",
+  "ombitasvir",  "ombitasvir_mut",
+  "pibrentasvir","pibrentasvir_mut",
+  "velpatasvir", "velpatasvir_mut",
+  "NS5B",
+  "dasabuvir",   "dasabuvir_mut",
+  "sofosbuvir",  "sofosbuvir_mut"
 )
 available_res_cols <- resistance_col_order[resistance_col_order %in% colnames(final)]
 
@@ -1743,6 +1744,31 @@ if (length(available_res_cols) > 0) {
       as.data.frame()
   } else {
     res_data <- major_res %>% as.data.frame()
+  }
+
+  # Overall Resistance summary column: strongest signal across all status columns.
+  # Priority: "Resistance" > "Probable/Possible resistance" > "No resistance" > NA.
+  resistance_status_cols <- c(
+    "NS34A", "glecaprevir", "grazoprevir", "paritaprevir", "voxilaprevir",
+    "NS5A",  "daclatasvir", "elbasvir",    "ledipasvir",   "ombitasvir",
+             "pibrentasvir","velpatasvir",
+    "NS5B",  "dasabuvir",   "sofosbuvir"
+  )
+  status_cols_present <- intersect(resistance_status_cols, colnames(res_data))
+  if (length(status_cols_present) > 0) {
+    status_matrix <- res_data[, status_cols_present, drop = FALSE]
+    overall_resistance <- apply(status_matrix, 1, function(vals) {
+      vals <- as.character(vals)
+      vals <- vals[!is.na(vals) & vals != "NA"]
+      if (length(vals) == 0) return(NA_character_)
+      if (any(vals == "Resistance")) return("Resistance")
+      if (any(grepl("Probable resistance|Possible resistance", vals, ignore.case = TRUE))) return("Probable/Possible resistance")
+      if (any(vals == "No resistance")) return("No resistance")
+      return(NA_character_)
+    })
+    res_data <- res_data %>%
+      mutate(Resistance = overall_resistance) %>%
+      select(Sample, Resistance, everything())
   }
 
   res_file <- "glue_resistance_mqc.tsv"
