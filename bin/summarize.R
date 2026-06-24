@@ -1572,6 +1572,13 @@ final <- final %>%
     Minor = Minor_subtype
   )
 
+# Save dominant-rank lookup before the reorder select drops it (used for
+# resistance MQC minor rows — the non-dominant GLUE report for co-infections).
+dom_rank_lookup <- if ("dominant_cand_rank" %in% colnames(final))
+  select(final, sampleName, dominant_cand_rank)
+else
+  tibble(sampleName = character(), dominant_cand_rank = integer())
+
 # Reorder columns
 final <- final %>%
   select(sampleName,
@@ -1626,24 +1633,119 @@ final <- final %>%
 # Write file
 write_csv(final, file = "Summary.csv")
 
-# Write file for MultiQC
-# Note: MultiQC section routing is handled entirely by multiqc_config.yml
-# (file_format: tsv, fn: "*/summary_mqc.tsv", section_name, id etc.).
-# Embedding comment-header lines in the file is NOT done here — omitting them
-# avoids a dead variable and keeps the TSV parseable by strict TSV readers.
-# A deployment without a matching multiqc_config.yml will cause MultiQC to
-# silently ignore the TSV; ensure the config ships alongside this pipeline.
-
-# Convert final data to data frame
-tt <- as.data.frame(final)
-
-# TSV avoids quoting issues when field values contain commas (e.g. review_flag sentences).
+# Write triage table for MultiQC (summary_mqc.tsv)
+# Contains only the 6 problem-signal columns plus key context. All columns in the
+# resistance section are split out to a separate file (glue_resistance_mqc.tsv) so
+# MultiQC can render them as a distinct section with appropriate colour config.
+# TSV format avoids quoting issues with commas in review_flag sentences.
 # MultiQC config must match: file_format: tsv, fn: "*/summary_mqc.tsv"
-file <- "summary_mqc.tsv"
 
-# Add the column names to file
-tt %>% colnames() %>% paste0(collapse = "\t") %>% write_lines(file, append = TRUE)
+triage <- final %>%
+  mutate(
+    # Signal 1: subtype conflict (mapping vs. de novo)
+    subtype_conflict = case_when(
+      denovo_major_subtype_match == "NO"  ~ "CONFLICT",
+      denovo_major_subtype_match == "YES" ~ "OK",
+      TRUE                               ~ NA_character_
+    ),
+    # Signal 6: co-infection call
+    co_infection = case_when(
+      overall_sample_call == "co-infection" ~ "CO-INFECTION",
+      TRUE                                  ~ NA_character_
+    )
+  ) %>%
+  select(
+    sampleName,
+    # --- 6 problem-signal flags (signals 2-5 are numeric columns, coloured via config) ---
+    subtype_conflict,
+    rescue_flag,
+    Major_avg_depth,
+    Reads_nodup_mapped_major,
+    percent_mapped_reads_major_firstmapping,
+    co_infection,
+    # --- final call and subtype shorthand ---
+    overall_sample_call,
+    Major,
+    Minor,
+    # --- human-readable review note ---
+    review_flag,
+    # --- supporting QC context ---
+    total_trimmed_reads,
+    Major_cov_breadth_min_10,
+    Major_cov_breadth_min_5,
+    Percent_reads_mapped_of_trimmed_with_dups_major,
+    any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences"))
+  ) %>%
+  as.data.frame()
 
-# Write the data to file
-write_tsv(tt, file, append = TRUE) # colnames will not be included
+triage_file <- "summary_mqc.tsv"
+triage %>% colnames() %>% paste0(collapse = "\t") %>% write_lines(triage_file, append = TRUE)
+write_tsv(triage, triage_file, append = TRUE)
+
+# Write resistance table for MultiQC (glue_resistance_mqc.tsv)
+# Co-infection samples: two rows — sampleName (major) and "sampleName [minor]".
+# Monoinfection samples: one row — sampleName.
+# Columns follow the order in the design spec (NS3/4A → NS5A → NS5B drug groups).
+# MultiQC config must match: file_format: tsv, fn: "*/glue_resistance_mqc.tsv"
+
+resistance_col_order <- c(
+  "glecaprevir",  "glecaprevir_mut",  "glecaprevir_mut_short",
+  "grazoprevir",  "grazoprevir_mut",  "grazoprevir_mut_short",
+  "paritaprevir", "paritaprevir_mut", "paritaprevir_mut_short",
+  "voxilaprevir", "voxilaprevir_mut", "voxilaprevir_mut_short",
+  "NS34A",        "NS34A_short",
+  "daclatasvir",  "daclatasvir_mut",  "daclatasvir_mut_short",
+  "elbasvir",     "elbasvir_mut",     "elbasvir_mut_short",
+  "ledipasvir",   "ledipasvir_mut",   "ledipasvir_mut_short",
+  "ombitasvir",   "ombitasvir_mut",   "ombitasvir_mut_short",
+  "pibrentasvir", "pibrentasvir_mut", "pibrentasvir_mut_short",
+  "velpatasvir",  "velpatasvir_mut",  "velpatasvir_mut_short",
+  "NS5A",         "NS5A_short",
+  "dasabuvir",    "dasabuvir_mut",    "dasabuvir_mut_short",
+  "sofosbuvir",   "sofosbuvir_mut",   "sofosbuvir_mut_short",
+  "NS5B",         "NS5B_short"
+)
+available_res_cols <- resistance_col_order[resistance_col_order %in% colnames(final)]
+
+if (length(available_res_cols) > 0) {
+  # Major rows: dominant-strain resistance is already in final after the GLUE join
+  major_res <- final %>%
+    select(sampleName, all_of(available_res_cols)) %>%
+    rename(Sample = sampleName)
+
+  # Minor rows for co-infection samples: use the non-dominant GLUE report.
+  # dom_rank_lookup gives the dominant rank; minor rank = 3 - dominant_rank.
+  # glue_by_rank (built during the GLUE join section) holds both ranks with .dom_rank.
+  minor_res <- tibble()
+  if (exists("glue_by_rank") && nrow(glue_by_rank) > 0 && nrow(dom_rank_lookup) > 0) {
+    coinf_names <- final %>%
+      filter(overall_sample_call == "co-infection") %>%
+      pull(sampleName)
+
+    if (length(coinf_names) > 0) {
+      minor_rank_df <- dom_rank_lookup %>%
+        filter(sampleName %in% coinf_names) %>%
+        mutate(minor_rank = 3L - coalesce(dominant_cand_rank, 1L))
+
+      minor_res <- glue_by_rank %>%
+        inner_join(minor_rank_df, by = c("sampleName", ".dom_rank" = "minor_rank")) %>%
+        select(sampleName, any_of(available_res_cols)) %>%
+        mutate(Sample = paste0(sampleName, " [minor]")) %>%
+        select(Sample, everything(), -sampleName)
+    }
+  }
+
+  # Combine; sort so "[minor]" rows appear immediately after their major row
+  if (nrow(minor_res) > 0) {
+    res_data <- bind_rows(major_res, minor_res) %>%
+      arrange(Sample) %>%
+      as.data.frame()
+  } else {
+    res_data <- major_res %>% as.data.frame()
+  }
+
+  res_file <- "glue_resistance_mqc.tsv"
+  res_data %>% colnames() %>% paste0(collapse = "\t") %>% write_lines(res_file, append = TRUE)
+  write_tsv(res_data, res_file, append = TRUE)
+}
 

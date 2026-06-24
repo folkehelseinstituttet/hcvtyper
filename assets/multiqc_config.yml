@@ -4,6 +4,8 @@ report_comment: >
 report_section_order:
   "results_summary":
     order: 1
+  "glue_resistance":
+    order: 2
   "folkehelseinstituttet-hcvtyper-methods-description":
     order: -1000
   software_versions:
@@ -59,20 +61,448 @@ module_order:
         - "*focused*.txt"
 
 custom_data:
+  # -------------------------------------------------------------------------
+  # Primary triage table — 6 problem-signal flags + final call
+  # -------------------------------------------------------------------------
   results_summary:
     id: "results_summary"
-    fn: "*/summary_mqc.tsv" # glob pattern; TSV avoids quoting issues with comma-containing fields
+    fn: "*/summary_mqc.tsv"
     file_format: "tsv"
     plot_type: "table"
     section_name: "Results summary"
     pconfig:
       id: "results_summary_table"
-      # Colour the review_flag column orange whenever it is non-NA so analysts
-      # can quickly spot samples that need manual inspection. MultiQC maps the
-      # "warn" class to an orange/amber background in its default CSS.
-      cond_formatting_rules:
+      col1_header: "Sample"
+      only_defined_headers: false
+      headers:
+        sampleName:
+          title: "Sample"
+          placement: 0
+        subtype_conflict:
+          title: "Subtype conflict"
+          description: "CONFLICT when de novo assembly and mapping disagree on the major subtype. OK when they agree. NA when no assembly was available."
+          placement: 10
+          cond_formatting_rules:
+            - pass:
+                - s_eq: "OK"
+            - fail:
+                - s_eq: "CONFLICT"
+        rescue_flag:
+          title: "Rescue"
+          description: "TRUE when the de-novo rescue step replaced the first-mapping reference for at least one candidate."
+          placement: 20
+          cond_formatting_rules:
+            - warn:
+                - s_eq: "TRUE"
+            - pass:
+                - s_eq: "FALSE"
+        Major_avg_depth:
+          title: "Depth (major)"
+          description: "Mean read depth across the major-strain consensus."
+          suffix: "×"
+          format: "{:,.0f}"
+          placement: 30
+          scale: "RdYlGn"
+          min: 0
+          max: 1000
+        Reads_nodup_mapped_major:
+          title: "Mapped reads (major)"
+          description: "De-duplicated reads mapped to the major-strain reference."
+          format: "{:,.0f}"
+          placement: 40
+          scale: "RdYlGn"
+          min: 0
+          max: 100000
+        percent_mapped_reads_major_firstmapping:
+          title: "Mapping % (major)"
+          description: "Percentage of trimmed reads that mapped to the major-strain reference at first-mapping."
+          suffix: "%"
+          format: "{:,.1f}"
+          placement: 50
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        co_infection:
+          title: "Co-infection"
+          description: "CO-INFECTION when more than one HCV subtype/genotype was detected."
+          placement: 60
+          cond_formatting_rules:
+            - warn:
+                - s_eq: "CO-INFECTION"
+        overall_sample_call:
+          title: "Final call"
+          description: "Overall sample classification: monoinfection, co-infection, indeterminate, or co-infection (indeterminate dominance)."
+          placement: 70
+        Major:
+          title: "Major subtype"
+          description: "Dominant HCV subtype."
+          placement: 80
+        Minor:
+          title: "Minor subtype"
+          description: "Minor (co-infecting) HCV subtype. Empty for monoinfection samples."
+          placement: 90
         review_flag:
-          - warn:
-              - s_contains: "Please review"
-              - s_contains: "refuted"
-              - s_contains: "uncertain"
+          title: "Review note"
+          description: "Human-readable reasons why this sample may require manual inspection. Empty when the call is clean."
+          placement: 100
+          cond_formatting_rules:
+            - warn:
+                - s_contains: "Please review"
+                - s_contains: "refuted"
+                - s_contains: "uncertain"
+        total_trimmed_reads:
+          title: "Trimmed reads"
+          description: "Total reads after adapter trimming."
+          format: "{:,.0f}"
+          placement: 110
+        Major_cov_breadth_min_10:
+          title: "Breadth ≥10× (major)"
+          description: "Fraction of the major-strain reference covered at ≥10× depth."
+          suffix: "%"
+          format: "{:,.1f}"
+          placement: 120
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        Major_cov_breadth_min_5:
+          title: "Breadth ≥5× (major)"
+          description: "Fraction of the major-strain reference covered at ≥5× depth."
+          suffix: "%"
+          format: "{:,.1f}"
+          placement: 130
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        Percent_reads_mapped_of_trimmed_with_dups_major:
+          title: "Mapped % (dedup, major)"
+          description: "Percentage of trimmed reads mapping to the major-strain reference, computed from de-duplicated counts."
+          suffix: "%"
+          format: "{:,.1f}"
+          placement: 140
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        Major_consensus_similarity_pct:
+          title: "Consensus similarity (major)"
+          description: "Global alignment identity between the major-strain consensus and reference (%)."
+          suffix: "%"
+          format: "{:,.2f}"
+          placement: 150
+          scale: "RdYlGn"
+          min: 90
+          max: 100
+        Major_consensus_n_differences:
+          title: "Consensus differences (major)"
+          description: "Number of positions where the major-strain consensus differs from the reference."
+          format: "{:,.0f}"
+          placement: 160
+
+  # -------------------------------------------------------------------------
+  # HCV-GLUE resistance section
+  # -------------------------------------------------------------------------
+  glue_resistance:
+    id: "glue_resistance"
+    fn: "*/glue_resistance_mqc.tsv"
+    file_format: "tsv"
+    plot_type: "table"
+    section_name: "Resistance (HCV-GLUE)"
+    description: >
+      Drug resistance predictions from HCV-GLUE for each sample.
+      Co-infection samples have two rows: the major strain (sample name)
+      and the minor strain (sample name [minor]).
+    pconfig:
+      id: "glue_resistance_table"
+      col1_header: "Sample"
+      only_defined_headers: false
+      headers:
+        # NS3/4A inhibitors
+        glecaprevir:
+          title: "Glecaprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 10
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        glecaprevir_mut:
+          title: "Glecaprevir mutations"
+          description: "Full mutation list for glecaprevir resistance."
+          placement: 11
+        glecaprevir_mut_short:
+          title: "Glecaprevir mutations (short)"
+          description: "Short mutation names for glecaprevir resistance."
+          placement: 12
+        grazoprevir:
+          title: "Grazoprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 20
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        grazoprevir_mut:
+          title: "Grazoprevir mutations"
+          description: "Full mutation list for grazoprevir resistance."
+          placement: 21
+        grazoprevir_mut_short:
+          title: "Grazoprevir mutations (short)"
+          description: "Short mutation names for grazoprevir resistance."
+          placement: 22
+        paritaprevir:
+          title: "Paritaprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 30
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        paritaprevir_mut:
+          title: "Paritaprevir mutations"
+          description: "Full mutation list for paritaprevir resistance."
+          placement: 31
+        paritaprevir_mut_short:
+          title: "Paritaprevir mutations (short)"
+          description: "Short mutation names for paritaprevir resistance."
+          placement: 32
+        voxilaprevir:
+          title: "Voxilaprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 40
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        voxilaprevir_mut:
+          title: "Voxilaprevir mutations"
+          description: "Full mutation list for voxilaprevir resistance."
+          placement: 41
+        voxilaprevir_mut_short:
+          title: "Voxilaprevir mutations (short)"
+          description: "Short mutation names for voxilaprevir resistance."
+          placement: 42
+        NS34A:
+          title: "NS3/4A class"
+          description: "Combined NS3/4A resistance summary across all inhibitors."
+          placement: 50
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        NS34A_short:
+          title: "NS3/4A class (short)"
+          description: "Short combined NS3/4A resistance summary."
+          placement: 51
+        # NS5A inhibitors
+        daclatasvir:
+          title: "Daclatasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 60
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        daclatasvir_mut:
+          title: "Daclatasvir mutations"
+          description: "Full mutation list for daclatasvir resistance."
+          placement: 61
+        daclatasvir_mut_short:
+          title: "Daclatasvir mutations (short)"
+          description: "Short mutation names for daclatasvir resistance."
+          placement: 62
+        elbasvir:
+          title: "Elbasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 70
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        elbasvir_mut:
+          title: "Elbasvir mutations"
+          description: "Full mutation list for elbasvir resistance."
+          placement: 71
+        elbasvir_mut_short:
+          title: "Elbasvir mutations (short)"
+          description: "Short mutation names for elbasvir resistance."
+          placement: 72
+        ledipasvir:
+          title: "Ledipasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 80
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        ledipasvir_mut:
+          title: "Ledipasvir mutations"
+          description: "Full mutation list for ledipasvir resistance."
+          placement: 81
+        ledipasvir_mut_short:
+          title: "Ledipasvir mutations (short)"
+          description: "Short mutation names for ledipasvir resistance."
+          placement: 82
+        ombitasvir:
+          title: "Ombitasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 90
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        ombitasvir_mut:
+          title: "Ombitasvir mutations"
+          description: "Full mutation list for ombitasvir resistance."
+          placement: 91
+        ombitasvir_mut_short:
+          title: "Ombitasvir mutations (short)"
+          description: "Short mutation names for ombitasvir resistance."
+          placement: 92
+        pibrentasvir:
+          title: "Pibrentasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 100
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        pibrentasvir_mut:
+          title: "Pibrentasvir mutations"
+          description: "Full mutation list for pibrentasvir resistance."
+          placement: 101
+        pibrentasvir_mut_short:
+          title: "Pibrentasvir mutations (short)"
+          description: "Short mutation names for pibrentasvir resistance."
+          placement: 102
+        velpatasvir:
+          title: "Velpatasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 110
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        velpatasvir_mut:
+          title: "Velpatasvir mutations"
+          description: "Full mutation list for velpatasvir resistance."
+          placement: 111
+        velpatasvir_mut_short:
+          title: "Velpatasvir mutations (short)"
+          description: "Short mutation names for velpatasvir resistance."
+          placement: 112
+        NS5A:
+          title: "NS5A class"
+          description: "Combined NS5A resistance summary across all inhibitors."
+          placement: 120
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        NS5A_short:
+          title: "NS5A class (short)"
+          description: "Short combined NS5A resistance summary."
+          placement: 121
+        # NS5B inhibitors
+        dasabuvir:
+          title: "Dasabuvir"
+          description: "NS5B inhibitor resistance status."
+          placement: 130
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        dasabuvir_mut:
+          title: "Dasabuvir mutations"
+          description: "Full mutation list for dasabuvir resistance."
+          placement: 131
+        dasabuvir_mut_short:
+          title: "Dasabuvir mutations (short)"
+          description: "Short mutation names for dasabuvir resistance."
+          placement: 132
+        sofosbuvir:
+          title: "Sofosbuvir"
+          description: "NS5B inhibitor resistance status."
+          placement: 140
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        sofosbuvir_mut:
+          title: "Sofosbuvir mutations"
+          description: "Full mutation list for sofosbuvir resistance."
+          placement: 141
+        sofosbuvir_mut_short:
+          title: "Sofosbuvir mutations (short)"
+          description: "Short mutation names for sofosbuvir resistance."
+          placement: 142
+        NS5B:
+          title: "NS5B class"
+          description: "Combined NS5B resistance summary across all inhibitors."
+          placement: 150
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        NS5B_short:
+          title: "NS5B class (short)"
+          description: "Short combined NS5B resistance summary."
+          placement: 151
