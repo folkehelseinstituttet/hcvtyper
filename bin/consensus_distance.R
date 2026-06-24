@@ -3,6 +3,17 @@
 # Compare a consensus FASTA (from iVar) against its mapping reference FASTA.
 # Outputs a TSV with: sample, reference, similarity_pct, n_differences, alignment_length, consensus_length
 #
+# iVar is run with -aa (all reference positions) and -n N (mask uncovered positions),
+# so the consensus is in reference coordinates: N at each uncovered position, one
+# character per reference position.  The consensus may be shorter than the reference
+# by a few bases when the 3'/5' tail has zero coverage and was trimmed before output.
+#
+# We compare only positions where BOTH sequences have a called base (not 'n' or '-').
+# Lengths are capped at min(cons_len, ref_len) before masking so that R never recycles
+# the shorter logical vector into a longer one — recycling silently produces out-of-bounds
+# NA values that propagate through sum() and make the result NA even when there are many
+# valid callable pairs.
+#
 # Usage: consensus_distance.R <consensus.fa> <reference.fa> <output.tsv>
 
 library(seqinr)
@@ -33,31 +44,32 @@ ref_name  <- names(reference_seqs)[1]
 cons_chars <- as.character(cons_seq)
 ref_chars  <- as.character(ref_seq)
 
-# iVar consensus sequences are the same length as the reference (position-by-position).
-# Positions where coverage was too low are filled with 'n'.
-# We compare only positions where BOTH sequences have a called base (not 'n' or '-').
+# Consensus length (non-N bases) — computed over the full consensus before truncation
+cons_callable_full <- !(cons_chars %in% c("n", "-"))
+consensus_length   <- sum(cons_callable_full)
 
-# Create masks for callable positions
-cons_callable <- !(cons_chars %in% c("n", "-"))
-ref_callable  <- !(ref_chars %in% c("n", "-"))
-both_callable <- cons_callable & ref_callable
+# Cap at the shorter length before building the callable masks.
+# Without this, `cons_callable & ref_callable` recycles the shorter vector, placing
+# recycled TRUE values beyond the end of the shorter vector; indexing with those
+# positions returns NA, which propagates through sum() to produce a spurious NA result.
+compare_len <- min(length(cons_chars), length(ref_chars))
+cons_cmp    <- cons_chars[seq_len(compare_len)]
+ref_cmp     <- ref_chars[seq_len(compare_len)]
 
-# Number of comparable positions
+cons_callable <- !(cons_cmp %in% c("n", "-"))
+ref_callable  <- !(ref_cmp  %in% c("n", "-"))
+both_callable <- cons_callable & ref_callable   # same length — no recycling
+
 alignment_length <- sum(both_callable)
 
 if (alignment_length == 0) {
-  # No comparable positions — cannot compute distance
   similarity_pct <- NA_real_
   n_differences  <- NA_integer_
 } else {
-  # Count differences at callable positions
-  matches <- cons_chars[both_callable] == ref_chars[both_callable]
+  matches        <- cons_cmp[both_callable] == ref_cmp[both_callable]
   n_differences  <- sum(!matches)
   similarity_pct <- round(sum(matches) / alignment_length * 100, 4)
 }
-
-# Consensus length (non-N bases)
-consensus_length <- sum(cons_callable)
 
 # Write output
 result <- data.frame(
