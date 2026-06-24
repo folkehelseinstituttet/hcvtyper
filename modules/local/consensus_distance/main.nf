@@ -3,12 +3,12 @@ process CONSENSUS_DISTANCE {
     label 'process_low'
 
     // Environment with Bioconductor Biostrings and pwalign packages. Created using seqera containers.
-    // TODO: submit environment.yml to Wave (https://wave.seqera.io) to obtain the updated container URLs
-    //       after adding bioconductor-biostrings and bioconductor-pwalign.
+    // Docker image:      https://wave.seqera.io/view/builds/bd-d44950715f95ecd3_1
+    // Singularity image: https://wave.seqera.io/view/builds/bd-925b098b091b9464_1
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-pwalign:TO_BE_UPDATED':
-        'community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-pwalign:TO_BE_UPDATED' }"
+        'oras://community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-pwalign:925b098b091b9464':
+        'community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-pwalign:d44950715f95ecd3' }"
 
     input:
     tuple val(meta), path(consensus)

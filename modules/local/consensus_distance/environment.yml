@@ -4,5 +4,5 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - bioconda::bioconductor-biostrings=2.74.0
-  - bioconda::bioconductor-pwalign=1.2.0
+  - bioconda::bioconductor-biostrings=2.78.0
+  - bioconda::bioconductor-pwalign=1.6.0
