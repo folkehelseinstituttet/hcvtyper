@@ -1574,10 +1574,11 @@ final <- final %>%
 
 # Save dominant-rank lookup before the reorder select drops it (used for
 # resistance MQC minor rows — the non-dominant GLUE report for co-infections).
-dom_rank_lookup <- if ("dominant_cand_rank" %in% colnames(final))
+dom_rank_lookup <- if ("dominant_cand_rank" %in% colnames(final)) {
   select(final, sampleName, dominant_cand_rank)
-else
+} else {
   tibble(sampleName = character(), dominant_cand_rank = integer())
+}
 
 # Reorder columns
 final <- final %>%
