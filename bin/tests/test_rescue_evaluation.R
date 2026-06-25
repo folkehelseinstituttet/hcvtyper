@@ -35,6 +35,10 @@
 #       ref of another candidate slot (ERR1810469 regression).
 #   (9) own-subtype-confirmed: no rescue fires when the candidate's own
 #       subtype has strong assembly support (floors pass).
+#  (10) same-genotype-blocked: rescue to 1a_AF009606 blocked because another
+#       candidate slot already holds genotype 1 (1a_EF407457).
+#  (11) 1a1b-exception: rescue to 1b_D90208 fires even though cand1 is 1a
+#       (1a/1b co-infection pair is an explicitly permitted exception).
 #
 # D-02 default thresholds: length 3000, pident 85, aln_length 3000,
 # kmer_cov 2, 1a1b_length 5000.
@@ -153,6 +157,12 @@ REFS <- list(
   "1b_D90208"    = strrep("T", 60),
   "2a_AB047639"  = strrep("A", 60)
 )
+
+REFS_DUPGENO <- c(REFS, list(
+  "1a_EF407457"  = strrep("G", 60),
+  "1a_AF009606"  = strrep("C", 60),
+  "1c_AY651061"  = strrep("T", 60)
+))
 
 empty_support <- tibble(
   sample = character(0), subtype = character(0), best_ref = character(0),
@@ -390,5 +400,61 @@ if (!is.na(o9$rescued_from[1]))
 if (o9$candidate_ref[1] != "2b_AY232748")
   fail(paste("own-subtype-confirmed: candidate_ref must remain 2b_AY232748, got", o9$candidate_ref[1]))
 ok("own-subtype-confirmed -> no rescue when candidate's own subtype has strong assembly support")
+
+# =========================================================================
+# Subtest 10: same-genotype-blocked — rescue to 1a_AF009606 must be blocked
+#             because cand1 (1a_EF407457) already occupies genotype 1.
+# =========================================================================
+# cand1 = 1a_EF407457 (pass, genotype 1). The 1a support row confirms cand1 via
+# the own-subtype guard (no rescue fires for cand1). cand2 = 1c_AY651061 (pass,
+# genotype 1); assembly support has 1a with best_ref=1a_AF009606 passing floors.
+# The same-genotype guard must block the rescue for cand2 because genotype 1 is
+# already held by cand1, and neither slot is the permitted 1a/1b cross-pair.
+r10 <- run_rescue(
+  "dupgeno", "DUPGENO",
+  cands = mk_cands("DUPGENO",
+    mk_cand(1, "1a_EF407457", "1a", "1", 10000, 88, "pass"),
+    mk_cand(2, "1c_AY651061", "1c", "1",   200, 12, "pass")),
+  support = mk_support("DUPGENO",
+    mk_support_row("1a", "1a_AF009606", 4000, 95.0, 3500, 3.0)),
+  refs = REFS_DUPGENO
+)
+assert_schema("dupgeno", r10$cands_out)
+d10_cand2 <- r10$cands_out %>% filter(candidate_rank == 2)
+if (!is.na(d10_cand2$rescued_from[1]))
+  fail(paste("same-genotype-blocked: cand2 rescued_from must be NA, got",
+             d10_cand2$rescued_from[1]))
+if (d10_cand2$candidate_ref[1] != "1c_AY651061")
+  fail(paste("same-genotype-blocked: cand2 must remain 1c_AY651061, got",
+             d10_cand2$candidate_ref[1]))
+ok("same-genotype-blocked -> rescue to 1a_AF009606 blocked (genotype 1 already held by cand1)")
+
+# =========================================================================
+# Subtest 11: 1a1b-exception (negative control) — rescue to 1b fires even
+#             though cand1 is 1a (1a/1b is the permitted co-infection pair).
+# =========================================================================
+# cand1 = 1a_M62321 (genotype 1, subtype 1a). cand2 = 1c_AY651061 (genotype 1,
+# subtype 1c). Assembly support has only 1b passing floors with best_ref=1b_D90208.
+# cand1 own-subtype (1a) has no support → rescue to 1b attempted but blocked by
+# same-genotype guard (cand2=1c is not 1a/1b). cand2 own-subtype (1c) has no
+# support → rescue to 1b_D90208; same-genotype guard checks: rescue_sub=1b,
+# other_sub=1a → 1a/1b exception applies → rescue fires.
+r11 <- run_rescue(
+  "ab_exception", "ABEXCEP",
+  cands = mk_cands("ABEXCEP",
+    mk_cand(1, "1a_M62321",  "1a", "1", 10000, 88, "pass"),
+    mk_cand(2, "1c_AY651061","1c", "1",   200, 12, "pass")),
+  support = mk_support("ABEXCEP",
+    mk_support_row("1b", "1b_D90208", 5200, 99.0, 5100, 8.0)),
+  refs = REFS_DUPGENO
+)
+assert_schema("ab_exception", r11$cands_out)
+e11_cand2 <- r11$cands_out %>% filter(candidate_rank == 2)
+if (is.na(e11_cand2$rescued_from[1]))
+  fail("1a1b-exception: cand2 must be rescued to 1b_D90208 (1a/1b cross-subtype pair allowed)")
+if (e11_cand2$candidate_ref[1] != "1b_D90208")
+  fail(paste("1a1b-exception: cand2 candidate_ref must be 1b_D90208, got",
+             e11_cand2$candidate_ref[1]))
+ok("1a1b-exception -> rescue to 1b fires when other slot is 1a (permitted cross-subtype pair)")
 
 cat("\nALL PASS\n")

@@ -31,6 +31,11 @@
 # distinct biological slots collapsing into the same reference and silently
 # discarding a genuine strain signal.
 #
+# Same-genotype guard: a rescue is blocked if the rescue target's genotype
+# already matches another candidate slot's genotype in the same sample.
+# Exception: 1a and 1b are treated as a permitted cross-subtype co-infection pair
+# (matching classify_roles.R is_valid_minor() logic), so a 1a+1b pair is allowed.
+#
 # On rescue: rescued_from records the ORIGINAL candidate ref, candidate_ref is
 # overwritten with the rescue reference, rescue_trigger gets a human-readable
 # evidence string, confirmation_status is forced to "pass" (D-05; the downstream
@@ -281,9 +286,28 @@ if (nrow(out) > 0) {
       FALSE
     }
 
+    rescue_would_dup_genotype <- if (!is.na(res$rescue_ref)) {
+      rescue_sub  <- subtype_of(res$rescue_ref)
+      rescue_geno <- genotype_of(rescue_sub)
+      other_refs <- out %>%
+        filter(sample == out$sample[i], candidate_rank != out$candidate_rank[i]) %>%
+        pull(candidate_ref)
+      any(vapply(other_refs, function(r) {
+        other_sub  <- subtype_of(r)
+        other_geno <- genotype_of(other_sub)
+        if (rescue_geno != other_geno) return(FALSE)
+        !( rescue_sub %in% c("1a","1b") &&
+           other_sub  %in% c("1a","1b") &&
+           rescue_sub != other_sub )
+      }, logical(1)))
+    } else {
+      FALSE
+    }
+
     if (!is.na(res$rescued_from) && !is.na(res$rescue_ref) &&
         res$rescue_ref %in% names(ref_fa) &&
-        !rescue_would_collapse) {
+        !rescue_would_collapse &&
+        !rescue_would_dup_genotype) {
       out$rescued_from[i]        <- res$rescued_from
       out$candidate_ref[i]       <- res$rescue_ref
       out$candidate_subtype[i]   <- subtype_of(res$rescue_ref)
