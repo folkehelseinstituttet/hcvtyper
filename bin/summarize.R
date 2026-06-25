@@ -622,7 +622,18 @@ df_coverage <- tmp_df %>%
 blastparse_files <- list.files(path = path_denovo, pattern = "blastparse.csv$", full.names = TRUE)
 
 if (length(blastparse_files) > 0) {
-  df_denovo <- map_dfr(blastparse_files, read_csv) %>%
+  # Pin col_types so per-file readr inference can't disagree across samples: a
+  # sample whose major/minor contig length is empty (NA) infers logical/character,
+  # while a populated one infers double -> map_dfr/bind_rows aborts ("Can't combine
+  # <double> and <character>"). Same header-only/empty-cell trap guarded below for
+  # candidates/assembly_support. Schema mirrors blast_parse.R summary CSV.
+  df_denovo <- map_dfr(blastparse_files, ~ read_csv(.x, col_types = cols(
+    sample              = col_character(),
+    major_ref           = col_character(),
+    major_contig_length = col_double(),
+    minor_ref           = col_character(),
+    minor_contig_length = col_double()
+  ))) %>%
     rename(
       sampleName                 = sample,
       denovo_major_ref           = major_ref,
@@ -657,7 +668,28 @@ if (length(blastparse_files) > 0) {
 blast_out_files <- list.files(path = path_denovo, pattern = "_blast_out.csv$", full.names = TRUE)
 
 if (length(blast_out_files) > 0) {
-  df_blast_out <- map_dfr(blast_out_files, ~ read_csv(.x, show_col_types = FALSE) %>%
+  # Pin col_types to the full blast_parse.R _blast_out.csv schema: a sample whose
+  # contigs were all dropped yields a header-only file, which readr would type as
+  # all-logical and abort map_dfr/bind_rows against the populated files (same trap
+  # that crashed the blastparse read above). Coercing here keeps a header-only file
+  # contributing zero rows (NA-fill, "unconfirmed") instead of failing the run.
+  df_blast_out <- map_dfr(blast_out_files, ~ read_csv(.x, col_types = cols(
+    qseqid    = col_character(),
+    sseqid    = col_character(),
+    subtype   = col_character(),
+    pident    = col_double(),
+    length    = col_double(),
+    mismatch  = col_double(),
+    gapopen   = col_double(),
+    qstart    = col_double(),
+    qend      = col_double(),
+    sstart    = col_double(),
+    send      = col_double(),
+    evalue    = col_double(),
+    bitscore  = col_double(),
+    sc_length = col_double(),
+    kmer_cov  = col_double()
+  )) %>%
     mutate(sampleName = str_remove(basename(.x), "_blast_out.csv$")))
 } else {
   df_blast_out <- tibble(
