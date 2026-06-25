@@ -717,9 +717,15 @@ if (length(blast_out_files) > 0) {
 # and the final Summary.csv join further below (the blocks there remain in place;
 # they read glue_report / glue_report_minor which are now defined here).
 glue_file <- list.files(path = path_8, pattern = "GLUE_collected_report_major.tsv$", full.names = TRUE)
-glue_report <- if (length(glue_file) > 0) read_tsv(glue_file, col_types = cols(GLUE_genotype = col_character(), GLUE_subtype = col_character())) else tibble()
+# Read every column as character (.default): the GLUE report schema is entirely
+# textual (genotype/subtype, drug-resistance status, mutation strings, *_short
+# codes, versions). A resistance column that is all-NA in one report infers as
+# logical/double while the other report has mutation strings -> bind_rows of the
+# major/minor reports (glue_by_rank, glue_per_cand) aborts ("Can't combine
+# <character> and <double>"). Forcing character pins the whole schema in one shot.
+glue_report <- if (length(glue_file) > 0) read_tsv(glue_file, col_types = cols(.default = col_character())) else tibble()
 glue_file_minor <- list.files(path = path_8, pattern = "GLUE_collected_report_minor.tsv$", full.names = TRUE)
-glue_report_minor <- if (length(glue_file_minor) > 0) read_tsv(glue_file_minor, col_types = cols(GLUE_genotype = col_character(), GLUE_subtype = col_character())) else tibble()
+glue_report_minor <- if (length(glue_file_minor) > 0) read_tsv(glue_file_minor, col_types = cols(.default = col_character())) else tibble()
 
 # Build the per-candidate GLUE frame (rank 1 = major report, rank 2 = minor report)
 # and join candidate_glue_genotype + candidate_glue_subtype onto candidates_long so

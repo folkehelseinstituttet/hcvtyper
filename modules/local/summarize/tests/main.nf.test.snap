@@ -3,7 +3,7 @@
         "content": [
             {
                 "summary": [
-                    "Summary.csv:md5,3381502a23cb50ec1b166897b64d6e36"
+                    "Summary.csv:md5,75de0fcd8096653a8209be3d99e9527f"
                 ],
                 "mqc": [
                     [
@@ -23,7 +23,7 @@
             "nf-test": "0.9.3",
             "nextflow": "24.10.5"
         },
-        "timestamp": "2026-06-25T06:52:31.450871931"
+        "timestamp": "2026-06-25T06:57:11.751757764"
     },
     "summarize: stub": {
         "content": [
