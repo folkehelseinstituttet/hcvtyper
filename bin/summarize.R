@@ -1546,11 +1546,14 @@ final <- final %>%
 #      assignment uncertain (de novo and mapping disagree on which strain is dominant)
 #   2. monoinfection AND denovo_major_subtype_match == "NO" — major subtype conflict
 #      between de novo assembly and mapping
-#   3. any_refuted_denovo — a minor candidate refuted by de novo; likely single infection
-#   4. any_uncorroborated — a co-infection kept without de novo corroboration (de novo
+#   3. monoinfection AND denovo_minor_subtype is non-NA AND its genotype differs from
+#      the major genotype — de novo found evidence of a second, different-genotype strain
+#      that the role classifier demoted to background (possible missed co-infection)
+#   4. any_refuted_denovo — a minor candidate refuted by de novo; likely single infection
+#   5. any_uncorroborated — a co-infection kept without de novo corroboration (de novo
 #      inconclusive for both strains); warrants analyst review of QC plots / contigs
-#   5. overall_sample_call == "indeterminate" — no candidate passed the major-gate
-#   6. gate_flag != "ok" — major failed the first-mapping quality thresholds
+#   6. overall_sample_call == "indeterminate" — no candidate passed the major-gate
+#   7. gate_flag != "ok" — major failed the first-mapping quality thresholds
 # (Earlier versions emitted semicolon-separated reason codes; rewritten to full
 # sentences in commit ff12009; rewired onto roles in Phase 8 / D-15.)
 #
@@ -1569,9 +1572,12 @@ final <- final %>%
         any_refuted_denovo,
         any_uncorroborated,
         dominant_unconfirmed,
-        gate_flag
+        gate_flag,
+        denovo_minor_subtype,
+        Major_subtype
       ),
-      function(maj_match, min_match, sample_call, refuted, uncorr, dom_unconf, gflag) {
+      function(maj_match, min_match, sample_call, refuted, uncorr, dom_unconf, gflag,
+               dv_minor_sub, major_sub) {
         msgs        <- character(0)
         is_coinf    <- !is.na(sample_call) && sample_call == "co-infection"
         is_mono     <- !is.na(sample_call) && sample_call == "monoinfection"
@@ -1584,6 +1590,12 @@ final <- final %>%
           msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
         if (is_mono && !is.na(maj_match) && maj_match == "NO")
           msgs <- c(msgs, "Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review.")
+        if (is_mono && !is.na(dv_minor_sub) && !is.na(major_sub) &&
+            substr(dv_minor_sub, 1, 1) != substr(major_sub, 1, 1))
+          msgs <- c(msgs, paste0(
+            "Monoinfection called, but de novo assembly found a different-genotype contig (",
+            dv_minor_sub, ") — possible missed co-infection or contamination. Please review."
+          ))
         if (isTRUE(dom_unconf) && is_mono)
           msgs <- c(msgs, "Genotype call is provisional — identity not corroborated (mapping evidence only; no GLUE or de novo confirmation). Please review.")
         if (isTRUE(refuted))
@@ -1691,21 +1703,23 @@ triage <- final %>%
     co_infection = case_when(
       overall_sample_call == "co-infection" ~ "CO-INFECTION",
       TRUE                                  ~ NA_character_
-    )
+    ),
+    # Per-row genotype: defaults to the dominant strain; overridden to Minor
+    # for the [minor] co-infection rows created below.
+    Genotype = Major
   ) %>%
   select(
     sampleName,
-    # --- 6 problem-signal flags (signals 2-5 are numeric columns, coloured via config) ---
+    # --- final call and per-row genotype (front of table) ---
+    overall_sample_call,
+    Genotype,
+    # --- 6 problem-signal flags ---
     subtype_conflict,
     rescue_flag,
     Major_avg_depth,
     Reads_nodup_mapped_major,
     percent_mapped_reads_major_firstmapping,
     co_infection,
-    # --- final call and subtype shorthand ---
-    overall_sample_call,
-    Major,
-    Minor,
     # --- human-readable review note ---
     review_flag,
     # --- supporting QC context ---
@@ -1713,9 +1727,86 @@ triage <- final %>%
     Major_cov_breadth_min_10,
     Major_cov_breadth_min_5,
     Percent_reads_mapped_of_trimmed_with_dups_major,
-    any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences"))
-  ) %>%
-  as.data.frame()
+    any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences")),
+    # Minor (kept temporarily to set Genotype on [minor] rows) + minor metric counterparts
+    Minor,
+    any_of(c("Minor_avg_depth",
+             "Reads_nodup_mapped_minor",
+             "percent_mapped_reads_minor_firstmapping",
+             "Minor_cov_breadth_min_10",
+             "Minor_cov_breadth_min_5",
+             "Percent_reads_mapped_of_trimmed_with_dups_minor",
+             "Minor_consensus_similarity_pct",
+             "Minor_consensus_n_differences"))
+  )
+
+# Paired metric columns.  major → the column present in triage;
+# minor → the counterpart column to promote for the [minor] row;
+# generic → the final output column name used in both rows.
+col_major   <- c("Major_avg_depth",
+                 "Reads_nodup_mapped_major",
+                 "percent_mapped_reads_major_firstmapping",
+                 "Major_cov_breadth_min_10",
+                 "Major_cov_breadth_min_5",
+                 "Percent_reads_mapped_of_trimmed_with_dups_major",
+                 "Major_consensus_similarity_pct",
+                 "Major_consensus_n_differences")
+col_minor   <- c("Minor_avg_depth",
+                 "Reads_nodup_mapped_minor",
+                 "percent_mapped_reads_minor_firstmapping",
+                 "Minor_cov_breadth_min_10",
+                 "Minor_cov_breadth_min_5",
+                 "Percent_reads_mapped_of_trimmed_with_dups_minor",
+                 "Minor_consensus_similarity_pct",
+                 "Minor_consensus_n_differences")
+col_generic <- c("average_depth_0",
+                 "Reads_nodup_mapped",
+                 "percent_mapped_reads_firstmapping",
+                 "cov_breadth_min_10",
+                 "cov_breadth_min_5",
+                 "Percent_reads_mapped_of_trimmed_with_dups",
+                 "pct_similarity_to_nearest_reference",
+                 "n_differences_to_nearest_reference")
+
+# Restrict to pairs where the major column actually exists in triage
+present     <- col_major %in% colnames(triage)
+col_major   <- col_major[present]
+col_minor   <- col_minor[present]
+col_generic <- col_generic[present]
+
+# Expand co-infection samples: add a [major] row and a [minor] row.
+# Monoinfection / indeterminate samples: one row, no brackets.
+coinf_rows <- !is.na(triage$co_infection) & triage$co_infection == "CO-INFECTION"
+
+if (any(coinf_rows)) {
+  triage_mono <- triage[!coinf_rows, , drop = FALSE]
+
+  # [major] row: identical to the original row but with the bracket label
+  triage_coinf_major <- triage[coinf_rows, , drop = FALSE] %>%
+    mutate(sampleName = paste0(sampleName, " [major]"))
+
+  # [minor] row: Genotype set to the minor strain's subtype; metric columns
+  # populated from the Minor_ counterparts.
+  triage_coinf_minor <- triage[coinf_rows, , drop = FALSE] %>%
+    mutate(sampleName = paste0(sampleName, " [minor]"),
+           Genotype = Minor)
+  for (i in seq_along(col_major)) {
+    mc <- col_major[i]; nc <- col_minor[i]
+    triage_coinf_minor[[mc]] <- if (nc %in% colnames(triage_coinf_minor)) triage_coinf_minor[[nc]] else NA
+  }
+
+  # Interleave: sort by base sample name, then [major] before [minor]
+  triage <- bind_rows(triage_mono, triage_coinf_major, triage_coinf_minor) %>%
+    arrange(str_remove(sampleName, " \\[(major|minor)\\]$"), sampleName)
+}
+
+# Drop minor-specific columns and the temporary Minor helper (now consumed by Genotype)
+triage <- triage %>% select(-any_of(c(col_minor, "Minor")))
+
+# Rename Major_* columns to final generic names
+rename_map <- setNames(col_major, col_generic)
+rename_map <- rename_map[rename_map %in% colnames(triage)]
+triage <- triage %>% rename(all_of(rename_map)) %>% as.data.frame()
 
 triage_file <- "summary_mqc.tsv"
 triage %>% colnames() %>% paste0(collapse = "\t") %>% write_lines(triage_file, append = TRUE)
