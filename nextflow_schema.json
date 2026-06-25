@@ -90,6 +90,11 @@
             "type": "integer",
             "default": 15
         },
+        "glue_min_reads": {
+            "type": "integer",
+            "default": 100,
+            "minimum": 0
+        },
         "multiqc_config": {
             "type": "string"
         },

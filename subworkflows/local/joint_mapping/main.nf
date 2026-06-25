@@ -189,6 +189,25 @@ workflow JOINT_MAPPING {
     ch_percand = REHEADER_CANDIDATE.out.bam            // per-candidate single-reference dedup BAM
     ch_versions = ch_versions.mix(REHEADER_CANDIDATE.out.versions.first())
 
+    // Attach each candidate's post-dedup mapped read count to its meta from the
+    // combined IDXSTATS_NODUP output. Join by sample id only (per-sample idxstats
+    // vs per-candidate ch_percand have different metas, plain .join() would drop all).
+    ch_percand_counted = ch_percand
+        .map { meta, bam -> tuple(meta.subMap('id'), meta, bam) }
+        .combine(
+            IDXSTATS_NODUP.out.idxstats.map { meta, idx -> tuple(meta.subMap('id'), idx) },
+            by: 0
+        )
+        .map { _key, meta, bam, idx ->
+            def counts = [:]
+            idx.readLines().each { line ->
+                def f = line.split('\t')
+                if (f.size() >= 3 && f[0] != '*') counts[f[0]] = (f[2] as long)
+            }
+            def n = counts.getOrDefault(meta.candidate_ref as String, 0L)
+            tuple(meta + [candidate_nodup_reads: n], bam)
+        }
+
     //
     // MODULE: Per-candidate depth — MUST run on the split (per-candidate) BAM, never the
     //         combined BAM (Pitfall 2: a combined depth file spans all references and corrupts
@@ -246,7 +265,7 @@ workflow JOINT_MAPPING {
     ch_versions = ch_versions.mix(CONSENSUS_DISTANCE.out.versions.first())
 
     emit:
-    aligned            = ch_percand                   // per-candidate dedup BAM
+    aligned            = ch_percand_counted           // per-candidate dedup BAM, meta carries candidate_nodup_reads
     idxstats_withdup   = IDXSTATS_WITHDUP.out.idxstats // combined BAM pre-dedup, per-reference counts
     idxstats_nodup     = IDXSTATS_NODUP.out.idxstats   // combined BAM post-dedup, per-reference counts
     depth              = SAMTOOLS_DEPTH.out.tsv

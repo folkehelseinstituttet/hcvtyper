@@ -469,8 +469,13 @@ workflow HCVTYPER {
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
+        ch_glue_bams = JOINT_MAPPING.out.aligned
+            .filter { meta, _bam -> (meta.candidate_nodup_reads ?: 0) >= params.glue_min_reads }
+            .collect({ it[1] })
+            .collect()
+
         HCVGLUE (
-            JOINT_MAPPING.out.aligned.collect({it[1]}).collect(), // Collect all candidate BAMs (T-2 lockstep). Can only have one GLUE process running
+            ch_glue_bams,
             params.hcvglue_threshold
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
