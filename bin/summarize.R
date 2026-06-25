@@ -1699,36 +1699,26 @@ triage <- final %>%
       denovo_major_subtype_match == "YES" ~ "OK",
       TRUE                               ~ NA_character_
     ),
-    # Signal 6: co-infection call
-    co_infection = case_when(
-      overall_sample_call == "co-infection" ~ "CO-INFECTION",
-      TRUE                                  ~ NA_character_
-    ),
     # Per-row genotype: defaults to the dominant strain; overridden to Minor
     # for the [minor] co-infection rows created below.
     Genotype = Major
   ) %>%
   select(
     sampleName,
-    # --- final call and per-row genotype (front of table) ---
-    overall_sample_call,
-    Genotype,
-    # --- 6 problem-signal flags ---
-    subtype_conflict,
-    rescue_flag,
-    Major_avg_depth,
-    Reads_nodup_mapped_major,
-    percent_mapped_reads_major_firstmapping,
-    co_infection,
-    # --- human-readable review note ---
-    review_flag,
-    # --- supporting QC context ---
-    total_trimmed_reads,
-    Major_cov_breadth_min_10,
-    Major_cov_breadth_min_5,
-    Percent_reads_mapped_of_trimmed_with_dups_major,
-    any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences")),
-    # Minor (kept temporarily to set Genotype on [minor] rows) + minor metric counterparts
+    overall_sample_call,                             # placement 2
+    review_flag,                                     # placement 3
+    Genotype,                                        # placement 4
+    Major_avg_depth,                                 # placement 6
+    subtype_conflict,                                # placement 10
+    rescue_flag,                                     # placement 20
+    total_trimmed_reads,                             # placement 25
+    Major_cov_breadth_min_10,                        # placement 30
+    Major_cov_breadth_min_5,                         # placement 35
+    Percent_reads_mapped_of_trimmed_with_dups_major, # placement 38
+    Reads_nodup_mapped_major,                        # placement 40
+    percent_mapped_reads_major_firstmapping,         # placement 50
+    any_of(c("Major_consensus_similarity_pct", "Major_consensus_n_differences")), # placement 150, 160
+    # Minor columns kept temporarily to set Genotype on [minor] rows
     Minor,
     any_of(c("Minor_avg_depth",
              "Reads_nodup_mapped_minor",
@@ -1776,7 +1766,7 @@ col_generic <- col_generic[present]
 
 # Expand co-infection samples: add a [major] row and a [minor] row.
 # Monoinfection / indeterminate samples: one row, no brackets.
-coinf_rows <- !is.na(triage$co_infection) & triage$co_infection == "CO-INFECTION"
+coinf_rows <- triage$overall_sample_call %in% c("co-infection", "co-infection (indeterminate dominance)")
 
 if (any(coinf_rows)) {
   triage_mono <- triage[!coinf_rows, , drop = FALSE]

@@ -3,9 +3,9 @@ report_comment: >
   analysis pipeline.
 report_section_order:
   "results_summary":
-    order: 2
+    order: 1000
   "glue_resistance":
-    order: 1
+    order: 999
   "folkehelseinstituttet-hcvtyper-methods-description":
     order: -1000
   software_versions:
@@ -77,11 +77,31 @@ custom_data:
       headers:
         sampleName:
           title: "Sample"
-          placement: 0
+        overall_sample_call:
+          title: "Final call"
+          description: "Overall sample classification: monoinfection, co-infection, indeterminate, or co-infection (indeterminate dominance)."
+        review_flag:
+          title: "Review note"
+          description: "Human-readable reasons why this sample may require manual inspection. Empty when the call is clean."
+          cond_formatting_rules:
+            - warn:
+                - s_contains: "Please review"
+                - s_contains: "refuted"
+                - s_contains: "uncertain"
+        Genotype:
+          title: "Genotype"
+          description: "HCV subtype for this row. Major strain for monoinfection and [major] rows; minor strain for [minor] rows of co-infections."
+        average_depth_0:
+          title: "Avg depth (≥0×)"
+          description: "Mean read depth across all reference positions (including zero-coverage positions; samtools depth -aa). Major row = major strain, [minor] row = minor strain for co-infections."
+          suffix: "×"
+          format: "{:,.0f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 1000
         subtype_conflict:
           title: "Subtype conflict"
           description: "CONFLICT when de novo assembly and mapping disagree on the major subtype. OK when they agree. NA when no assembly was available."
-          placement: 10
           cond_formatting_rules:
             - pass:
                 - s_eq: "OK"
@@ -90,112 +110,66 @@ custom_data:
         rescue_flag:
           title: "Rescue"
           description: "TRUE when the de-novo rescue step replaced the first-mapping reference for at least one candidate."
-          placement: 20
           cond_formatting_rules:
             - warn:
                 - s_eq: "TRUE"
             - pass:
                 - s_eq: "FALSE"
-        Major_avg_depth:
-          title: "Depth (major)"
-          description: "Mean read depth across the major-strain consensus."
-          suffix: "×"
-          format: "{:,.0f}"
-          placement: 30
-          scale: "RdYlGn"
-          min: 0
-          max: 1000
-        Reads_nodup_mapped_major:
-          title: "Mapped reads (major)"
-          description: "De-duplicated reads mapped to the major-strain reference."
-          format: "{:,.0f}"
-          placement: 40
-          scale: "RdYlGn"
-          min: 0
-          max: 100000
-        percent_mapped_reads_major_firstmapping:
-          title: "Mapping % (major)"
-          description: "Percentage of trimmed reads that mapped to the major-strain reference at first-mapping."
-          suffix: "%"
-          format: "{:,.1f}"
-          placement: 50
-          scale: "RdYlGn"
-          min: 0
-          max: 100
-        co_infection:
-          title: "Co-infection"
-          description: "CO-INFECTION when more than one HCV subtype/genotype was detected."
-          placement: 60
-          cond_formatting_rules:
-            - warn:
-                - s_eq: "CO-INFECTION"
-        overall_sample_call:
-          title: "Final call"
-          description: "Overall sample classification: monoinfection, co-infection, indeterminate, or co-infection (indeterminate dominance)."
-          placement: 70
-        Major:
-          title: "Major subtype"
-          description: "Dominant HCV subtype."
-          placement: 80
-        Minor:
-          title: "Minor subtype"
-          description: "Minor (co-infecting) HCV subtype. Empty for monoinfection samples."
-          placement: 90
-        review_flag:
-          title: "Review note"
-          description: "Human-readable reasons why this sample may require manual inspection. Empty when the call is clean."
-          placement: 100
-          cond_formatting_rules:
-            - warn:
-                - s_contains: "Please review"
-                - s_contains: "refuted"
-                - s_contains: "uncertain"
         total_trimmed_reads:
           title: "Trimmed reads"
           description: "Total reads after adapter trimming."
           format: "{:,.0f}"
-          placement: 110
-        Major_cov_breadth_min_10:
-          title: "Breadth ≥10× (major)"
-          description: "Fraction of the major-strain reference covered at ≥10× depth."
+        cov_breadth_min_10:
+          title: "Breadth ≥10×"
+          description: "Fraction of the strain reference covered at ≥10× depth (major row = major strain, [minor] row = minor strain for co-infections)."
           suffix: "%"
           format: "{:,.1f}"
-          placement: 120
           scale: "RdYlGn"
           min: 0
           max: 100
-        Major_cov_breadth_min_5:
-          title: "Breadth ≥5× (major)"
-          description: "Fraction of the major-strain reference covered at ≥5× depth."
+        cov_breadth_min_5:
+          title: "Breadth ≥5×"
+          description: "Fraction of the strain reference covered at ≥5× depth (major row = major strain, [minor] row = minor strain for co-infections)."
           suffix: "%"
           format: "{:,.1f}"
-          placement: 130
           scale: "RdYlGn"
           min: 0
           max: 100
-        Percent_reads_mapped_of_trimmed_with_dups_major:
-          title: "Mapped % (dedup, major)"
-          description: "Percentage of trimmed reads mapping to the major-strain reference, computed from de-duplicated counts."
+        Percent_reads_mapped_of_trimmed_with_dups:
+          title: "Mapped % (dedup)"
+          description: "Percentage of trimmed reads mapping to the strain reference, computed from de-duplicated counts (major row = major strain, [minor] row = minor strain for co-infections)."
           suffix: "%"
           format: "{:,.1f}"
-          placement: 140
           scale: "RdYlGn"
           min: 0
           max: 100
-        Major_consensus_similarity_pct:
-          title: "Consensus similarity (major)"
-          description: "Global alignment identity between the major-strain consensus and reference (%)."
+        Reads_nodup_mapped:
+          title: "Mapped reads"
+          description: "De-duplicated reads mapped to the strain reference (major row = major strain, [minor] row = minor strain for co-infections)."
+          format: "{:,.0f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100000
+        percent_mapped_reads_firstmapping:
+          title: "Mapping %"
+          description: "Percentage of trimmed reads that mapped to the strain reference at first-mapping (major row = major strain, [minor] row = minor strain for co-infections)."
+          suffix: "%"
+          format: "{:,.1f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        pct_similarity_to_nearest_reference:
+          title: "% similarity to nearest ref"
+          description: "Global alignment identity (%) between the strain consensus and its nearest reference (major row = major strain, [minor] row = minor strain for co-infections)."
           suffix: "%"
           format: "{:,.2f}"
-          placement: 150
           scale: "RdYlGn"
           min: 90
           max: 100
-        Major_consensus_n_differences:
-          title: "Consensus differences (major)"
-          description: "Number of positions where the major-strain consensus differs from the reference."
+        n_differences_to_nearest_reference:
+          title: "Differences from nearest ref"
+          description: "Number of positions where the strain consensus differs from its nearest reference (major row = major strain, [minor] row = minor strain for co-infections)."
           format: "{:,.0f}"
-          placement: 160
 
   # -------------------------------------------------------------------------
   # HCV-GLUE resistance section (appears right below Results summary)

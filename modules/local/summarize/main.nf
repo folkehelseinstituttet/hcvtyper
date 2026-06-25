@@ -75,9 +75,11 @@ sampleName,total_raw_reads,total_trimmed_reads,total_classified_reads,total_mapp
 Test_1,40000,34446,31482,31478,1.2804002521914215,NA,NA,NA,NA,NO,NO,NA,NA,NA,NA,NA,95.59,NA,NA,NA,NA,NA,3.55,@SRR24174266.1 1/1,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,HCVTyper (version unknown),NA,NA,NA,NA,indeterminate,NA,NA,NA,NA,NA,NA,NA,NA
 EOF
 
-    # summary_mqc.tsv: triage table (6 problem-signal flags + key context columns)
-    printf 'sampleName\tsubtype_conflict\trescue_flag\tMajor_avg_depth\tReads_nodup_mapped_major\tpercent_mapped_reads_major_firstmapping\tco_infection\toverall_sample_call\tMajor\tMinor\treview_flag\ttotal_trimmed_reads\tMajor_cov_breadth_min_10\tMajor_cov_breadth_min_5\tPercent_reads_mapped_of_trimmed_with_dups_major\n' > summary_mqc.tsv
-    printf 'Test_1\tNA\tFALSE\tNA\tNA\t95.59\tNA\tindeterminate\tNA\tNA\tNA\t34446\tNA\tNA\tNA\n' >> summary_mqc.tsv
+    # summary_mqc.tsv: triage table (final call + genotype up front, then signal flags).
+    # Co-infection samples get two rows: "sampleName [major]" and "sampleName [minor]".
+    # Metric columns use generic names; average depth is average_depth_0 (all positions, -aa).
+    printf 'sampleName\toverall_sample_call\treview_flag\tGenotype\taverage_depth_0\tsubtype_conflict\trescue_flag\ttotal_trimmed_reads\tcov_breadth_min_10\tcov_breadth_min_5\tPercent_reads_mapped_of_trimmed_with_dups\tReads_nodup_mapped\tpercent_mapped_reads_firstmapping\n' > summary_mqc.tsv
+    printf 'Test_1\tindeterminate\tNA\tNA\tNA\tNA\tFALSE\t34446\tNA\tNA\tNA\tNA\t95.59\n' >> summary_mqc.tsv
 
     # glue_resistance_mqc.tsv: resistance section (major row per sample; [minor] row for co-infections)
     printf 'Sample	Resistance	NS34A	glecaprevir	glecaprevir_mut	grazoprevir	grazoprevir_mut	paritaprevir	paritaprevir_mut	voxilaprevir	voxilaprevir_mut	NS5A	daclatasvir	daclatasvir_mut	elbasvir	elbasvir_mut	ledipasvir	ledipasvir_mut	ombitasvir	ombitasvir_mut	pibrentasvir	pibrentasvir_mut	velpatasvir	velpatasvir_mut	NS5B	dasabuvir	dasabuvir_mut	sofosbuvir	sofosbuvir_mut\n' > glue_resistance_mqc.tsv
