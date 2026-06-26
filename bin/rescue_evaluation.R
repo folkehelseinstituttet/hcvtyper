@@ -75,6 +75,12 @@ rescue_min_pident     <- as.numeric(args[6])
 rescue_min_aln_length <- as.numeric(args[7])
 rescue_min_kmer_cov   <- as.numeric(args[8])
 rescue_1a1b_length    <- as.numeric(args[9])
+# Optional 10th positional arg: the genotype-diverse candidate cap (params.n_candidates).
+# Bounds the final candidate set to at most this many DISTINCT-genotype references
+# after de-novo nomination + genotype collapse. Absent / non-integer => no cap (Inf),
+# which preserves the legacy behaviour for callers (and unit tests) that omit it.
+n_candidates_cap <- if (length(args) >= 10) suppressWarnings(as.integer(args[10])) else NA_integer_
+if (is.na(n_candidates_cap) || n_candidates_cap < 1L) n_candidates_cap <- Inf
 
 # --- Subtype-token helper -----------------------------------------------------
 subtype_of <- function(ref) {
@@ -323,6 +329,155 @@ if (nrow(out) > 0) {
       }
     }
     # else: membership guard failed, collapse guard blocked, or no rescue → leave NA, status unchanged.
+  }
+}
+
+# =============================================================================
+# Genotype-diverse candidate finalization -------------------------------------
+# The pipeline CANNOT resolve within-genotype (same-genotype) co-infections, so
+# at most ONE reference per genotype may enter JOINT_MAPPING — the sole exception
+# being the 1a/1b cross-subtype pair (mirrors classify_roles::is_valid_minor()).
+# Two steps run AFTER the per-slot rescue above:
+#   (1) De-novo nomination (additive): a genuine DIFFERENT-genotype strain that
+#       first-mapping under-ranked but de novo assembled strongly (e.g. the
+#       ERR1810475 1a) is APPENDED as a new candidate from assembly_support,
+#       gated on the same four rescue floors. First-mapping ranks only the top-N
+#       subtypes by read recruitment, so a low-recruitment second genotype that
+#       only survives as a de-novo contig is otherwise unmappable; this is the
+#       only path that surfaces it in the mapping minor call.
+#   (2) Genotype collapse: the candidate set is reduced to one reference per
+#       genotype (best first-mapping read recruiter kept), 1a/1b kept as a pair,
+#       the 2k1b recombinant blocked vs genotype 1/2. This removes redundant
+#       same-genotype slots (the cosmetic same-genotype "Minor", and the divergent
+#       genotype-4 second reference) at SELECTION rather than only labelling them
+#       downstream — a sub-optimal-but-correct-genotype reference still yields the
+#       right consensus under Bowtie2 mismatch tolerance.
+# Candidates are then re-ranked 1..N by read recruitment (dominant first; nominated
+# NA-read candidates last), capped at n_candidates_cap, and the per-rank candidate
+# FASTAs are reconciled to the final set (stale ones removed, survivors written) so
+# exactly one *_cand{rank}.fa exists per surviving candidate (dup-@SQ guard).
+# -----------------------------------------------------------------------------
+
+# Local genotype + validity helpers. genotype_utils.R is NOT staged into this
+# module, so replicate the minimal 2k1b-aware logic of genotype_from_subtype()
+# and the verbatim three-rule is_valid_minor() (classify_roles.R:137).
+geno_of_subtype <- function(subtype) {
+  ifelse(is.na(subtype), NA_character_,
+         ifelse(str_starts(subtype, "2k1b"), "2k1b", str_sub(subtype, 1, 1)))
+}
+valid_minor_pair <- function(minor_sub, minor_geno, major_sub, major_geno) {
+  if (is.na(minor_sub) || is.na(major_sub)) return(FALSE)
+  # Rule 1: allow 1a/1b cross-subtype co-infection.
+  if (minor_sub %in% c("1a", "1b") && major_sub %in% c("1a", "1b") &&
+      minor_sub != major_sub) return(TRUE)
+  # Rule 2: block 2k1b paired with genotype 1 / 2 / 2k1b.
+  if ((major_geno == "2k1b" && minor_geno %in% c("1", "2", "2k1b")) ||
+      (minor_geno == "2k1b" && major_geno %in% c("1", "2", "2k1b"))) return(FALSE)
+  # Rule 3: otherwise require a different genotype.
+  major_geno != minor_geno
+}
+
+if (nrow(out) > 0) {
+  sample_id <- out$sample[1]
+
+  # ---- (1) De-novo additive nomination --------------------------------------
+  present_genos <- unique(out$candidate_genotype)
+  # Dominant (for the validity check) = highest first-mapping read recruiter.
+  dom_row  <- out %>% arrange(desc(candidate_reads)) %>% slice(1)
+  dom_sub  <- dom_row$candidate_subtype[1]
+  dom_geno <- dom_row$candidate_genotype[1]
+
+  nominable <- support %>%
+    filter(!is.na(best_ref), best_ref %in% names(ref_fa)) %>%
+    mutate(.geno = geno_of_subtype(subtype)) %>%
+    filter(
+      !is.na(.geno), !(.geno %in% present_genos),
+      best_contig_length     >  rescue_min_length,
+      best_contig_pident     >  rescue_min_pident,
+      best_contig_aln_length >= rescue_min_aln_length,
+      best_contig_kmer_cov   >= rescue_min_kmer_cov
+    ) %>%
+    group_by(.geno) %>%
+    arrange(desc(best_contig_length), .by_group = TRUE) %>%
+    slice(1) %>%
+    ungroup()
+
+  if (nrow(nominable) > 0) {
+    next_rank <- max(out$candidate_rank, na.rm = TRUE)
+    for (j in seq_len(nrow(nominable))) {
+      nsub  <- nominable$subtype[j]
+      ngeno <- nominable$.geno[j]
+      nref  <- nominable$best_ref[j]
+      # Validity vs the dominant (e.g. block a 2k1b nomination over a genotype-2
+      # dominant). The collapse below would drop an invalid pair anyway; this just
+      # avoids creating then deleting its FASTA.
+      if (!valid_minor_pair(nsub, ngeno, dom_sub, dom_geno)) next
+      next_rank <- next_rank + 1L
+      trig <- sprintf(
+        "denovo-nomination %s contig %gbp pident=%g aln=%gbp kmer_cov=%g (different-genotype strain absent from first-mapping candidates)",
+        nref, nominable$best_contig_length[j], nominable$best_contig_pident[j],
+        nominable$best_contig_aln_length[j], nominable$best_contig_kmer_cov[j])
+      out <- bind_rows(out, tibble(
+        sample              = sample_id,
+        candidate_rank      = as.integer(next_rank),
+        candidate_ref       = nref,
+        candidate_subtype   = nsub,
+        candidate_genotype  = ngeno,
+        candidate_reads     = NA_real_,
+        candidate_cov       = NA_real_,
+        confirmation_status = "pass",
+        rescued_from        = NA_character_,
+        rescue_trigger      = trig
+      ))
+    }
+  }
+
+  # ---- (2) Genotype collapse to distinct genotypes (1a/1b pair exempt) -------
+  ord <- out %>% arrange(desc(candidate_reads))
+  dom_sub2  <- ord$candidate_subtype[1]
+  dom_geno2 <- ord$candidate_genotype[1]
+  keep_idx   <- integer(0)
+  kept_subs  <- character(0)
+  kept_genos <- character(0)
+  for (i in seq_len(nrow(ord))) {
+    csub  <- ord$candidate_subtype[i]
+    cgeno <- ord$candidate_genotype[i]
+    if (length(keep_idx) == 0) {            # the dominant always survives
+      keep_idx <- i; kept_subs <- csub; kept_genos <- cgeno; next
+    }
+    # Must be a valid minor w.r.t. the dominant ...
+    if (!valid_minor_pair(csub, cgeno, dom_sub2, dom_geno2)) next
+    # ... and a distinct genotype from EVERY already-kept candidate (1a/1b pair ok).
+    dup <- any(vapply(seq_along(kept_subs), function(k) {
+      if (cgeno != kept_genos[k]) return(FALSE)
+      !(csub %in% c("1a", "1b") && kept_subs[k] %in% c("1a", "1b") &&
+        csub != kept_subs[k])
+    }, logical(1)))
+    if (dup) next
+    keep_idx   <- c(keep_idx, i)
+    kept_subs  <- c(kept_subs, csub)
+    kept_genos <- c(kept_genos, cgeno)
+  }
+
+  # ---- Re-rank 1..N (dominant first) and cap at n_candidates_cap -------------
+  out <- ord[keep_idx, , drop = FALSE] %>%
+    arrange(desc(candidate_reads)) %>%
+    slice(seq_len(min(n(), n_candidates_cap))) %>%
+    mutate(candidate_rank = row_number())
+
+  # ---- Reconcile per-rank candidate FASTAs to the final set -----------------
+  # Exactly one {prefix}.{ref}_cand{rank}.fa must survive per final candidate:
+  # remove any stale / collapsed-away / wrong-rank per-rank FASTA, then (re)write
+  # the survivors. A duplicated or stale per-rank FASTA would duplicate an @SQ line
+  # in the combined per-sample reference and crash BOWTIE2_BUILD.
+  final_fastas <- paste0(prefix, ".", out$candidate_ref, "_cand", out$candidate_rank, ".fa")
+  existing_fastas <- list.files(".", pattern = "_cand[0-9]+\\.fa$")
+  existing_fastas <- existing_fastas[startsWith(existing_fastas, paste0(prefix, "."))]
+  for (f in setdiff(existing_fastas, final_fastas)) {
+    if (file.exists(f)) file.remove(f)
+  }
+  for (i in seq_len(nrow(out))) {
+    write_ref_fasta(out$candidate_ref[i], paste0("cand", out$candidate_rank[i]))
   }
 }
 

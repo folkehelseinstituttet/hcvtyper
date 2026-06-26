@@ -297,9 +297,11 @@ ok("skip-assembly -> candidates pass through unchanged, rescue columns NA (D-10 
 # =========================================================================
 # Subtest 6: forced-pass — below_threshold candidate rescued, status forced
 # =========================================================================
-# Single rank-2 below_threshold candidate with no own subtype support.
-# The best alternative (2b) passes floors -> rescue fires and status is
-# forced to "pass" regardless of the original confirmation_status.
+# Single below_threshold candidate with no own subtype support. The best
+# alternative (2b) passes floors -> rescue fires and status is forced to "pass"
+# regardless of the original confirmation_status. The genotype-diverse
+# finalization re-ranks the lone survivor to rank 1 (dominant-first), so the
+# rescued FASTA basename is _cand1.
 r6 <- run_rescue(
   "forced", "FORCED",
   cands = mk_cands("FORCED",
@@ -309,16 +311,20 @@ r6 <- run_rescue(
   refs = REFS
 )
 assert_schema("forced", r6$cands_out)
-f6 <- r6$cands_out %>% filter(candidate_rank == 2)
+if (nrow(r6$cands_out) != 1)
+  fail(paste("forced-pass: exactly one candidate must survive, got", nrow(r6$cands_out)))
+f6 <- r6$cands_out %>% filter(candidate_rank == 1)
+if (nrow(f6) != 1)
+  fail("forced-pass: the lone survivor must be re-ranked to rank 1")
 if (is.na(f6$rescued_from[1]))
-  fail("forced-pass: the below_threshold rank-2 candidate must be rescued")
+  fail("forced-pass: the below_threshold candidate must be rescued")
 if (f6$confirmation_status[1] != "pass")
   fail(paste("forced-pass: confirmation_status must be forced to 'pass', got",
              f6$confirmation_status[1]))
-if (!any(grepl("_cand2\\.", r6$fastas)))
-  fail(paste("forced-pass: the rescued FASTA basename must match '_cand2.'; got:",
+if (!any(grepl("_cand1\\.", r6$fastas)))
+  fail(paste("forced-pass: the rescued FASTA basename must match '_cand1.'; got:",
              paste(r6$fastas, collapse = ",")))
-ok("forced-pass -> below_threshold row rescued, status forced pass, _cand2. FASTA written (D-05/D-06)")
+ok("forced-pass -> below_threshold row rescued, status forced pass, re-ranked to _cand1. (D-05/D-06)")
 
 # =========================================================================
 # Subtest 7: stale pass-through FASTA removed on ref-changing rescue
@@ -402,14 +408,14 @@ if (o9$candidate_ref[1] != "2b_AY232748")
 ok("own-subtype-confirmed -> no rescue when candidate's own subtype has strong assembly support")
 
 # =========================================================================
-# Subtest 10: same-genotype-blocked — rescue to 1a_AF009606 must be blocked
-#             because cand1 (1a_EF407457) already occupies genotype 1.
+# Subtest 10: same-genotype collapse — a redundant same-genotype slot is
+#             dropped entirely (not kept-but-unrescued) at selection.
 # =========================================================================
-# cand1 = 1a_EF407457 (pass, genotype 1). The 1a support row confirms cand1 via
-# the own-subtype guard (no rescue fires for cand1). cand2 = 1c_AY651061 (pass,
-# genotype 1); assembly support has 1a with best_ref=1a_AF009606 passing floors.
-# The same-genotype guard must block the rescue for cand2 because genotype 1 is
-# already held by cand1, and neither slot is the permitted 1a/1b cross-pair.
+# cand1 = 1a_EF407457 (pass, genotype 1, dominant by reads). cand2 = 1c_AY651061
+# (pass, genotype 1) is the same genotype as the dominant and is NOT the permitted
+# 1a/1b cross-pair, so the genotype-collapse step removes it. Only the dominant
+# 1a survives — a within-genotype "minor" the pipeline cannot resolve never
+# reaches JOINT_MAPPING.
 r10 <- run_rescue(
   "dupgeno", "DUPGENO",
   cands = mk_cands("DUPGENO",
@@ -420,14 +426,16 @@ r10 <- run_rescue(
   refs = REFS_DUPGENO
 )
 assert_schema("dupgeno", r10$cands_out)
-d10_cand2 <- r10$cands_out %>% filter(candidate_rank == 2)
-if (!is.na(d10_cand2$rescued_from[1]))
-  fail(paste("same-genotype-blocked: cand2 rescued_from must be NA, got",
-             d10_cand2$rescued_from[1]))
-if (d10_cand2$candidate_ref[1] != "1c_AY651061")
-  fail(paste("same-genotype-blocked: cand2 must remain 1c_AY651061, got",
-             d10_cand2$candidate_ref[1]))
-ok("same-genotype-blocked -> rescue to 1a_AF009606 blocked (genotype 1 already held by cand1)")
+if (nrow(r10$cands_out) != 1)
+  fail(paste("same-genotype-collapse: only the dominant genotype-1 ref must survive, got",
+             nrow(r10$cands_out), "rows"))
+if (r10$cands_out$candidate_ref[1] != "1a_EF407457")
+  fail(paste("same-genotype-collapse: survivor must be the dominant 1a_EF407457, got",
+             r10$cands_out$candidate_ref[1]))
+if (any(grepl("1c_AY651061", r10$fastas)))
+  fail(paste("same-genotype-collapse: the collapsed 1c FASTA must be removed; got:",
+             paste(r10$fastas, collapse = ",")))
+ok("same-genotype-collapse -> redundant same-genotype slot dropped at selection (within-genotype unresolvable)")
 
 # =========================================================================
 # Subtest 11: 1a1b-exception (negative control) — rescue to 1b fires even
@@ -456,5 +464,76 @@ if (e11_cand2$candidate_ref[1] != "1b_D90208")
   fail(paste("1a1b-exception: cand2 candidate_ref must be 1b_D90208, got",
              e11_cand2$candidate_ref[1]))
 ok("1a1b-exception -> rescue to 1b fires when other slot is 1a (permitted cross-subtype pair)")
+
+# =========================================================================
+# Subtest 12: de-novo nomination (ERR1810475 shape) — a genuine different-
+#             genotype strain absent from first-mapping is APPENDED as a new
+#             candidate from assembly_support.
+# =========================================================================
+# Single genotype-2 candidate (2b, well-supported own subtype -> no rescue). The
+# assembly support ALSO carries a strong genotype-1 contig (1a, >3kb, passes the
+# four floors) that first-mapping never ranked. Genotype 1 is absent from the
+# candidate set, so it is nominated and appended at rank 2 with status forced to
+# "pass" and a _cand2. FASTA written.
+REFS_NOMINATE <- c(REFS, list("1a_HQ850279" = strrep("G", 60)))
+r12 <- run_rescue(
+  "nominate", "NOMINATE",
+  cands = mk_cands("NOMINATE",
+    mk_cand(1, "2b_AY232748", "2b", "2", 4460744, 100, "pass")),
+  support = mk_support("NOMINATE",
+    mk_support_row("2b", "2b_AY232748", 9549, 91.2, 9471, 30307.0),
+    mk_support_row("1a", "1a_HQ850279", 4734, 93.1, 4738, 7.1)),
+  refs = REFS_NOMINATE
+)
+assert_schema("nominate", r12$cands_out)
+if (nrow(r12$cands_out) != 2)
+  fail(paste("nominate: the nominated 1a must be appended (2 candidates), got",
+             nrow(r12$cands_out), "rows"))
+n12_dom <- r12$cands_out %>% filter(candidate_rank == 1)
+n12_min <- r12$cands_out %>% filter(candidate_rank == 2)
+if (n12_dom$candidate_ref[1] != "2b_AY232748")
+  fail(paste("nominate: dominant must remain 2b_AY232748, got", n12_dom$candidate_ref[1]))
+if (n12_min$candidate_ref[1] != "1a_HQ850279")
+  fail(paste("nominate: the nominated minor must be 1a_HQ850279, got", n12_min$candidate_ref[1]))
+if (n12_min$candidate_genotype[1] != "1")
+  fail(paste("nominate: nominated minor genotype must be 1, got", n12_min$candidate_genotype[1]))
+if (n12_min$confirmation_status[1] != "pass")
+  fail("nominate: nominated minor confirmation_status must be forced to 'pass'")
+if (is.na(n12_min$rescue_trigger[1]) || !grepl("denovo-nomination", n12_min$rescue_trigger[1]))
+  fail("nominate: nominated minor must carry a 'denovo-nomination' rescue_trigger")
+if (!any(grepl("1a_HQ850279_cand2\\.", r12$fastas)))
+  fail(paste("nominate: a 1a_HQ850279_cand2. FASTA must be written; got:",
+             paste(r12$fastas, collapse = ",")))
+ok("denovo-nomination -> different-genotype de-novo strain appended as a mapped candidate (ERR1810475)")
+
+# =========================================================================
+# Subtest 13: same-genotype collapse, divergent gt-4 (ERR1810450/451 shape) —
+#             two same-genotype references collapse to a single best ref.
+# =========================================================================
+# cand1 = 4a_DQ418789 (dominant), cand2 = a generic genotype-4 reference (subtype
+# "4"). Both are genotype 4 and not a 1a/1b pair, so the collapse keeps only the
+# best read recruiter (4a) and drops the generic genotype-4 second reference, so a
+# single genotype-4 reference enters JOINT_MAPPING.
+REFS_GT4 <- c(REFS, list("4a_DQ418789" = strrep("A", 60), "4_JF735135" = strrep("C", 60)))
+r13 <- run_rescue(
+  "gt4collapse", "GT4",
+  cands = mk_cands("GT4",
+    mk_cand(1, "4a_DQ418789", "4a", "4", 80000, 89, "pass"),
+    mk_cand(2, "4_JF735135",  "4",  "4", 30000, 77, "pass")),
+  support = mk_support("GT4",
+    mk_support_row("4", "4_JF735135", 9506, 85.6, 9417, 130.7)),
+  refs = REFS_GT4
+)
+assert_schema("gt4collapse", r13$cands_out)
+if (nrow(r13$cands_out) != 1)
+  fail(paste("gt4-collapse: only one genotype-4 reference must survive, got",
+             nrow(r13$cands_out), "rows"))
+if (r13$cands_out$candidate_ref[1] != "4a_DQ418789")
+  fail(paste("gt4-collapse: survivor must be the dominant 4a_DQ418789, got",
+             r13$cands_out$candidate_ref[1]))
+if (any(grepl("4_JF735135_cand", r13$fastas)))
+  fail(paste("gt4-collapse: the dropped generic genotype-4 FASTA must be removed; got:",
+             paste(r13$fastas, collapse = ",")))
+ok("gt4-collapse -> two same-genotype refs collapse to the single best (ERR1810450/451)")
 
 cat("\nALL PASS\n")
