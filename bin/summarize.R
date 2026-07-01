@@ -1536,6 +1536,40 @@ final <- final %>%
   # A sample with no candidate_support row (left_join NA) is, by definition, not rescued.
   mutate(rescue_flag = if_else(is.na(rescue_flag), FALSE, rescue_flag))
 
+# Phase-10 rescue_effect (handoff §4b): a per-sample categorical that reports WHERE a
+# surviving de-novo rescue landed — on the dominant/Major slot vs a minor slot vs
+# nowhere. Derived ONLY from data summarize.R already holds (candidate_support role +
+# rescued_from), so no new channel input is added (avoids SUMMARIZE channel-arity
+# fragility). NOTE: rescue_effect reflects ONLY rescues that SURVIVED into the final
+# call; the standalone {prefix}.rescue_audit.csv (rescue_evaluation.R) is authoritative
+# and additionally captures dropped_collapse / dropped_cap events. Mirrors the
+# rescue_review group_by/summarise/left_join structure.
+if (nrow(candidate_support) > 0) {
+  rescue_effect_review <- candidate_support %>%
+    group_by(sampleName) %>%
+    summarise(
+      major_changed = any(role == "dominant" & !is.na(rescued_from), na.rm = TRUE),
+      minor_changed = any(!is.na(rescued_from), na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(rescue_effect = case_when(
+      major_changed ~ "major_ref_changed",
+      minor_changed ~ "minor_ref_changed",
+      TRUE          ~ "none"
+    )) %>%
+    select(sampleName, rescue_effect)
+} else {
+  rescue_effect_review <- tibble(
+    sampleName    = character(),
+    rescue_effect = character()
+  )
+}
+
+final <- final %>%
+  left_join(rescue_effect_review, join_by(sampleName)) %>%
+  # A sample with no candidate_support row (left_join NA) had no surviving rescue.
+  mutate(rescue_effect = if_else(is.na(rescue_effect), "none", rescue_effect))
+
 # Review flag (REVIEW-01), rewired onto the Phase-8 roles (D-13/D-15). Human-readable
 # inspection prompts for samples that warrant manual review, joined with " | ". NA
 # when no reasons fire. The verbatim message text lives in the pmap_chr() below; the
