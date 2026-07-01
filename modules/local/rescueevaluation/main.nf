@@ -21,9 +21,10 @@ process RESCUE_EVALUATION {
     path(references)
 
     output:
-    tuple val(meta), path("*.candidates.csv"), emit: candidates
-    tuple val(meta), path("*_cand*.fa"),       emit: candidate_fasta, optional: true
-    path "versions.yml",                       emit: versions
+    tuple val(meta), path("*.candidates.csv"),   emit: candidates
+    tuple val(meta), path("*.rescue_audit.csv"), emit: rescue_audit
+    tuple val(meta), path("*_cand*.fa"),         emit: candidate_fasta, optional: true
+    path "versions.yml",                         emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -90,6 +91,9 @@ process RESCUE_EVALUATION {
     printf "sample,candidate_rank,candidate_ref,candidate_subtype,candidate_genotype,candidate_reads,candidate_cov,confirmation_status,rescued_from,rescue_trigger\n" > ${prefix}.rescued.candidates.csv
     printf "${prefix},1,3a_D17763,3a,3,8079,94,pass,NA,NA\n" >> ${prefix}.rescued.candidates.csv
     printf "${prefix},2,4k_EU392173,4k,4,40,5,below_threshold,NA,NA\n" >> ${prefix}.rescued.candidates.csv
+
+    # Header-only rescue audit ledger so -stub-run matches the rescue_audit emit glob.
+    printf "sample,event,original_ref,original_subtype,target_ref,target_subtype,target_genotype,evidence,disposition\n" > ${prefix}.rescue_audit.csv
 
     # Per-rank cand FASTA outputs (one per stub candidates.csv row). Filenames
     # match the declared emit glob "*_cand*.fa" (underscore before cand).
