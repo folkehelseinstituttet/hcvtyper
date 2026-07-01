@@ -94,7 +94,7 @@ TH_1A1B_LEN <- 5000
 #
 # Returns list(exit, cands_out, fastas, path).
 # -------------------------------------------------------------------------
-run_rescue <- function(case, prefix, cands, support, refs, prestage = character(0)) {
+run_rescue <- function(case, prefix, cands, support, refs, prestage = character(0), extra_args = NULL) {
   wd <- tempfile(paste0("rescue_", case, "_")); dir.create(wd)
 
   for (f in prestage) writeLines(c(paste0(">stub"), "ACGT"), file.path(wd, f))
@@ -115,7 +115,8 @@ run_rescue <- function(case, prefix, cands, support, refs, prestage = character(
     c(shQuote(script), shQuote(prefix),
       shQuote(cand_path), shQuote(support_path),
       shQuote(refs_path),
-      TH_LENGTH, TH_PIDENT, TH_ALN, TH_KMER, TH_1A1B_LEN),
+      TH_LENGTH, TH_PIDENT, TH_ALN, TH_KMER, TH_1A1B_LEN,
+      if (is.null(extra_args)) character(0) else extra_args),
     stdout = FALSE, stderr = FALSE
   )
 
@@ -535,5 +536,71 @@ if (any(grepl("4_JF735135_cand", r13$fastas)))
   fail(paste("gt4-collapse: the dropped generic genotype-4 FASTA must be removed; got:",
              paste(r13$fastas, collapse = ",")))
 ok("gt4-collapse -> two same-genotype refs collapse to the single best (ERR1810450/451)")
+
+# =========================================================================
+# Subtests 14-17: dominant-protect / kmer-guard / stale-reads / rescue-audit
+# =========================================================================
+REFS_ERR <- c(REFS, list("1a_HQ850279" = strrep("G",60),
+                         "3a_X76918"   = strrep("T",60),
+                         "1_KJ439780"  = strrep("A",60)))
+
+# Subtest 14: dominant strain protected (real-sample shape).
+rA <- run_rescue("err_dominant", "ERRDOM",
+  cands = mk_cands("ERRDOM",
+    mk_cand(1, "1a_HQ850279", "1a", "1", 6534184, 100, "pass"),
+    mk_cand(2, "1_KJ439780",  "1",  "1",   55438,  91, "pass")),
+  support = mk_support("ERRDOM",
+    mk_support_row("1a", "1a_HQ850279", 2118, 92.304, 2118, 31647.19),
+    mk_support_row("3a", "3a_X76918",   4189, 92.357, 4187, 2.728)),
+  refs = REFS_ERR, extra_args = c("2", "10", "90"))
+assert_schema("err_dominant", rA$cands_out)
+a1 <- rA$cands_out %>% filter(candidate_ref == "1a_HQ850279")
+if (nrow(a1) != 1 || !is.na(a1$rescued_from[1]))
+  fail("err-dominant: dominant 1a must survive UNREPLACED (Fix #2)")
+if (!any(rA$cands_out$candidate_ref == "3a_X76918"))
+  fail("err-dominant: 3a must be surfaced additively via nomination")
+if (any(rA$cands_out$candidate_ref == "1_KJ439780"))
+  fail("err-dominant: redundant genotype-1 slot must collapse")
+if ((rA$cands_out %>% arrange(candidate_rank) %>% slice(1))$candidate_ref[1] != "1a_HQ850279")
+  fail("err-dominant: Major (rank 1) must remain 1a_HQ850279")
+ok("dominant-protect -> well-covered assembled 1a kept as Major; thin 3a additive")
+
+# Subtest 15: Fix #3 in isolation (below the #2 cov floor).
+rB <- run_rescue("kmer_guard", "KMERG",
+  cands = mk_cands("KMERG",
+    mk_cand(1, "1a_HQ850279", "1a", "1", 500000, 50, "pass")),
+  support = mk_support("KMERG",
+    mk_support_row("1a", "1a_HQ850279", 2118, 92.3,   2118, 31647.19),
+    mk_support_row("3a", "3a_X76918",   4189, 92.357, 4187, 2.728)),
+  refs = REFS_ERR, extra_args = c("2", "10", "90"))
+b1 <- rB$cands_out %>% filter(candidate_ref == "1a_HQ850279")
+if (nrow(b1) != 1 || !is.na(b1$rescued_from[1]))
+  fail("kmer-guard: 1a REPLACE must be blocked by the relative k-mer guard (Fix #3)")
+ok("kmer-guard -> own-subtype depth >> target depth blocks the REPLACE (Fix #3)")
+
+# Subtest 16: legitimate correction still fires AND stale stats are blanked.
+rC <- run_rescue("stale_reads", "STALEREADS",
+  cands = mk_cands("STALEREADS",
+    mk_cand(1, "1a_M62321", "1a", "1", 80000, 95, "pass")),
+  support = mk_support("STALEREADS",
+    mk_support_row("2b", "2b_AY232748", 4120, 96.2, 3840, 4.1)),
+  refs = REFS, extra_args = c("2", "10", "90"))
+c1 <- rC$cands_out %>% filter(candidate_rank == 1)
+if (is.na(c1$rescued_from[1]))
+  fail("stale-reads: legitimate 1a->2b correction must still fire with guards enabled")
+if (!is.na(c1$candidate_reads[1]) || !is.na(c1$candidate_cov[1]))
+  fail("stale-reads: a REPLACED candidate must not carry the displaced ref's reads/cov")
+ok("stale-reads -> replace still fires; displaced ref's first-mapping reads/cov blanked")
+
+# Subtest 17: rescue audit ledger is written and records the replace.
+audit_path <- file.path(dirname(rC$path), "STALEREADS.rescue_audit.csv")
+if (!file.exists(audit_path))
+  fail("rescue-audit: {prefix}.rescue_audit.csv must be written")
+aud <- read_csv(audit_path, show_col_types = FALSE)
+if (!any(aud$event == "replace" & aud$target_ref == "2b_AY232748"))
+  fail("rescue-audit: the 1a->2b replace must appear in the ledger")
+if (!any(grepl("^retained_rank_", aud$disposition)))
+  fail("rescue-audit: a surviving replace must have a retained_rank_* disposition")
+ok("rescue-audit -> ledger records the replace with its final disposition (Fix #4)")
 
 cat("\nALL PASS\n")
