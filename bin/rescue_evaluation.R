@@ -82,6 +82,13 @@ rescue_1a1b_length    <- as.numeric(args[9])
 n_candidates_cap <- if (length(args) >= 10) suppressWarnings(as.integer(args[10])) else NA_integer_
 if (is.na(n_candidates_cap) || n_candidates_cap < 1L) n_candidates_cap <- Inf
 
+# Optional 11th/12th positional args (Fix #2/#3). Absent => guard disabled, so
+# the 9-arg subprocess test and any legacy caller preserve prior behaviour.
+rescue_kmer_cov_ratio <- if (length(args) >= 11) suppressWarnings(as.numeric(args[11])) else NA_real_
+if (is.na(rescue_kmer_cov_ratio) || rescue_kmer_cov_ratio <= 0) rescue_kmer_cov_ratio <- Inf
+dominant_protect_cov  <- if (length(args) >= 12) suppressWarnings(as.numeric(args[12])) else NA_real_
+if (is.na(dominant_protect_cov)) dominant_protect_cov <- Inf
+
 # --- Subtype-token helper -----------------------------------------------------
 subtype_of <- function(ref) {
   ifelse(is.na(ref), NA_character_, str_extract(ref, "^[^_]+"))
@@ -200,13 +207,37 @@ evaluate_row <- function(row) {
   sample_support <- support %>% filter(sample == sample_id)
   if (nrow(sample_support) == 0) return(no_rescue)
 
-  # Own-subtype floor check: if de novo confirms the candidate's own subtype,
-  # no rescue needed. Skipped for 2k1b candidates — the 2k1b special rule
-  # (D-03) fires regardless of own-support quality.
-  if (!isTRUE(cand_sub == "2k1b")) {
-    own_row <- sample_support %>% filter(subtype == cand_sub) %>%
-      arrange(desc(best_contig_length)) %>% slice(1)
-    if (nrow(own_row) > 0 && floors_ok(own_row, rescue_min_length)) return(no_rescue)
+  # Best own-subtype contig depth — reference point for Fix #2 / #3.
+  own_rows <- sample_support %>% filter(subtype == cand_sub)
+  own_kmer <- if (nrow(own_rows) > 0) max(own_rows$best_contig_kmer_cov, na.rm = TRUE) else NA_real_
+
+  # Fix #3 — relative k-mer-coverage guard (used at both rescue-return points).
+  # A REPLACE target whose k-mer depth is dwarfed by the candidate's own assembled
+  # subtype is cross-mapping noise sitting on a real strain; refuse. Inert when the
+  # own subtype has no contig (own_kmer NA) — preserves subtest 1.
+  kmer_ratio_blocks <- function(target_kmer) {
+    !is.na(own_kmer) && is.finite(own_kmer) && !is.na(target_kmer) &&
+      target_kmer > 0 && (own_kmer / target_kmer) >= rescue_kmer_cov_ratio
+  }
+
+  # Own-subtype confirmation. Skipped for 2k1b (D-03 fires regardless).
+  if (!isTRUE(cand_sub == "2k1b") && nrow(own_rows) > 0) {
+    # Standard: longest own-subtype contig passes all four floors.
+    own_longest <- own_rows %>% arrange(desc(best_contig_length)) %>% slice(1)
+    if (floors_ok(own_longest, rescue_min_length)) return(no_rescue)
+    # Fix #2 — mapping-aware confirmation. A candidate already well covered by
+    # first-mapping reads is a real dominant strain; its de-novo contig merely
+    # assembling SHORT must not make it eligible for replacement. Confirm if the
+    # own subtype clears the QUALITY floors (identity + k-mer depth) even when it
+    # fails the LENGTH / ALN floors. (Subtest 1 stays a replace: there the own
+    # subtype has NO contig, so this cannot fire.)
+    own_best_q <- own_rows %>% arrange(desc(best_contig_kmer_cov)) %>% slice(1)
+    own_quality_ok <- isTRUE(
+      own_best_q$best_contig_pident[1]   >  rescue_min_pident &
+      own_best_q$best_contig_kmer_cov[1] >= rescue_min_kmer_cov
+    )
+    if (isTRUE(row$candidate_cov >= dominant_protect_cov) && own_quality_ok)
+      return(no_rescue)
   }
 
   # Find the best-supported alternative subtype (longest contig, different
@@ -232,7 +263,8 @@ evaluate_row <- function(row) {
       g2_row <- g2_support[1, ]
       if (floors_ok(g2_row, rescue_min_length)) {
         rescue_ref <- g2_row$best_ref[1]
-        if (!is.na(rescue_ref) && rescue_ref != orig_ref) {
+        if (!is.na(rescue_ref) && rescue_ref != orig_ref &&
+            !kmer_ratio_blocks(g2_row$best_contig_kmer_cov[1])) {
           trig <- sprintf(
             "2k1b-rule denovo %s contig %gbp pident=%g aln=%gbp kmer_cov=%g (replaced %s)",
             rescue_ref, g2_row$best_contig_length[1], g2_row$best_contig_pident[1],
@@ -254,6 +286,7 @@ evaluate_row <- function(row) {
   }
 
   if (!floors_ok(alt_support, length_floor)) return(no_rescue)
+  if (kmer_ratio_blocks(alt_support$best_contig_kmer_cov[1])) return(no_rescue)  # Fix #3
 
   trig <- sprintf(
     "denovo %s contig %gbp pident=%g aln=%gbp kmer_cov=%g (replaced %s)",
@@ -265,6 +298,23 @@ evaluate_row <- function(row) {
 # --- Drive evaluation over every candidate row --------------------------------
 out <- candidates %>%
   mutate(rescued_from = NA_character_, rescue_trigger = NA_character_)
+
+# --- Rescue audit ledger (Fix #4) --------------------------------------------
+# Records EVERY rescue/nomination/block decision so a fired-then-dropped rescue
+# (collapsed or capped) remains traceable in the published output.
+audit_rows <- list()
+add_audit <- function(sample, event, orig_ref, target_ref, evidence) {
+  audit_rows[[length(audit_rows) + 1]] <<- tibble(
+    sample = sample, event = event,
+    original_ref = orig_ref, original_subtype = subtype_of(orig_ref),
+    target_ref = target_ref, target_subtype = subtype_of(target_ref),
+    target_genotype = genotype_of(subtype_of(target_ref)),
+    evidence = evidence)
+}
+
+# Pre-cap survivor set (Fix #4). Declared in outer scope so it exists even when
+# there are no candidates (empty / skip-assembly inputs).
+kept_refs_precap <- character(0)
 
 if (nrow(out) > 0) {
   # Snapshot original candidate refs before any rescue mutations.
@@ -327,8 +377,13 @@ if (nrow(out) > 0) {
       if (!identical(res$rescued_from, res$rescue_ref) && file.exists(stale_fa)) {
         file.remove(stale_fa)
       }
+      add_audit(out$sample[i], "replace", res$rescued_from, res$rescue_ref, res$rescue_trigger)
+    } else if (!is.na(res$rescue_ref) && rescue_would_collapse) {
+      add_audit(out$sample[i], "blocked_collapse", out$candidate_ref[i], res$rescue_ref, res$rescue_trigger)
+    } else if (!is.na(res$rescue_ref) && rescue_would_dup_genotype) {
+      add_audit(out$sample[i], "blocked_dup_genotype", out$candidate_ref[i], res$rescue_ref, res$rescue_trigger)
     }
-    # else: membership guard failed, collapse guard blocked, or no rescue → leave NA, status unchanged.
+    # else: membership guard failed or no rescue → leave NA, status unchanged.
   }
 }
 
@@ -429,6 +484,7 @@ if (nrow(out) > 0) {
         rescued_from        = NA_character_,
         rescue_trigger      = trig
       ))
+      add_audit(sample_id, "nominate", NA_character_, nref, trig)
     }
   }
 
@@ -460,6 +516,9 @@ if (nrow(out) > 0) {
   }
 
   # ---- Re-rank 1..N (dominant first) and cap at n_candidates_cap -------------
+  # Capture the pre-cap survivor set so the audit can distinguish a rescue that
+  # was dropped by genotype-collapse from one dropped by the n_candidates cap.
+  kept_refs_precap <- ord[keep_idx, , drop = FALSE]$candidate_ref
   out <- ord[keep_idx, , drop = FALSE] %>%
     arrange(desc(candidate_reads)) %>%
     slice(seq_len(min(n(), n_candidates_cap))) %>%
@@ -481,9 +540,40 @@ if (nrow(out) > 0) {
   }
 }
 
+# --- Stale first-mapping-stat guard ------------------------------------------
+# A REPLACED candidate's first-mapping read count / coverage described the
+# DISPLACED reference, not the reference now shown in candidate_ref. Blank them
+# (as the additive-nomination path already does) so no downstream table reports
+# the old ref's reads / first-mapping % against the new ref. Targeted mapping
+# recomputes the real per-candidate numbers.
+out <- out %>%
+  mutate(
+    candidate_reads = if_else(!is.na(rescued_from), NA_real_, candidate_reads),
+    candidate_cov   = if_else(!is.na(rescued_from), NA_real_, candidate_cov)
+  )
+
 # --- Write the corrected candidates CSV --------------------------------------
 out_cols <- c("sample", "candidate_rank", "candidate_ref", "candidate_subtype",
               "candidate_genotype", "candidate_reads", "candidate_cov",
               "confirmation_status", "rescued_from", "rescue_trigger")
 out <- out %>% select(all_of(out_cols))
+
+# Resolve each audit row's fate against the FINAL candidate set.
+audit <- if (length(audit_rows) > 0) bind_rows(audit_rows) else tibble(
+  sample = character(), event = character(),
+  original_ref = character(), original_subtype = character(),
+  target_ref = character(), target_subtype = character(),
+  target_genotype = character(), evidence = character())
+final_rank <- out %>% select(target_ref = candidate_ref, .rank = candidate_rank)
+audit <- audit %>%
+  left_join(final_rank, by = "target_ref") %>%
+  mutate(disposition = case_when(
+    event %in% c("blocked_collapse", "blocked_dup_genotype") ~ "blocked",
+    !is.na(.rank)                                            ~ paste0("retained_rank_", .rank),
+    target_ref %in% kept_refs_precap                         ~ "dropped_cap",
+    TRUE                                                     ~ "dropped_collapse"
+  )) %>%
+  select(-.rank)
+write_csv(audit, paste0(prefix, ".rescue_audit.csv"))
+
 write_csv(out, paste0(prefix, ".rescued.candidates.csv"))
