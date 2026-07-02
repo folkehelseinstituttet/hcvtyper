@@ -1588,6 +1588,14 @@ final <- final %>%
 #      inconclusive for both strains); warrants analyst review of QC plots / contigs
 #   6. overall_sample_call == "indeterminate" — no candidate passed the major-gate
 #   7. gate_flag != "ok" — major failed the first-mapping quality thresholds
+#   8. rescue_effect == "major_ref_changed" — the de-novo rescue OVERRODE the
+#      dominant/Major reference chosen by first-mapping. This is the single
+#      highest-stakes automated decision in the pipeline (it silently replaces the
+#      primary call for the dominant strain), so it ALWAYS warrants human
+#      adjudication — see rescue_audit.csv for the from/to and the trigger. Note
+#      rescue_flag (D-08) stays independent; only a rescue that landed on the MAJOR
+#      slot is coupled into review_flag here (a minor-slot rescue is surfaced via
+#      rescue_effect but does not on its own force review).
 # (Earlier versions emitted semicolon-separated reason codes; rewritten to full
 # sentences in commit ff12009; rewired onto roles in Phase 8 / D-15.)
 #
@@ -1608,10 +1616,11 @@ final <- final %>%
         dominant_unconfirmed,
         gate_flag,
         denovo_minor_subtype,
-        Major_subtype
+        Major_subtype,
+        rescue_effect
       ),
       function(maj_match, min_match, sample_call, refuted, uncorr, dom_unconf, gflag,
-               dv_minor_sub, major_sub) {
+               dv_minor_sub, major_sub, resc_effect) {
         msgs        <- character(0)
         is_coinf    <- !is.na(sample_call) && sample_call == "co-infection"
         is_mono     <- !is.na(sample_call) && sample_call == "monoinfection"
@@ -1640,10 +1649,59 @@ final <- final %>%
           msgs <- c(msgs, "No candidate passed the major-gate — overall sample call indeterminate.")
         if (!is.na(gflag) && gflag != "ok")
           msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
+        if (!is.na(resc_effect) && resc_effect == "major_ref_changed")
+          msgs <- c(msgs, "De novo rescue overrode the dominant/Major reference chosen by first-mapping — the primary call was reassigned automatically. Confirm against rescue_audit.csv (from/to + trigger) before reporting. Please review.")
         if (length(msgs) == 0) NA_character_ else paste(msgs, collapse = " | ")
       }
     )
   }) %>%
+  # call_confidence (evidence-tier axis) — an EXPLICIT rollup of the confidence
+  # signals that are otherwise scattered across review_flag / gate_flag /
+  # rescue_effect / subtype-match / role columns. It does NOT introduce new science:
+  # every input below is already computed upstream. The point is to separate "what
+  # the data indicate" (overall_sample_call — kept concrete) from "how much to trust
+  # it" (this column), so a clean call reads differently from a marginal one at a
+  # glance without a reader reverse-engineering the flag columns. Deliberately a
+  # small controlled vocabulary; tiers are ordered most-severe-first (first match
+  # wins), so a single hard signal caps the tier regardless of softer ones.
+  #
+  #   indeterminate — no actionable call (no candidate passed the gate / untypable).
+  #   review        — a HARD conflict that should block auto-reporting: major failed
+  #                   mapping QC, major subtype conflict (de novo vs mapping), the
+  #                   rescue overrode the Major reference, or dominance is ambiguous.
+  #   provisional   — a SOFT caveat worth noting but not blocking: dominant identity
+  #                   uncorroborated, co-infection kept without corroboration, a minor
+  #                   refuted by de novo, a minor-subtype conflict, or a minor-slot
+  #                   rescue.
+  #   high          — none of the above fired AND no review note; the call stands
+  #                   on clean evidence.
+  #
+  # Invariant (one-directional, enforced by construction): a sample with a non-empty
+  # review_flag is NEVER `high` — the final `!is.na(review_flag)` clause below
+  # demotes any remaining review-noted sample to at least `provisional`. This catches
+  # review_flag triggers that have no dedicated column signal here (e.g. the
+  # "monoinfection but de novo found a different-genotype contig" trigger, where the
+  # Minor slot — and thus denovo_minor_subtype_match — is NA). So `high` always has
+  # an empty review_flag. The converse does NOT hold: some `provisional` samples
+  # carry no prose note (a minor-slot rescue, an uncorroborated co-infection
+  # dominant), which is intended — `provisional` is a softer bucket than a sentence.
+  mutate(
+    call_confidence = case_when(
+      is.na(overall_sample_call) |
+        overall_sample_call %in% c("indeterminate", "untypable")        ~ "indeterminate",
+      (!is.na(gate_flag) & gate_flag != "ok") |
+        (!is.na(denovo_major_subtype_match) & denovo_major_subtype_match == "NO") |
+        (!is.na(rescue_effect) & rescue_effect == "major_ref_changed") |
+        overall_sample_call == "co-infection (indeterminate dominance)"  ~ "review",
+      coalesce(dominant_unconfirmed, FALSE) |
+        coalesce(any_uncorroborated, FALSE) |
+        coalesce(any_refuted_denovo, FALSE) |
+        (!is.na(denovo_minor_subtype_match) & denovo_minor_subtype_match == "NO") |
+        (!is.na(rescue_effect) & rescue_effect == "minor_ref_changed") |
+        !is.na(review_flag)                                              ~ "provisional",
+      TRUE                                                               ~ "high"
+    )
+  ) %>%
   # Drop the per-sample role-review helper booleans now they have been consumed.
   select(-any_refuted_denovo, -any_uncorroborated, -dominant_unconfirmed)
 
@@ -1654,6 +1712,54 @@ final <- final %>%
   mutate(
     Major = Major_subtype,
     Minor = Minor_subtype
+  )
+
+# Per-strain evidence basis (Major_evidence / Minor_evidence). A single compact
+# string per strain answering the reviewer's real question — "on what evidence is
+# THIS strain being called?" — so the basis for a call can be read in one cell
+# instead of cross-referencing the ~dozen scattered Major_*/Minor_* metric columns.
+# Pure presentation: every token is a value already computed upstream; nothing is
+# re-derived. Optional columns (consensus identity, present only when the distance
+# leg ran) are NA-filled first so the row-wise builder never errors, and each token
+# is emitted only when its source value is non-NA. A strain with no reference (e.g.
+# the Minor slot of a monoinfection) yields NA — no empty scaffold string.
+evidence_cols <- c(
+  "Major_reference", "Reads_nodup_mapped_major", "Major_cov_breadth_min_10",
+  "denovo_major_subtype", "Major_consensus_similarity_pct",
+  "Minor_reference", "Reads_nodup_mapped_minor", "Minor_cov_breadth_min_10",
+  "denovo_minor_subtype", "Minor_consensus_similarity_pct"
+)
+for (col in evidence_cols) {
+  if (!col %in% colnames(final)) final <- final %>% add_column(!!col := NA)
+}
+
+# Build one strain's evidence string from its (already-computed) parts. `rescued`
+# is TRUE when the de-novo rescue reassigned THIS slot's reference (from rescue_effect).
+build_evidence <- function(ref, reads, breadth10, dn_sub, cons_pct, rescued) {
+  if (is.na(ref)) return(NA_character_)
+  toks <- ref
+  if (!is.na(reads))     toks <- c(toks, paste0(format(round(reads), big.mark = ",", trim = TRUE, scientific = FALSE), " reads (nodup)"))
+  if (!is.na(breadth10)) toks <- c(toks, paste0(round(breadth10), "% breadth@10x"))  # cov_breadth_min_10 is already 0-100
+  if (!is.na(dn_sub))    toks <- c(toks, paste0("de novo ", dn_sub))
+  if (!is.na(cons_pct))  toks <- c(toks, paste0(round(cons_pct, 1), "% consensus id"))
+  toks <- c(toks, if (isTRUE(rescued)) "ref REASSIGNED by de-novo rescue" else "ref from first-mapping")
+  paste(toks, collapse = " | ")
+}
+
+final <- final %>%
+  mutate(
+    Major_evidence = pmap_chr(
+      list(Major_reference, Reads_nodup_mapped_major, Major_cov_breadth_min_10,
+           denovo_major_subtype, Major_consensus_similarity_pct,
+           !is.na(rescue_effect) & rescue_effect == "major_ref_changed"),
+      build_evidence
+    ),
+    Minor_evidence = pmap_chr(
+      list(Minor_reference, Reads_nodup_mapped_minor, Minor_cov_breadth_min_10,
+           denovo_minor_subtype, Minor_consensus_similarity_pct,
+           !is.na(rescue_effect) & rescue_effect == "minor_ref_changed"),
+      build_evidence
+    )
   )
 
 # Save dominant-rank lookup before the reorder select drops it (used for
@@ -1683,6 +1789,8 @@ final <- final %>%
          # Phase 8 (D-16): overall sample call from the N-candidate role model,
          # placed where the retired minor_denovo_status / coinfection_flag sat.
          overall_sample_call,
+         # Explicit evidence-tier axis paired with the call (see mutate above).
+         call_confidence,
          Major_role_reference,
          Major_role_subtype,
          Major_dominance_score,
@@ -1696,6 +1804,9 @@ final <- final %>%
          denovo_major_subtype_match,
          denovo_minor_subtype_match,
          review_flag,
+         # Per-strain evidence basis strings (built above) — the "why this call".
+         Major_evidence,
+         Minor_evidence,
          Reads_withdup_mapped_major,
          Reads_nodup_mapped_major,
          Percent_reads_mapped_of_trimmed_with_dups_major,
@@ -1740,11 +1851,13 @@ triage <- final %>%
   select(
     sampleName,
     overall_sample_call,                             # placement 2
+    call_confidence,                                 # placement 2b
     review_flag,                                     # placement 3
     Genotype,                                        # placement 4
     Major_avg_depth,                                 # placement 6
     subtype_conflict,                                # placement 10
     rescue_flag,                                     # placement 20
+    rescue_effect,                                   # placement 20b — where a surviving rescue landed
     total_trimmed_reads,                             # placement 25
     Major_cov_breadth_min_10,                        # placement 30
     Major_cov_breadth_min_5,                         # placement 35
