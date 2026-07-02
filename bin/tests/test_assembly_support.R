@@ -15,7 +15,7 @@
 #   Case B (multi-hit de-dup): a single contig with two BLAST hits to the same
 #     subtype reference -> one row for that subtype, length not duplicated.
 #   Case C (empty / no hits): empty blast_out -> a header-only assembly_support.csv
-#     is written, the script exits 0, and the header equals the six-column contract
+#     is written, the script exits 0, and the header equals the seven-column contract
 #     (T-07-01 DoS guard: never abort on skip-assembly).
 #
 # blast_parse.R sources nothing test-local; it reads the references FASTA (must be
@@ -46,8 +46,11 @@ fail <- function(msg) {
 }
 ok <- function(msg) cat("PASS:", msg, "\n")
 
-SUPPORT_COLS <- c("sample", "subtype", "best_contig_length", "best_contig_pident",
-                  "best_contig_aln_length", "best_contig_kmer_cov")
+# Seven-column contract: `best_ref` (the winning contig's BLAST subject / reference)
+# was added after `subtype` mid-project so the rescue step (rescue_evaluation.R) can
+# rank alternate subtypes by their best_ref; blast_parse.R §4b emits it in this order.
+SUPPORT_COLS <- c("sample", "subtype", "best_ref", "best_contig_length",
+                  "best_contig_pident", "best_contig_aln_length", "best_contig_kmer_cov")
 
 # The 12 standard outfmt6 columns. `hits` is a list of named lists each carrying
 # the fields we vary (qseqid, sseqid, pident, length); the rest are filled with
@@ -125,7 +128,7 @@ r_a <- run_blast_parse(
 )
 if (is.null(r_a$support)) fail("best: no assembly_support.csv written")
 if (!identical(colnames(r_a$support), SUPPORT_COLS))
-  fail(paste("best: header must be the six-column contract; got:",
+  fail(paste("best: header must be the seven-column contract; got:",
              paste(colnames(r_a$support), collapse = ",")))
 if (nrow(r_a$support) != 2)
   fail(paste("best: expected exactly 2 rows (one per subtype), got", nrow(r_a$support)))
@@ -172,7 +175,7 @@ if (b2b$best_contig_length[1] != 1500)
              b2b$best_contig_length[1]))
 ok("dedup -> one 2b row, length not duplicated across the two same-ref hits")
 
-# --- Case C: empty / no hits -> header-only CSV, exit 0, six-column contract --
+# --- Case C: empty / no hits -> header-only CSV, exit 0, seven-column contract --
 r_c <- run_blast_parse("empty", "EMPTY", hits = list())
 if (r_c$exit != 0)
   fail(paste("empty: script must exit 0 on no-hit input, got exit", r_c$exit))
@@ -180,11 +183,11 @@ if (is.na(r_c$header))
   fail("empty: a header-only assembly_support.csv must still be written")
 got_cols <- strsplit(r_c$header, ",", fixed = TRUE)[[1]]
 if (!identical(got_cols, SUPPORT_COLS))
-  fail(paste("empty: header-only CSV must carry the six-column contract; got:",
+  fail(paste("empty: header-only CSV must carry the seven-column contract; got:",
              r_c$header))
 if (!is.null(r_c$support) && nrow(r_c$support) != 0)
   fail(paste("empty: header-only CSV must have zero data rows, got",
              nrow(r_c$support)))
-ok("empty -> header-only CSV, exit 0, six-column contract (T-07-01 DoS guard)")
+ok("empty -> header-only CSV, exit 0, seven-column contract (T-07-01 DoS guard)")
 
 cat("\nALL PASS\n")
