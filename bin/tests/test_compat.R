@@ -639,4 +639,41 @@ if (!identical(as.character(minor_row$denovo_best_contig_ref[1]), "1b_D90208"))
   fail(sprintf("RPT-CONTIG: [minor] denovo_best_contig_ref = '%s', expected 1b_D90208 (minor strain's ref, not the major's)", minor_row$denovo_best_contig_ref[1]))
 ok("RPT-CONTIG: summary_mqc.tsv [major]/[minor] rows carry the correct per-strain contig + ref via col_major/col_minor pairing")
 
+# =========================================================================
+# EVID-02 (Phase 12, folded todo 2026-06-22): a co-infection whose MINOR
+# candidate's combined-BAM idxstats row reports mapped=0 (competitive joint
+# mapping assigned all reads to the dominant, Phase 11) must NOT be silently
+# dropped. Before the fix, summarize.R's `filter(mapped > 0)` in both idxstats
+# parse loops discarded the minor row, Minor_reference collapsed to NA, and the
+# sample was reported as a false monoinfection. After relaxing the guard to
+# `filter(candidate_ref != "*")`, the zero-read minor survives to Summary.csv so
+# the downstream evidence engine — not a silent upstream filter — decides its role.
+#
+# The minor is a genuine trace co-infection: selected during first-pass with a
+# low-but-above-floor candidate_reads count (> minRead), yet its withdup/nodup
+# idxstats mapped count is 0 because competitive joint mapping assigned all its
+# reads to the dominant. Its first-pass count stays trace-level so the dominant
+# (candidate 1) remains the role-dominant and the zero-read minor genuinely lands
+# in the Minor slot. Assert Minor_reference is retained (populated, not NA).
+# -------------------------------------------------------------------------
+zeroread_cands <- mk_cands(
+  mk_cand(1, "1a_M62321", "1a", 200000, 99, withdup_reads = 200000, nodup_reads = 15000),
+  mk_cand(2, "1b_D90208", "1b", 1000,   97, withdup_reads = 0,      nodup_reads = 0)
+)
+zeroread_summary <- run_summarize("zeroread", "ZEROREAD", zeroread_cands)
+if (is.null(zeroread_summary)) fail("EVID-02 zero-read: summarize.R wrote no Summary.csv")
+if (nrow(zeroread_summary) != 1)
+  fail(sprintf("EVID-02 zero-read: expected exactly 1 Summary.csv row, got %d", nrow(zeroread_summary)))
+# The minor reference must be retained (populated, not silently dropped to NA).
+zr_minor <- zeroread_summary$Minor_reference[1]
+if (is.na(zr_minor) || (is.character(zr_minor) && zr_minor %in% c("NA", "")))
+  fail("EVID-02 zero-read: Minor_reference was silently dropped to NA for a 0-mapped-read minor (mapped>0 filter regression)")
+if (zr_minor != "1b_D90208")
+  fail(sprintf("EVID-02 zero-read: Minor_reference = '%s', expected 1b_D90208 (the retained zero-read minor)", zr_minor))
+# The retained minor carries a numeric 0 read count (flows through, not NA-dropped).
+if (!cell_equal(zeroread_summary$Reads_nodup_mapped_minor[1], 0))
+  fail(sprintf("EVID-02 zero-read: Reads_nodup_mapped_minor = '%s', expected 0 (the zero-read minor's idxstats col 3)",
+               zeroread_summary$Reads_nodup_mapped_minor[1]))
+ok("EVID-02 zero-read: a 0-mapped-read co-infection minor is retained in Summary.csv (not silently dropped)")
+
 cat("\nALL PASS\n")
