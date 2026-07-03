@@ -397,10 +397,12 @@ classify_roles <- function(scored_df, minRead, minCov,
     out <- if (is.null(scored_df)) tibble() else scored_df
     out <- out %>%
       mutate(
-        dominance_score     = if ("dominance_score" %in% names(.)) dominance_score else double(),
-        role                = character(),
-        role_reason         = character(),
-        overall_sample_call = character()
+        dominance_score        = if ("dominance_score" %in% names(.)) dominance_score else double(),
+        assembly_support_score = if ("assembly_support_score" %in% names(.)) assembly_support_score else double(),
+        assembly_exists        = if ("assembly_exists" %in% names(.)) assembly_exists else logical(),
+        role                   = character(),
+        role_reason            = character(),
+        overall_sample_call    = character()
       )
     return(out)
   }
@@ -408,6 +410,17 @@ classify_roles <- function(scored_df, minRead, minCov,
   # Ensure a dominance_score column exists (defensive — caller normally scores first).
   if (!"dominance_score" %in% names(scored_df)) {
     scored_df <- score_candidates(scored_df)
+  }
+
+  # D-14: emit the continuous assembly_support_score + assembly_exists as ADDITIVE
+  # columns on every output row (EVID-01). This is purely additive this plan — the
+  # own_substantial / asymmetric-refute / role / role_reason / overall_sample_call
+  # logic below still reads the binary ANDed floors, unchanged, until Plan 03
+  # replaces it with the evidence-state model. score_assembly_support() reads only
+  # the candidate's OWN assembly metrics (identity/length/k-mer, D-11); adding it
+  # here cannot perturb any existing derivation.
+  if (!"assembly_support_score" %in% names(scored_df)) {
+    scored_df <- score_assembly_support(scored_df)
   }
 
   # Per-candidate substantiality of OWN assembly support (D-10 ANDed floors on the
