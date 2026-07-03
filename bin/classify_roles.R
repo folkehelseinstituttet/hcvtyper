@@ -177,6 +177,105 @@ is_valid_minor <- function(cand_subtype, cand_genotype, dom_subtype, dom_genotyp
   list(evenness = 3.0, reads = 1.0, kmercov = 0.5)
 }
 
+# Default assembly-support-score weights (EVID-01 / D-11). Parallels
+# .default_score_weights() in house style, but carries ONLY the identity/length/
+# kmer_bonus keys — deliberately NO reads/breadth/evenness keys, so the score can
+# never read candidate_reads/candidate_cov/cv_evenness (D-11: assembly_support_score
+# stays purely about the candidate's OWN de novo/assembly evidence, orthogonal to
+# dominance_score). Constants are the Phase-12 calibration-VALIDATED defaults
+# (12-RESEARCH §Real Data Calibration; see score_assembly_support() header).
+.default_assembly_weights <- function() {
+  list(identity = 0.65, length = 0.35, kmer_bonus = 0.10)
+}
+
+# score_assembly_support(df, w, id_center, id_slope, len_ref, kmer_cap)
+#   Adds a bounded continuous `assembly_support_score` (0-1) and an `assembly_exists`
+#   boolean to df, replacing the meaning of the binary ANDed `own_substantial`
+#   collapse with a smooth, calibrated evidence signal (EVID-01). The score reads
+#   ONLY the candidate's own assembly metrics (D-11):
+#     assembly_support_best_contig_pident   (identity %),
+#     assembly_support_best_contig_length   (bp),
+#     assembly_support_best_contig_kmer_cov (k-mer coverage; bonus-only).
+#   It NEVER reads candidate_reads / candidate_cov / cv_evenness / targeted_reads_nodup.
+#
+#   Formula (bounded to [0,1], D-08):
+#     id_term  = logistic((pident - id_center) / id_slope)         -- smooth, NO 90% cliff
+#     len_term = min(length / len_ref, 1)                          -- saturating partial credit
+#     base     = w$identity * id_term + w$length * len_term
+#     kbonus   = w$kmer_bonus * log10(1 + min(kmer, kmer_cap)) / log10(1 + kmer_cap)  -- bonus-only (D-10)
+#     score    = min(base + kbonus, 1)                             -- floored to 0 when no assembly (D-09)
+#
+#   Calibration (12-RESEARCH §Real Data Calibration, D-12/D-13): the identity
+#   logistic is centered at 88 — BELOW 90 — because real dominant assemblies reach
+#   81.34% identity and the genuine corroborated co-infection band clusters at
+#   90.4-94.1%; centering a steep curve at 90 would re-create the very cliff EVID-01
+#   removes. Named-anchor scores under these constants: Sample51K-2c (89.009%, 9479bp,
+#   k-mer 514) -> 0.874; Sample61K-2c (88.987%, 9477bp, k-mer 103) -> 0.872;
+#   2714372 1a (90.996%, 6811bp, k-mer 1.93 — k-mer no longer penalizes) -> 0.941;
+#   2768856 4d (no assembly) -> 0.000. The 15 genuine corroborated minors all land
+#   >= 0.87, cleanly separable from the score-0 no-assembly floor.
+#
+#   D-09: a candidate with NO own assembly (assembly_exists FALSE, or NA identity/
+#   length) returns score EXACTLY 0, not NA. `assembly_exists` is carried as a
+#   SEPARATE boolean (derived from assembly_support == "supported" OR non-NA
+#   identity+length) so no_own_assembly stays distinguishable from a weak-but-
+#   present assembly (D-06).
+#
+#   Pure; no file I/O. NA-tolerant; never stop() on empty/NULL input (CLASS-03/
+#   T-08-01) — the typed zero-row/NULL guard carries the new columns.
+score_assembly_support <- function(df, w = .default_assembly_weights(),
+                                   id_center = 88, id_slope = 1.6,
+                                   len_ref = 3000, kmer_cap = 50) {
+  if (is.null(df) || nrow(df) == 0) {
+    out <- if (is.null(df)) tibble() else df
+    return(out %>% mutate(assembly_support_score = double(), assembly_exists = logical()))
+  }
+
+  wi <- w$identity   %||% 0.65
+  wl <- w$length     %||% 0.35
+  wk <- w$kmer_bonus %||% 0.10
+
+  # NA-tolerant, presence-checked extraction (score_candidates() idiom). Reads ONLY
+  # the three OWN-assembly metric columns — never reads/breadth/evenness (D-11).
+  pid <- if ("assembly_support_best_contig_pident"   %in% names(df)) df$assembly_support_best_contig_pident   else rep(NA_real_, nrow(df))
+  len <- if ("assembly_support_best_contig_length"   %in% names(df)) df$assembly_support_best_contig_length   else rep(NA_real_, nrow(df))
+  kmer <- if ("assembly_support_best_contig_kmer_cov" %in% names(df)) df$assembly_support_best_contig_kmer_cov else rep(NA_real_, nrow(df))
+
+  # assembly_exists (D-06/D-09): a contig is present when the join flags it
+  # "supported" OR when both identity and length metrics are non-NA. Kept SEPARATE
+  # from the score so no_own_assembly (exists FALSE) vs weak_own_assembly (exists
+  # TRUE, low score) stays distinguishable downstream.
+  metric_present <- !is.na(pid) & !is.na(len)
+  if ("assembly_support" %in% names(df)) {
+    supported <- !is.na(df$assembly_support) & df$assembly_support == "supported"
+    assembly_exists <- supported | metric_present
+  } else {
+    assembly_exists <- metric_present
+  }
+
+  # Identity: logistic centered BELOW 90 (D-12) — smooth, no cliff (EVID-01).
+  id_term  <- 1 / (1 + exp(-(pid - id_center) / id_slope))
+  # Length: saturating partial credit, clamped to [0,1] (D-08).
+  len_term <- pmax(0, pmin(len / len_ref, 1))
+  base     <- wi * id_term + wl * len_term
+
+  # k-mer: BONUS-ONLY, capped + log-compressed (D-10) — NA / <=0 => 0 boost, never a
+  # penalty. Reuses the kmercov_cap precedent from score_candidates().
+  kmer_capped <- ifelse(is.na(kmer) | kmer <= 0, 0, pmin(kmer, kmer_cap))
+  kbonus      <- ifelse(kmer_capped > 0, wk * (log10(1 + kmer_capped) / log10(1 + kmer_cap)), 0)
+
+  raw   <- base + kbonus
+  # D-09: floor to 0 for no assembly / NA identity or length; D-08: bound to [0,1].
+  score <- ifelse(!assembly_exists | is.na(pid) | is.na(len), 0, pmin(raw, 1))
+  score <- pmax(0, pmin(1, score))
+
+  df %>%
+    mutate(
+      assembly_support_score = score,
+      assembly_exists        = assembly_exists
+    )
+}
+
 # score_candidates(df, score_weights, evenness_const, kmercov_cap)
 #   df             : candidate frame. Expected columns (NA-tolerant):
 #                    candidate_reads (numeric) AND/OR targeted_reads_nodup (numeric,
