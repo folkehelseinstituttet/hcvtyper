@@ -885,7 +885,12 @@ if (nrow(candidate_support) > 0) {
       Major_role_reference     = candidate_ref,
       Major_role_subtype       = candidate_subtype,
       Major_dominance_score    = dominance_score,
-      Major_role_reason        = role_reason
+      Major_role_reason        = role_reason,
+      # WR-05 (12-REVIEW): surface the calibrated confirmed-vs-probable evidence
+      # band on the wide, human-facing Summary.csv — before this, evidence_state
+      # survived only in the long candidates.csv, so a marginal 0.50-score
+      # co-infection call was indistinguishable from a strong 0.95 one at a glance.
+      Major_evidence_state     = evidence_state
     )
 
   role_minor <- candidate_support %>%
@@ -902,7 +907,9 @@ if (nrow(candidate_support) > 0) {
       Minor_role_reference     = candidate_ref,
       Minor_role_subtype       = candidate_subtype,
       Minor_dominance_score    = dominance_score,
-      Minor_role_reason        = role_reason
+      Minor_role_reason        = role_reason,
+      # WR-05: see the Major_evidence_state comment above.
+      Minor_evidence_state     = evidence_state
     )
 
   overall_call <- candidate_support %>%
@@ -921,10 +928,12 @@ if (nrow(candidate_support) > 0) {
     Major_role_subtype       = character(),
     Major_dominance_score    = double(),
     Major_role_reason        = character(),
+    Major_evidence_state     = character(),
     Minor_role_reference     = character(),
     Minor_role_subtype       = character(),
     Minor_dominance_score    = double(),
-    Minor_role_reason        = character()
+    Minor_role_reason        = character(),
+    Minor_evidence_state     = character()
   )
 }
 
@@ -1882,10 +1891,14 @@ final <- final %>%
          Major_role_subtype,
          Major_dominance_score,
          Major_role_reason,
+         # WR-05 (12-REVIEW): the confirmed/probable/weak/refuted evidence band
+         # behind Major/Minor_role_reason's "corroborated" bucket.
+         Major_evidence_state,
          Minor_role_reference,
          Minor_role_subtype,
          Minor_dominance_score,
          Minor_role_reason,
+         Minor_evidence_state,
          denovo_major_subtype,
          denovo_minor_subtype,
          denovo_major_subtype_match,

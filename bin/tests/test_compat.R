@@ -746,6 +746,16 @@ if (is.na(probable_summary$call_confidence[1]) ||
     probable_summary$call_confidence[1] != "provisional")
   fail(sprintf("CR-01 probable-band: call_confidence must be 'provisional', got '%s'",
                probable_summary$call_confidence[1]))
-ok("CR-01/WR-05: a probable-band (evidence_state=probable) co-infection minor fires the any_probable_only review_flag sentence and demotes call_confidence to provisional, end-to-end via the real summarize.R")
+# WR-05: the confirmed/probable/weak/refuted band must also be surfaced as its
+# own wide Summary.csv column, not just folded into the review_flag prose.
+if (is.na(probable_summary$Minor_evidence_state[1]) ||
+    probable_summary$Minor_evidence_state[1] != "probable")
+  fail(sprintf("WR-05: Minor_evidence_state must be 'probable', got '%s'",
+               probable_summary$Minor_evidence_state[1]))
+if (is.na(probable_summary$Major_evidence_state[1]) ||
+    probable_summary$Major_evidence_state[1] != "weak")
+  fail(sprintf("WR-05: Major_evidence_state must be 'weak' (no assembly_support fixture staged for the major), got '%s'",
+               probable_summary$Major_evidence_state[1]))
+ok("CR-01/WR-05: a probable-band (evidence_state=probable) co-infection minor fires the any_probable_only review_flag sentence, demotes call_confidence to provisional, and surfaces Major_evidence_state/Minor_evidence_state in Summary.csv, end-to-end via the real summarize.R")
 
 cat("\nALL PASS\n")
