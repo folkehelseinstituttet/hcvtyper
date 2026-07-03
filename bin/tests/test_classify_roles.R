@@ -581,4 +581,62 @@ for (col in c("assembly_support_score", "assembly_exists")) {
 }
 ok("Test16 (EVID-01/D-14): calibrated anchors reproduced; assembly_support_score + assembly_exists wired additively onto classify_roles() output")
 
+# --- Test 17: per-candidate evidence_state (EVID-02/EVID-03, D-01/D-05/D-09/D-10) ---
+# Phase-12 Plan-02 Task 1. evidence_state (confirmed/probable/weak/refuted) is an
+# ADDITIVE column computed from each candidate's OWN assembly_support_score +
+# assembly_exists + its OWN de novo contradiction — never from another candidate's
+# dominance. role/role_reason/overall_sample_call are UNCHANGED this plan (Plan 03
+# re-derives them from the state). Band cutpoints are calibration-VALIDATED against
+# the real 203-candidate dataset (12-RESEARCH §4, D-13).
+state_of <- function(r, the_ref) r %>% filter(candidate_ref == the_ref) %>% pull(evidence_state)
+
+# (a) Synthetic own-assembly contradiction -> refuted (the ONLY path to refuted, D-07).
+# mapping says 1a, de novo assembled a 3a contig (genotype 3 != 1), and the contig
+# FAILS quality (pid 85 < 90 floor). apply_concordance() run first (Test 14 idiom).
+syn_contra <- mk_cand("SYN17", "1a_ref", "1a", 5000, 80, 0.70,
+                      sup_len = 600, sup_kmer = 3, sup_pid = 85) %>%
+  mutate(candidate_glue_genotype  = NA_character_,
+         assembly_support         = "supported",
+         assembly_support_subtype = "3a")
+r17_syn <- classify(apply_concordance(syn_contra))
+if (state_of(r17_syn, "1a_ref") != "refuted")
+  fail(sprintf("Test17 synthetic own-assembly contradiction must be refuted, got '%s'", state_of(r17_syn, "1a_ref")))
+
+# (b) No own assembly -> weak (NOT refuted): the 4d shape, no contig at all (D-01/D-09).
+no_asm17 <- mk_cand("S17b", "4d_none", "4d", 8, NA, 0)
+r17_no <- classify(no_asm17)
+if (state_of(r17_no, "4d_none") != "weak")
+  fail(sprintf("Test17 no-assembly candidate must be weak, not refuted, got '%s'", state_of(r17_no, "4d_none")))
+
+# (c) k-mer cliff (2714372 1a shape: id 90.996%, k-mer 1.93) -> NOT refuted (D-10).
+# k-mer alone cannot force refutation; the strong contig scores ~0.941 -> confirmed.
+kcliff17 <- mk_cand("S17c", "1a_HQ850279", "1a", 4462, NA, 0,
+                    sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)
+r17_k <- classify(kcliff17)
+if (state_of(r17_k, "1a_HQ850279") == "refuted")
+  fail("Test17 k-mer-cliff (91% id, k-mer 1.93) must NOT be refuted (D-10 k-mer bonus-only)")
+if (state_of(r17_k, "1a_HQ850279") != "confirmed")
+  fail(sprintf("Test17 k-mer-cliff strong contig must be confirmed, got '%s'", state_of(r17_k, "1a_HQ850279")))
+
+# (d) Real named anchors never reach refuted; the strong-but-89% 2c is confirmed
+# (EVID-01: ~89% identity is NOT disqualifying).
+s51k17 <- mk_cand("S17d1", "2c_JX227949", "2c", 26023, NA, 0, sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009)
+s61k17 <- mk_cand("S17d2", "2c_JX227949", "2c", 6919,  NA, 0, sup_len = 9477, sup_kmer = 102.8, sup_pid = 88.987)
+if (state_of(classify(s51k17), "2c_JX227949") != "confirmed")
+  fail("Test17 Sample51K-2c (89.009%) must be confirmed, not refuted (EVID-01)")
+if (state_of(classify(s61k17), "2c_JX227949") != "confirmed")
+  fail("Test17 Sample61K-2c (88.987%) must be confirmed, not refuted (EVID-01)")
+
+# (e) evidence_state present on every output row incl. zero-row (CLASS-03/D-14 additive).
+if (!"evidence_state" %in% names(r17_no))
+  fail("Test17 classify_roles() output must carry the evidence_state column (D-14)")
+if (!"evidence_state" %in% names(classify(no_asm17[0, ])))
+  fail("Test17 zero-row classify output must carry evidence_state (CLASS-03)")
+
+# (f) role/overall_sample_call UNCHANGED this plan: the additive column must not
+# perturb the existing dominant/monoinfection outcome of a known fixture.
+if ((classify(false_4g) %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
+  fail("Test17 additive evidence_state must not change false_4g's monoinfection call (Plan 03 owns role changes)")
+ok("Test17 (EVID-02/EVID-03): per-candidate evidence_state — contradiction->refuted, no-assembly->weak, k-mer-cliff/89%-2c->not refuted; additive only")
+
 cat("\nALL PASS\n")
