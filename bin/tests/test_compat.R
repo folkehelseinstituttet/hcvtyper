@@ -356,7 +356,24 @@ coinf_cands <- mk_cands(
   mk_cand(1, "1a_M62321", "1a", 200000, 99),
   mk_cand(2, "1b_D90208", "1b", 150000, 97)
 )
-coinf_summary <- run_summarize("coinf", "COINF", coinf_cands)
+# Plan 12-05: skip_assembly was removed, so every real run now always produces
+# assembly_support.csv. Under the continuous-evidence model a candidate with NO
+# own de novo support scores "weak" and can never be a co-infection minor (D-06),
+# so an unstaged coinf run would collapse the golden co-infection to a false
+# monoinfection. Stage realistic per-subtype assembly support so BOTH genotype-1
+# candidates (1a major, 1b minor) land at evidence_state "confirmed" and the
+# golden co-infection outcome (compat_golden.csv COINF) is reproduced. The join
+# is genotype-level (assembly_support_join.R default), so both genotype-1
+# candidates share the single best genotype-1 contig — this is concordant (the
+# own-denovo conflict check is genotype-level: both map and assemble to gt1).
+coinf_support <- tibble(
+  subtype              = c("1a", "1b"),
+  best_contig_length   = c(9076, 9339),
+  best_contig_pident   = c(99, 99),
+  best_contig_kmer_cov = c(40, 38)
+)
+coinf_summary <- run_summarize("coinf", "COINF", coinf_cands,
+                               assembly_support = coinf_support)
 if (is.null(coinf_summary)) fail("COMPAT-01 coinf: summarize.R wrote no Summary.csv")
 if (nrow(coinf_summary) != 1) fail("COMPAT-01 coinf: expected 1 Summary.csv row")
 for (col in core_cols) {
@@ -490,7 +507,22 @@ gate03_cands <- mk_cands(
   mk_cand(1, "3a_D17763", "3a", 248,  99),
   mk_cand(2, "1a_M62321", "1a", 1030, 99)
 )
-gate03_summary <- run_summarize("gate03remove", "G03", gate03_cands, minRead = 500, minCov = 30)
+# Plan 12-05: skip_assembly removed => assembly always runs, so this fixture must
+# stage assembly_support for BOTH candidates (as a real run would) or the new
+# evidence model scores the 1a minor "weak" and flips minor_typable to NO for a
+# reason unrelated to GATE-03. Major 3a (genotype 3) and minor 1a (genotype 1) are
+# distinct genotypes, so each gets its own confirmed contig (no genotype-collapse
+# cross-contamination). With the minor confirmed, minor_typable staying YES
+# genuinely isolates the GATE-03-removal behaviour this test guards.
+gate03_support <- tibble(
+  subtype              = c("3a", "1a"),
+  best_contig_length   = c(9000, 9076),
+  best_contig_pident   = c(99, 99),
+  best_contig_kmer_cov = c(40, 40)
+)
+gate03_summary <- run_summarize("gate03remove", "G03", gate03_cands,
+                                minRead = 500, minCov = 30,
+                                assembly_support = gate03_support)
 if (is.null(gate03_summary)) fail("GATE03-REMOVE: summarize.R wrote no Summary.csv")
 if (!identical(gate03_summary$minor_typable[1], "YES"))
   fail(sprintf("GATE03-REMOVE: minor_typable must be YES after GATE-03 removal, got '%s'",
@@ -622,8 +654,21 @@ contig_denovo <- list(
   major_ref    = "1a_M62321", major_contig = "NODE_1_len_3000",
   minor_ref    = "1b_D90208", minor_contig = "NODE_7_len_2500"
 )
+# Plan 12-05: the [minor] summary_mqc.tsv row only exists for a co-infection, so
+# (like COMPAT-01 coinf) this run must stage assembly_support to confirm the 1b
+# minor now that skip_assembly is gone and assembly is load-bearing. The `denovo`
+# fixture above feeds the orthogonal denovo_*_ref/contig reporting columns, NOT
+# the assembly_support_* evidence columns that drive evidence_state.
+contig_support <- tibble(
+  subtype              = c("1a", "1b"),
+  best_contig_length   = c(9076, 9339),
+  best_contig_pident   = c(99, 99),
+  best_contig_kmer_cov = c(40, 38)
+)
 contig_out <- run_summarize("rptcontig", "RPTCONTIG", contig_cands,
-                            denovo = contig_denovo, return_mqc = TRUE)
+                            denovo = contig_denovo,
+                            assembly_support = contig_support,
+                            return_mqc = TRUE)
 cs <- contig_out$summary
 cm <- contig_out$mqc
 if (is.null(cs)) fail("RPT-CONTIG: summarize.R wrote no Summary.csv")
