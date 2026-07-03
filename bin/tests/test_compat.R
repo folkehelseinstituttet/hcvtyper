@@ -71,7 +71,8 @@ cell_equal <- function(a, b) {
 # -------------------------------------------------------------------------
 run_summarize <- function(case, sampleName, cands,
                           minRead = 500, minCov = 30, n_candidates = 2,
-                          ref_length = 200, denovo = NULL, return_mqc = FALSE) {
+                          ref_length = 200, denovo = NULL, return_mqc = FALSE,
+                          assembly_support = NULL) {
   wd <- tempfile(paste0("compat_", case, "_")); dir.create(wd)
   old <- getwd(); setwd(wd); on.exit(setwd(old), add = TRUE)
 
@@ -227,6 +228,33 @@ run_summarize <- function(case, sampleName, cands,
              qstart, qend, sstart, send, evalue, bitscore, sc_length, kmer_cov)
     write_csv(blast_out, file.path(wd, "denovo",
                                    paste0(sampleName, "_blast_out.csv")))
+  }
+
+  # --- OPTIONAL Phase-7 assembly-support fixture (CR-01/CR-02/WR-05, 12-REVIEW):
+  # stage <sample>.assembly_support.csv so join_assembly_support() (called from
+  # summarize.R L799) populates real assembly_support_* metrics on candidate_support,
+  # which score_assembly_support() -> classify_roles() then turns into a per-candidate
+  # evidence_state (confirmed/probable/weak/refuted). Absent by default (assembly_exists
+  # stays FALSE / evidence_state stays "weak" for every candidate, matching every
+  # existing caller's fixtures, which never set this up — this is a distinct fixture
+  # from the RPT-CONTIG `denovo` block above, which only staged the rescue-path
+  # blastparse/blast_out files, never the Phase-7 per-subtype support table).
+  # `assembly_support` is a tibble: subtype, best_contig_length, best_contig_pident,
+  # best_contig_kmer_cov (best_contig_aln_length NA-fills — unused by scoring).
+  # Exact column types pinned to match summarize.R's col_types (L773-780).
+  if (!is.null(assembly_support)) {
+    if (!dir.exists(file.path(wd, "denovo"))) dir.create(file.path(wd, "denovo"))
+    support_csv <- assembly_support %>%
+      transmute(
+        sample                  = sampleName,
+        subtype                 = subtype,
+        best_contig_length      = as.double(best_contig_length),
+        best_contig_pident      = as.double(best_contig_pident),
+        best_contig_aln_length  = as.double(if ("best_contig_aln_length" %in% names(assembly_support)) best_contig_aln_length else NA_real_),
+        best_contig_kmer_cov    = as.double(if ("best_contig_kmer_cov" %in% names(assembly_support)) best_contig_kmer_cov else NA_real_)
+      )
+    write_csv(support_csv, file.path(wd, "denovo",
+                                     paste0(sampleName, ".assembly_support.csv")))
   }
 
   # --- invoke the REAL summarize.R (positional arg contract, L27-86) ---
@@ -675,5 +703,49 @@ if (!cell_equal(zeroread_summary$Reads_nodup_mapped_minor[1], 0))
   fail(sprintf("EVID-02 zero-read: Reads_nodup_mapped_minor = '%s', expected 0 (the zero-read minor's idxstats col 3)",
                zeroread_summary$Reads_nodup_mapped_minor[1]))
 ok("EVID-02 zero-read: a 0-mapped-read co-infection minor is retained in Summary.csv (not silently dropped)")
+
+# =========================================================================
+# CR-01 / WR-05 (12-REVIEW): any_probable_only review_flag + call_confidence
+# trigger, exercised end-to-end through the REAL summarize.R (not just at the
+# classify_roles() helper level, per the Fix note: "add a test_compat.R case
+# that exercises the review_flag/call_confidence text end-to-end so a future
+# role_reason rename cannot silently break it again"). A 1a-dominant + 2c-minor
+# sample where the 2c candidate's own de novo contig scores in the marginal
+# "probable" band (assembly_support_score ~0.577, in [0.50, 0.72)) must surface
+# the co-infection minor AND fire the any_probable_only review sentence /
+# demote call_confidence to "provisional" — the exact signal the retired
+# any_uncorroborated trigger (built on the no-longer-reachable role_reason ==
+# "uncorroborated_kept") could never produce.
+# -------------------------------------------------------------------------
+probable_cands <- mk_cands(
+  mk_cand(1, "1a_M62321", "1a", 200000, 99),
+  mk_cand(2, "2c_JX227949", "2c", 5000, 50)
+)
+probable_support <- tibble(
+  subtype                = "2c",
+  best_contig_length     = 3000,
+  best_contig_pident     = 87,
+  best_contig_kmer_cov   = NA_real_
+)
+probable_summary <- run_summarize("probable", "PROBABLE", probable_cands,
+                                  assembly_support = probable_support)
+if (is.null(probable_summary)) fail("CR-01 probable-band: summarize.R wrote no Summary.csv")
+if (is.na(probable_summary$overall_sample_call[1]) ||
+    probable_summary$overall_sample_call[1] != "co-infection")
+  fail(sprintf("CR-01 probable-band: overall_sample_call must be co-infection, got '%s'",
+               probable_summary$overall_sample_call[1]))
+if (is.na(probable_summary$Minor_role_reference[1]) ||
+    probable_summary$Minor_role_reference[1] != "2c_JX227949")
+  fail(sprintf("CR-01 probable-band: Minor_role_reference must be the 2c ref, got '%s'",
+               probable_summary$Minor_role_reference[1]))
+pb_flag <- probable_summary$review_flag[1]
+if (is.na(pb_flag) || !grepl("marginally corroborated", pb_flag))
+  fail(sprintf("CR-01 probable-band: review_flag must carry the any_probable_only sentence, got '%s'",
+               pb_flag))
+if (is.na(probable_summary$call_confidence[1]) ||
+    probable_summary$call_confidence[1] != "provisional")
+  fail(sprintf("CR-01 probable-band: call_confidence must be 'provisional', got '%s'",
+               probable_summary$call_confidence[1]))
+ok("CR-01/WR-05: a probable-band (evidence_state=probable) co-infection minor fires the any_probable_only review_flag sentence and demotes call_confidence to provisional, end-to-end via the real summarize.R")
 
 cat("\nALL PASS\n")

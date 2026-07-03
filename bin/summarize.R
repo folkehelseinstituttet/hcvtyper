@@ -1529,26 +1529,38 @@ if (!"denovo_major_subtype" %in% colnames(final)) {
 # review sentences are now derived from the N-candidate role model, not the retired
 # minor_denovo_status / coinfection_flag. Roll the long classified candidate_support
 # frame up to one row per sample, capturing whether ANY candidate was refuted by de
-# novo (background/refuted_denovo) or kept as an uncorroborated co-infection
-# (co-infection/uncorroborated_kept). These per-sample booleans feed the pmap_chr
+# novo (background/refuted_denovo). These per-sample booleans feed the pmap_chr
 # below alongside overall_sample_call + gate_flag + the subtype-match columns.
+#
+# CR-01/WR-05 (12-REVIEW): the old any_uncorroborated trigger checked
+# role_reason == "uncorroborated_kept", a value the Plan-03 evidence_state redesign
+# retired entirely (no code path can produce it any more — see the state->role map
+# in classify_roles.R::classify_one_sample()), so the old trigger was permanently
+# FALSE and its review_flag sentence / call_confidence "provisional" contribution
+# could never fire. any_probable_only is the closest new-model equivalent of "kept
+# without strong corroboration": a co-infection candidate whose OWN evidence only
+# cleared the marginal "probable" band (assembly_support_score in [0.50, 0.72)),
+# not the stronger "confirmed" band (>=0.72) — surfacing exactly the confidence
+# gradient the continuous-score redesign was meant to preserve.
 if (nrow(candidate_support) > 0) {
   role_review <- candidate_support %>%
     group_by(sampleName) %>%
     summarise(
-      any_refuted_denovo   = any(role_reason == "refuted_denovo",      na.rm = TRUE),
-      any_uncorroborated   = any(role_reason == "uncorroborated_kept", na.rm = TRUE),
-      dominant_unconfirmed = any(role == "dominant" &
-                                 !is.na(concordance_status) &
-                                 concordance_status == "unconfirmed",  na.rm = TRUE),
+      any_refuted_denovo    = any(role_reason == "refuted_denovo",       na.rm = TRUE),
+      any_probable_only     = any(role == "co-infection" &
+                                  !is.na(evidence_state) &
+                                  evidence_state == "probable",           na.rm = TRUE),
+      dominant_unconfirmed  = any(role == "dominant" &
+                                  !is.na(concordance_status) &
+                                  concordance_status == "unconfirmed",    na.rm = TRUE),
       .groups = "drop"
     )
 } else {
   role_review <- tibble(
-    sampleName           = character(),
-    any_refuted_denovo   = logical(),
-    any_uncorroborated   = logical(),
-    dominant_unconfirmed = logical()
+    sampleName             = character(),
+    any_refuted_denovo     = logical(),
+    any_probable_only      = logical(),
+    dominant_unconfirmed   = logical()
   )
 }
 
@@ -1628,8 +1640,11 @@ final <- final %>%
 #      the major genotype — de novo found evidence of a second, different-genotype strain
 #      that the role classifier demoted to background (possible missed co-infection)
 #   4. any_refuted_denovo — a minor candidate refuted by de novo; likely single infection
-#   5. any_uncorroborated — a co-infection kept without de novo corroboration (de novo
-#      inconclusive for both strains); warrants analyst review of QC plots / contigs
+#   5. any_probable_only — a co-infection candidate's own evidence only cleared the
+#      marginal "probable" band (assembly_support_score 0.50-0.72), not "confirmed"
+#      (>=0.72); warrants analyst review of QC plots / contigs (CR-01/WR-05, replaces
+#      the pre-Phase-12 any_uncorroborated trigger, which checked for the retired
+#      role_reason == "uncorroborated_kept" and could never fire)
 #   6. overall_sample_call == "indeterminate" — no candidate passed the major-gate
 #   7. gate_flag != "ok" — major failed the first-mapping quality thresholds
 #   8. rescue_effect == "major_ref_changed" — the de-novo rescue OVERRODE the
@@ -1656,14 +1671,14 @@ final <- final %>%
         denovo_minor_subtype_match,
         overall_sample_call,
         any_refuted_denovo,
-        any_uncorroborated,
+        any_probable_only,
         dominant_unconfirmed,
         gate_flag,
         denovo_minor_subtype,
         Major_subtype,
         rescue_effect
       ),
-      function(maj_match, min_match, sample_call, refuted, uncorr, dom_unconf, gflag,
+      function(maj_match, min_match, sample_call, refuted, probable_only, dom_unconf, gflag,
                dv_minor_sub, major_sub, resc_effect) {
         msgs        <- character(0)
         is_coinf    <- !is.na(sample_call) && sample_call == "co-infection"
@@ -1687,8 +1702,8 @@ final <- final %>%
           msgs <- c(msgs, "Genotype call is provisional — identity not corroborated (mapping evidence only; no GLUE or de novo confirmation). Please review.")
         if (isTRUE(refuted))
           msgs <- c(msgs, "Minor strain candidate refuted by de novo assembly — likely single infection.")
-        if (isTRUE(uncorr))
-          msgs <- c(msgs, "Co-infection kept without de novo corroboration — de novo inconclusive for both strains; minor strain may be a genuine low-yield co-infection. Please review.")
+        if (isTRUE(probable_only))
+          msgs <- c(msgs, "Co-infection minor is only marginally corroborated by de novo assembly (evidence_state=probable) — please review contigs/QC before reporting as a genuine co-infection.")
         if (is_indet)
           msgs <- c(msgs, "No candidate passed the major-gate — overall sample call indeterminate.")
         if (!is.na(gflag) && gflag != "ok")
@@ -1738,7 +1753,7 @@ final <- final %>%
         (!is.na(rescue_effect) & rescue_effect == "major_ref_changed") |
         overall_sample_call == "co-infection (indeterminate dominance)"  ~ "review",
       coalesce(dominant_unconfirmed, FALSE) |
-        coalesce(any_uncorroborated, FALSE) |
+        coalesce(any_probable_only, FALSE) |
         coalesce(any_refuted_denovo, FALSE) |
         (!is.na(denovo_minor_subtype_match) & denovo_minor_subtype_match == "NO") |
         (!is.na(rescue_effect) & rescue_effect == "minor_ref_changed") |
@@ -1747,7 +1762,7 @@ final <- final %>%
     )
   ) %>%
   # Drop the per-sample role-review helper booleans now they have been consumed.
-  select(-any_refuted_denovo, -any_uncorroborated, -dominant_unconfirmed)
+  select(-any_refuted_denovo, -any_probable_only, -dominant_unconfirmed)
 
 # Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
 # Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no
