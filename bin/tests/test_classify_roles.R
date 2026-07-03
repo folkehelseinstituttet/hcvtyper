@@ -68,6 +68,7 @@ classify <- function(df, minRead = 500, minCov = 30) {
 
 role_of   <- function(r, the_ref) r %>% filter(candidate_ref == the_ref) %>% pull(role)
 reason_of <- function(r, the_ref) r %>% filter(candidate_ref == the_ref) %>% pull(role_reason)
+state_of  <- function(r, the_ref) r %>% filter(candidate_ref == the_ref) %>% pull(evidence_state)
 
 # --- Test 1: false 4g refuted (D-11 asymmetric) -----------------------------
 # Dominant 1a (genuine, full contig). 4g minor clears the floor on reads/cov but
@@ -78,11 +79,16 @@ false_4g <- bind_rows(
 )
 r1 <- classify(false_4g)
 if (role_of(r1, "4g_artif") != "background") fail("Test1 false 4g must be background")
-if (reason_of(r1, "4g_artif") != "refuted_denovo") fail("Test1 false 4g reason must be refuted_denovo")
+# Plan-03 reconciliation (outcome-preserving; Phase 14 owns the formal REGR-04 port):
+# the false-4g candidate has NO own assembly, so its evidence_state is weak and its
+# role_reason moves from the old "refuted_denovo" to "no_own_assembly" (D-18). The
+# role (background) and the sample call (monoinfection) are UNCHANGED — a weak
+# candidate does not count toward the co-infection call (D-02).
+if (reason_of(r1, "4g_artif") != "no_own_assembly") fail("Test1 false 4g reason must be no_own_assembly")
 if (role_of(r1, "1a_M62321") != "dominant") fail("Test1 genuine 1a must be dominant")
 if ((r1 %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
-  fail("Test1 a refuted-only sample must be monoinfection")
-ok("Test1 (D-11): false 4g -> background/refuted_denovo; sample monoinfection")
+  fail("Test1 a weak-minor-only sample must be monoinfection")
+ok("Test1 (D-02/D-18): false 4g -> background/no_own_assembly; sample monoinfection")
 
 # --- Test 2: genuine 2b co-infections corroborated (CLASS-02) ---------------
 # ERR1810447: full 9207bp 2b. ERR1810453: partial 2949bp 2b at k-mer cov ~5
@@ -108,15 +114,23 @@ if ((r3 %>% pull(overall_sample_call) %>% unique()) != "co-infection")
   fail("Test2 a corroborated minor sample must be co-infection")
 ok("Test2 (CLASS-02): full + partial genuine 2b both -> co-infection/corroborated")
 
-# --- Test 2b: the OLD 10.0 k-mer floor WOULD have refuted ERR1810453 --------
-# Locks the Pitfall-1 reconciliation: at the stricter 10.0 floor the kmer-5
-# partial 2b is no longer substantial and (dominant assembled) gets refuted.
+# --- Test 2b: the ANDed denovo floors no longer gate a concordant candidate ---
+# Plan-03 reconciliation (Phase 14 owns the formal REGR-04 port): under the old
+# model, running at the stricter 10.0 k-mer floor made the kmer-5 partial 2b
+# non-substantial and (because the dominant assembled) refuted it to background.
+# The new model derives role from the per-candidate evidence_state, whose bands
+# read the continuous assembly_support_score (k-mer bonus-only, D-10) — NOT the
+# denovo_min_* floors — for a CONCORDANT candidate. So the genuine partial 2b now
+# stays co-infection REGARDLESS of the k-mer floor: the AND-of-independent-floors
+# cliff this milestone removes can no longer refute it (EVID-01/EVID-03).
 r3_strict <- classify_roles(score_candidates(err453), minRead = 500, minCov = 30,
                             denovo_min_contig_length = 1000, denovo_min_kmer_cov = 10.0,
                             denovo_min_blast_identity = 90, match_level = "genotype")
-if (role_of(r3_strict, "2b_ref") != "background")
-  fail("Test2b precondition: at the old 10.0 floor the kmer-5 2b should be refuted (motivates the 2.0 reconciliation)")
-ok("Test2b: the validated 2.0 floor (not 10.0) is what preserves the genuine partial 2b")
+if (role_of(r3_strict, "2b_ref") != "co-infection")
+  fail("Test2b: the concordant partial 2b must stay co-infection even at the old 10.0 k-mer floor (floors no longer gate role)")
+if (state_of(r3_strict, "2b_ref") != "confirmed")
+  fail("Test2b: the partial 2b evidence_state must be confirmed (k-mer bonus-only, no floor gate)")
+ok("Test2b (EVID-01/D-10): the denovo k-mer floor no longer refutes the genuine partial 2b — evidence_state drives role")
 
 # --- Test 3: true co-infections preserved (sim1 1a:1b, sim2 2a:3a) ----------
 sim1 <- bind_rows(
@@ -170,19 +184,29 @@ if (!(sc_2a > sc_3a))
   fail(sprintf("Test3b: 2a score (%.4f) must exceed 3a score (%.4f) when scoring on targeted_reads_nodup", sc_2a, sc_3a))
 ok("Test3b: dominance reads term uses targeted_reads_nodup -> true major 2a wins despite inverted candidate_reads")
 
-# --- Test 4: IVT extreme-ratio genuine minor, de novo failed for BOTH -------
-# Genuine low-yield minor clears the floor but assembled nothing; the DOMINANT
-# also assembled nothing substantial -> de novo inconclusive -> keep, do not refute.
+# --- Test 4: no-own-assembly minor -> weak/background (uncorroborated_kept dropped) -
+# Plan-03 reconciliation (outcome CHANGES with the mechanism; Phase 14 owns the
+# formal REGR-04 port): under the old model, when NEITHER the minor nor the dominant
+# assembled, the dominance-dependent asymmetric-refute branch KEPT the minor as
+# co-infection/uncorroborated_kept. The new per-candidate model removes that carve-out
+# (EVID-02: a candidate's fate must not depend on whether the DOMINANT assembled) —
+# a minor with no own assembly is weak (no_own_assembly) -> background, exactly like
+# the false-4g case (D-16/D-02). This tightens toward the core value: a reported
+# co-infection must be backed by the candidate's OWN orthogonal assembly evidence.
 ivt <- bind_rows(
   mk_cand("IVT", "1a_ref", "1a", 500000, 99, 0.95),   # dominant, NO support
-  mk_cand("IVT", "3a_ref", "3a", 800,    35, 0.40)    # minor clears floor, NO support
+  mk_cand("IVT", "3a_ref", "3a", 800,    35, 0.40)    # minor, NO own support
 )
 r6 <- classify(ivt)
-if (role_of(r6, "3a_ref") != "co-infection")
-  fail("Test4 IVT minor with both-de-novo-failed must be kept as co-infection")
-if (reason_of(r6, "3a_ref") != "uncorroborated_kept")
-  fail("Test4 IVT minor reason must be uncorroborated_kept (D-11 never suppress on inconclusive de novo)")
-ok("Test4 (D-11): de-novo-failed-for-both genuine minor -> co-infection/uncorroborated_kept")
+if (state_of(r6, "3a_ref") != "weak")
+  fail("Test4 IVT minor with no own assembly must be weak")
+if (role_of(r6, "3a_ref") != "background")
+  fail("Test4 IVT minor with no own assembly must now be background (uncorroborated_kept dropped, D-16)")
+if (reason_of(r6, "3a_ref") != "no_own_assembly")
+  fail("Test4 IVT minor reason must be no_own_assembly")
+if ((r6 %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
+  fail("Test4 a weak-minor-only sample must be monoinfection (weak does not count as co-infection, D-02)")
+ok("Test4 (EVID-02/D-16): no-own-assembly minor -> weak/background/monoinfection (uncorroborated_kept carve-out removed)")
 
 # --- Test 5: D-12 same-genotype (non-1a/1b) demotion ------------------------
 # A 3b candidate against a dominant 3a: same genotype 3, NOT a 1a/1b pair ->
@@ -319,16 +343,21 @@ err507 <- bind_rows(
 )
 r_err507 <- classify(err507)   # uses the 500-floor classify() helper
 if (role_of(r_err507, "3a_ref") != "co-infection")
-  fail("Test10: ERR1810507 829bp 3a contig must be co-infection at the 500bp floor")
+  fail("Test10: ERR1810507 829bp 3a contig must be co-infection")
 if (reason_of(r_err507, "3a_ref") != "corroborated")
   fail("Test10: ERR1810507 829bp 3a contig reason must be corroborated")
-# Precondition: at the old 1000bp floor the same contig would be refuted.
+# Plan-03 reconciliation (outcome CHANGES; Phase 14 owns the formal REGR-04 port):
+# under the old model the 829bp contig fell below the 1000bp floor and (dominant
+# assembled) was refuted to background. The new model derives role from the
+# continuous evidence_state, which gives partial length credit rather than a hard
+# cliff — so the genuine short 829bp 3a contig now STAYS co-infection even at the
+# stricter 1000bp floor (EVID-01: the length floor no longer gates role).
 r_err507_strict <- classify_roles(score_candidates(err507), minRead = 500, minCov = 30,
                                   denovo_min_contig_length = 1000, denovo_min_kmer_cov = 2.0,
                                   denovo_min_blast_identity = 90, match_level = "genotype")
-if (role_of(r_err507_strict, "3a_ref") != "background")
-  fail("Test10 precondition: at the old 1000bp floor the 829bp contig should be refuted")
-ok("Test10 (D5): 829bp minor contig -> co-infection/corroborated at 500bp; refuted_denovo at old 1000bp floor")
+if (role_of(r_err507_strict, "3a_ref") != "co-infection")
+  fail("Test10: the 829bp contig must stay co-infection even at the old 1000bp floor (floors no longer gate role)")
+ok("Test10 (EVID-01/D5): 829bp minor contig -> co-infection/corroborated; the length floor no longer refutes it")
 
 # --- Test 11: apply_concordance() three-way check (D8) -----------------------
 suppressPackageStartupMessages(library(tidyverse))
@@ -587,8 +616,7 @@ ok("Test16 (EVID-01/D-14): calibrated anchors reproduced; assembly_support_score
 # assembly_exists + its OWN de novo contradiction — never from another candidate's
 # dominance. role/role_reason/overall_sample_call are UNCHANGED this plan (Plan 03
 # re-derives them from the state). Band cutpoints are calibration-VALIDATED against
-# the real 203-candidate dataset (12-RESEARCH §4, D-13).
-state_of <- function(r, the_ref) r %>% filter(candidate_ref == the_ref) %>% pull(evidence_state)
+# the real 203-candidate dataset (12-RESEARCH §4, D-13). state_of() defined near the top.
 
 # (a) Synthetic own-assembly contradiction -> refuted (the ONLY path to refuted, D-07).
 # mapping says 1a, de novo assembled a 3a contig (genotype 3 != 1), and the contig
@@ -640,12 +668,13 @@ if ((classify(false_4g) %>% pull(overall_sample_call) %>% unique()) != "monoinfe
 ok("Test17 (EVID-02/EVID-03): per-candidate evidence_state — contradiction->refuted, no-assembly->weak, k-mer-cliff/89%-2c->not refuted; additive only")
 
 # --- Test 18: per-candidate independence + sole-refuted (EVID-02, D-07) -------
-# Phase-12 Plan-02 Task 2. The Sample51K paradox: the SAME 2c contig (89.009%,
-# ~9479bp, k-mer 514) is refuted at the ROLE layer only because a 3a co-infects the
-# sample and wins dominance — while in samples where no 3a competes (52K/53T/54T)
-# the identical 2c is the dominant monoinfection call. The new per-candidate
-# evidence_state must be IDENTICAL across both, proving it is a property of the
-# candidate's OWN evidence, not of which candidate happens to be dominant (EVID-02).
+# Phase-12 Plan-02 Task 2 (reconciled in Plan 03). The Sample51K paradox: the SAME
+# 2c contig (89.009%, ~9479bp, k-mer 514) was refuted at the ROLE layer under the old
+# model only because a 3a co-infects the sample and wins dominance — while in samples
+# where no 3a competes the identical 2c is the dominant call. The per-candidate
+# evidence_state is IDENTICAL across both (a property of the candidate's OWN evidence,
+# not of which candidate is dominant, EVID-02); as of Plan 03 the ROLE is now
+# consistent too — the 2c surfaces as a co-infection member under the competitor.
 
 # Sample51K-shaped: 2c (89.009%, strong contig) + a competing 3a that wins dominance.
 s51k_frame <- bind_rows(
@@ -667,14 +696,20 @@ if (st_51 != st_52)
 if (st_51 != "confirmed")
   fail(sprintf("Test18 the strong 89%% 2c contig must be confirmed regardless of dominance, got '%s'", st_51))
 
-# The ROLE, by contrast, still flips with the competitor (old own_substantial logic
-# runs underneath this plan): background/refuted_denovo when the 3a wins dominance,
-# dominant when the 2c stands alone. This is exactly the dominance-dependence the
-# evidence_state removes — and which Plan 03 will re-derive role FROM the state.
-if (reason_of(r51, "2c_JX227949") != "refuted_denovo")
-  fail("Test18 precondition: 2c is still refuted_denovo at the ROLE layer under the competing 3a (old ANDed floor); Plan 03 rewires role from evidence_state")
+# Plan-03 reconciliation (the EVID-04 flip): as of Plan 03 the ROLE is derived FROM
+# the per-candidate evidence_state, so the strong 2c is now a co-infection MEMBER when
+# the 3a wins dominance — it is no longer gated out by dominance (was background/
+# refuted_denovo under the old ANDed floor). When the 2c stands alone it is dominant.
+# Both the role AND the state are now dominance-consistent: the 2c is corroborated
+# regardless, surfacing as co-infection alongside a dominant competitor.
+if (role_of(r51, "2c_JX227949") != "co-infection")
+  fail("Test18 EVID-04: the strong 2c must now surface as a co-infection member under the competing 3a (dominance no longer gates existence)")
+if (reason_of(r51, "2c_JX227949") != "corroborated")
+  fail("Test18: the co-infection 2c role_reason must be corroborated")
+if ((r51 %>% pull(overall_sample_call) %>% unique()) != "co-infection")
+  fail("Test18: the Sample51K-shaped sample must now call co-infection (EVID-04)")
 if (role_of(r52, "2c_JX227949") != "dominant")
-  fail("Test18: the lone 2c is dominant — its ROLE flips with the competitor even though its evidence_state does NOT (EVID-02)")
+  fail("Test18: the lone 2c is dominant when no competitor shares the sample")
 
 # Sole-refuted (D-07): across every real/anchor fixture frame in the suite, NO
 # candidate reaches refuted — only a synthetic own-assembly contradiction can.
