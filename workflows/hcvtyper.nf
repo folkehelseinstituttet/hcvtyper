@@ -261,57 +261,55 @@ workflow HCVTYPER {
         .filter { _meta, _fastq, n -> n > 0 } // Filter out empty fastq files
         .map { meta, fastq, _n -> [ meta, fastq, [], [] ] } // Recreate the channel structure correct for SPADES
 
-    if (!params.skip_assembly) {
-            SPADES (
-                ch_reads,
-                [], // Empty input channel. Can be used to specify hmm profile
-                []  // Empty input channel. Placeholder for separate specification of reads.
-            )
-            ch_versions = ch_versions.mix(SPADES.out.versions.first())
+    SPADES (
+        ch_reads,
+        [], // Empty input channel. Can be used to specify hmm profile
+        []  // Empty input channel. Placeholder for separate specification of reads.
+    )
+    ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
-            //
-            // MODULE: Blast assembled contigs against viral references.
-            //
-            // NOTE:
-            // In some cases there is an empty contig file produced by Spades. Filter out these
-            ch_blastn = SPADES.out.contigs
-                .map { meta, contigs ->
-                def n = contigs.countFasta() // Count fasta records
-                return [meta, contigs, n] // Add the count as the last element in the tuple
-            }
-            .filter { _meta, _contigs, n -> n > 0 } // Filter out empty fasta files
-            .map { meta, contigs, _n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
-            BLAST_BLASTN (
-                ch_blastn,
-                BLAST_MAKEBLASTDB.out.db,
-                [], // taxidlist - empty, no taxonomic filtering
-                "", // taxids - empty string, no taxonomic filtering
-                false // negative_tax - false, not using negative filtering
-            )
-            ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+    //
+    // MODULE: Blast assembled contigs against viral references.
+    //
+    // NOTE:
+    // In some cases there is an empty contig file produced by Spades. Filter out these
+    ch_blastn = SPADES.out.contigs
+        .map { meta, contigs ->
+        def n = contigs.countFasta() // Count fasta records
+        return [meta, contigs, n] // Add the count as the last element in the tuple
+    }
+    .filter { _meta, _contigs, n -> n > 0 } // Filter out empty fasta files
+    .map { meta, contigs, _n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
+    BLAST_BLASTN (
+        ch_blastn,
+        BLAST_MAKEBLASTDB.out.db,
+        [], // taxidlist - empty, no taxonomic filtering
+        "", // taxids - empty string, no taxonomic filtering
+        false // negative_tax - false, not using negative filtering
+    )
+    ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
 
-            //
-            // MODULE: Parse blast output
-            //
-            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs) // Create input channel that holds val(meta), path(blast_out), path(contigs)
-            BLASTPARSE (
-                ch_blastparse,
-                file(params.references),
-                params.agens
-            )
-            ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+    //
+    // MODULE: Parse blast output
+    //
+    ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs) // Create input channel that holds val(meta), path(blast_out), path(contigs)
+    BLASTPARSE (
+        ch_blastparse,
+        file(params.references),
+        params.agens
+    )
+    ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
 
-            //
-            // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
-            //
-            if (!params.skip_contamination_check) {
-                CONTAMINATION_CHECK(
-                    SPADES.out.contigs,
-                    Channel.empty(),  // fastp JSONs — not wired in main pipeline
-                    Channel.empty()   // GLUE JSONs  — not wired in main pipeline
-                )
-                ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
-            }
+    //
+    // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
+    //
+    if (!params.skip_contamination_check) {
+        CONTAMINATION_CHECK(
+            SPADES.out.contigs,
+            Channel.empty(),  // fastp JSONs — not wired in main pipeline
+            Channel.empty()   // GLUE JSONs  — not wired in main pipeline
+        )
+        ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
     }
 
     //
@@ -384,23 +382,15 @@ workflow HCVTYPER {
     // and the contig clears the four quality floors, and forces that candidate's
     // confirmation_status to 'pass' so the builder routes it to JOINT_MAPPING.
     //
-    // BLASTPARSE is invoked ONLY inside if (!params.skip_assembly), so BLASTPARSE.out is
-    // UNDEFINED on a skip-assembly run -- referencing it unconditionally is a hard Nextflow
-    // error (Pitfall 1 / T-10-05). Mirror the same guard the SUMMARIZE staging uses below:
-    // skip-assembly yields empty channels, fed via remainder:true so samples pass through
-    // unchanged (rescue columns NA-filled).
-    if (!params.skip_assembly) {
-        ch_blastparse_support = BLASTPARSE.out.support
-    } else {
-        ch_blastparse_support = Channel.empty()
-    }
+    // De novo assembly always runs, so BLASTPARSE.out.support is always defined.
+    ch_blastparse_support = BLASTPARSE.out.support
 
     // Build the RESCUE_EVALUATION input tuple (meta, candidates_csv, support_csv,
     // cand_fastas) by joining on meta.id. PARSEFIRSTMAPPING.out.candidate_fasta
     // is tuple(meta, parsefirstmapping_csv, cand_fastas) -- extract cand_fastas. The
-    // support leg uses remainder:true (D-10) so a skip-assembly run with an empty
-    // BLASTPARSE channel does not drop samples; the R script's typed-empty guard
-    // handles the missing file.
+    // support leg uses remainder:true (D-10) so a sample with no de-novo contig
+    // (empty BLASTPARSE support) does not drop samples; the R script's typed-empty
+    // guard handles the missing file.
     ch_rescue_input = PARSEFIRSTMAPPING.out.candidates
         .join(PARSEFIRSTMAPPING.out.candidate_fasta, remainder: true)       // meta, candidates_csv, parsefirstmapping_csv?, cand_fastas?
         .join(ch_blastparse_support, remainder: true)                       // ..., support_csv?
@@ -517,19 +507,12 @@ workflow HCVTYPER {
     ch_depth            = JOINT_MAPPING.out.depth.collect({it[1]})
     // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
     // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
-    // staged channel. BLASTPARSE is invoked only inside if (!params.skip_assembly),
-    // so its .out attribute is undefined on a skip-assembly run -- referencing it
-    // unconditionally is a hard Nextflow error (process not invoked), which .ifEmpty
-    // cannot rescue. Guard the channel construction with the same condition (mirroring
-    // the ch_glue if/else below): skip-assembly yields [] -> empty denovo/ staging dir
-    // -> NA de novo columns + no dropped rows (the PLUMB-02 path).
-    if (!params.skip_assembly) {
-        // Phase 7 (ASUP-02): also stage the per-subtype *.assembly_support.csv into
-        // denovo/ so summarize.R can join it to candidates at genotype level.
-        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).mix(BLASTPARSE.out.support.collect({it[1]})).collect().ifEmpty([])
-    } else {
-        ch_denovo = []
-    }
+    // staged channel. De novo assembly always runs, so BLASTPARSE.out is always
+    // defined; .ifEmpty([]) still handles a batch where every sample produced no
+    // contig (empty denovo/ staging dir -> NA de novo columns + no dropped rows).
+    // Phase 7 (ASUP-02): also stage the per-subtype *.assembly_support.csv into
+    // denovo/ so summarize.R can join it to candidates at genotype level.
+    ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).mix(BLASTPARSE.out.support.collect({it[1]})).collect().ifEmpty([])
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
@@ -599,7 +582,7 @@ workflow HCVTYPER {
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_FOCUSED.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
-    if (!params.skip_assembly && !params.skip_contamination_check) {
+    if (!params.skip_contamination_check) {
         ch_multiqc_files = ch_multiqc_files.mix(CONTAMINATION_CHECK.out.mqc)
     }
 
