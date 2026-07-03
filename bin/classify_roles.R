@@ -413,13 +413,13 @@ classify_roles <- function(scored_df, minRead, minCov,
     scored_df <- score_candidates(scored_df)
   }
 
-  # D-14: emit the continuous assembly_support_score + assembly_exists as ADDITIVE
-  # columns on every output row (EVID-01). This is purely additive this plan — the
-  # own_substantial / asymmetric-refute / role / role_reason / overall_sample_call
-  # logic below still reads the binary ANDed floors, unchanged, until Plan 03
-  # replaces it with the evidence-state model. score_assembly_support() reads only
-  # the candidate's OWN assembly metrics (identity/length/k-mer, D-11); adding it
-  # here cannot perturb any existing derivation.
+  # D-14: emit the continuous assembly_support_score + assembly_exists columns on
+  # every output row (EVID-01). As of Plan 03, role / role_reason / overall_sample_call
+  # are DERIVED from the per-candidate evidence_state (below) — the binary ANDed
+  # own_substantial floor now survives ONLY as the refuted quality re-check
+  # (quality_fails_state) feeding evidence_state, never as the role gate itself.
+  # score_assembly_support() reads only the candidate's OWN assembly metrics
+  # (identity/length/k-mer, D-11).
   if (!"assembly_support_score" %in% names(scored_df)) {
     scored_df <- score_assembly_support(scored_df)
   }
@@ -434,14 +434,15 @@ classify_roles <- function(scored_df, minRead, minCov,
     has_kmer >= denovo_min_kmer_cov &
     has_pid  >= denovo_min_blast_identity
 
-  # --- EVID-02 / EVID-03: per-candidate evidence_state (Plan 02, ADDITIVE) -----
+  # --- EVID-02 / EVID-03 / EVID-04: per-candidate evidence_state ---------------
   # Computed for EACH candidate from its OWN assembly_support_score + assembly_exists
   # (Plan 01) and its OWN de novo contradiction — NEVER from another candidate's
   # dominance (EVID-02: the state is identical whether or not a stronger candidate
   # shares the sample; this vectorised outer computation cannot see dom_idx, which is
-  # only determined per-sample inside classify_one_sample()). Purely ADDITIVE this
-  # plan: role / role_reason / overall_sample_call still derive from own_substantial
-  # below, unchanged — Plan 03 re-derives them from evidence_state (D-14).
+  # only determined per-sample inside classify_one_sample()). As of Plan 03, this
+  # evidence_state is the SOLE driver of a non-dominant candidate's role /
+  # role_reason (see the state -> role map in classify_one_sample()), which is what
+  # decouples the sample-level co-infection call from dominance ordering (EVID-04).
   #
   # Band cutpoints are calibration-VALIDATED against the real 203-candidate dataset
   # (12-RESEARCH §4, D-13): the 15 genuine corroborated minors + the Sample51K/61K 2c
@@ -518,7 +519,6 @@ classify_roles <- function(scored_df, minRead, minCov,
 
   scored_df <- scored_df %>%
     mutate(
-      .own_substantial = own_substantial,
       below_floor      = clears_floor,
       .eligible        = eligible,
       .row_order       = row_number(),
@@ -552,8 +552,6 @@ classify_roles <- function(scored_df, minRead, minCov,
       dom_idx <- gated[ord[1]]
     }
 
-    # "Did de novo work for the dominant?" (D-11) — the dominant's OWN substantiality.
-    dom_substantial <- if (!is.na(dom_idx)) isTRUE(g$.own_substantial[dom_idx]) else FALSE
     dom_subtype  <- if (!is.na(dom_idx)) as.character(g$candidate_subtype[dom_idx])  else NA_character_
     dom_genotype <- if (!is.na(dom_idx)) as.character(g$candidate_genotype[dom_idx]) else NA_character_
 
@@ -571,20 +569,30 @@ classify_roles <- function(scored_df, minRead, minCov,
         next
       }
 
-      # Provisional corroboration verdict (D-10/D-11):
-      if (isTRUE(g$.own_substantial[i])) {
+      # state -> role (EVID-04 / D-16): a non-dominant candidate's role is DERIVED
+      # from its OWN per-candidate evidence_state (computed at outer scope, never
+      # from dom_substantial), replacing the old own_substantial + dominance-
+      # dependent asymmetric-refute branch. This is what lets a strong non-dominant
+      # candidate (Sample51K-2c) surface as a co-infection MEMBER independent of
+      # which candidate wins dominance, while a no-assembly candidate nets out
+      # background regardless of whether the dominant assembled.
+      #   confirmed / probable -> co-infection (subject to the UNCHANGED
+      #                           is_valid_minor() demotion below; D-17)
+      #   refuted              -> background / refuted_denovo (genuine own-assembly
+      #                           genotype contradiction; reason retained, D-18)
+      #   weak                 -> background, with the D-06/D-18 reason split:
+      #                           no_own_assembly (assembly_exists FALSE) vs
+      #                           weak_own_assembly_below_floor (present, below cut)
+      st <- g$evidence_state[i]
+      if (st %in% c("confirmed", "probable")) {
         role <- "co-infection"
         reason <- "corroborated"
-      } else if (dom_substantial) {
-        # Candidate has no own support BUT de novo demonstrably worked for the
-        # dominant => absence is real evidence (the 4g case). Asymmetric refute.
+      } else if (identical(st, "refuted")) {
         role <- "background"
         reason <- "refuted_denovo"
       } else {
-        # Neither the candidate nor the dominant assembled substantially => de novo
-        # inconclusive; never suppress a genuine low-yield minor (D-11).
-        role <- "co-infection"
-        reason <- "uncorroborated_kept"
+        role <- "background"
+        reason <- if (isTRUE(g$assembly_exists[i])) "weak_own_assembly_below_floor" else "no_own_assembly"
       }
 
       # D-12 HCV exceptions: applied to candidates that would be co-infection. They
@@ -660,5 +668,5 @@ classify_roles <- function(scored_df, minRead, minCov,
 
   out %>%
     arrange(.row_order) %>%
-    select(-.own_substantial, -.eligible, -.row_order)
+    select(-.eligible, -.row_order)
 }
