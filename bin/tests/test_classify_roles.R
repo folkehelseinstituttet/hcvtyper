@@ -809,4 +809,32 @@ if ((r19e %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
   fail("Test19e lone dominant weak candidate -> monoinfection")
 ok("Test19 (EVID-04/D-16/D-18): role/role_reason/overall_sample_call derived from evidence_state — 2c co-infection flip, false-4g weak/background, weak-present vs no-assembly split, genuine contradiction refuted_denovo, dominant stays dominant when weak")
 
+# --- Test 20: production call-order integration (CR-02, 12-REVIEW) -----------
+# summarize.R ALWAYS runs apply_concordance() BEFORE score_candidates() /
+# classify_roles() (bin/summarize.R L818, L820, L830). Test19d's synthetic
+# contradiction, run WITHOUT apply_concordance() first, locks in
+# role_reason == "refuted_denovo" — but that is NOT what production actually
+# produces for the identical candidate frame, because apply_concordance()
+# computes the SAME own-de-novo-vs-mapping contradiction as concordance_status
+# == "discordant" (denovo_conflict, classify_roles.R L106), and the
+# discordant_identity hard gate in classify_one_sample() (L565-570) runs and
+# `next`s BEFORE the evidence_state branch is ever reached (L586-596). Mirror
+# the real call order here and assert on the ACTUALLY-OBSERVED role_reason, so
+# a future rename of either gate cannot silently regress this back to a
+# comforting-but-wrong "refuted_denovo" expectation.
+integ_contra <- bind_rows(
+  mk_cand("I20", "2a_dom",    "2a", 300000, 99, 0.95, sup_len = 9500, sup_kmer = 40, sup_pid = 99),
+  mk_cand("I20", "1a_contra", "1a", 5000,   80, 0.70, sup_len = 600,  sup_kmer = 3,  sup_pid = 85) %>%
+    mutate(assembly_support = "supported", assembly_support_subtype = "3a")
+)
+# Real production order: apply_concordance() -> score_candidates() -> classify_roles().
+r20 <- classify(apply_concordance(integ_contra))
+if (state_of(r20, "1a_contra") != "refuted")
+  fail(sprintf("Test20 CR-02: the candidate's own evidence_state must still be 'refuted' regardless of call order, got '%s'", state_of(r20, "1a_contra")))
+if (role_of(r20, "1a_contra") != "background")
+  fail("Test20 CR-02: the contradicting candidate must be background either way")
+if (reason_of(r20, "1a_contra") != "discordant_identity")
+  fail(sprintf("Test20 CR-02: in the REAL production call order, the discordant-identity hard gate pre-empts the refuted-evidence_state branch — role_reason must be 'discordant_identity', got '%s' (NOT 'refuted_denovo', which only Test19d's non-integrated call order can observe)", reason_of(r20, "1a_contra")))
+ok("Test20 (CR-02): production call order (apply_concordance -> score_candidates -> classify_roles) yields role_reason=='discordant_identity' for a genuine own-assembly contradiction, not the isolated-call-order 'refuted_denovo' Test19d observes")
+
 cat("\nALL PASS\n")
