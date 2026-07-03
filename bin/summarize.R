@@ -340,8 +340,14 @@ if (length(stats_files) > 0) {
     # 4-col no-header idxstats TSV: refname, seqlen, mapped, unmapped.
     read_tsv(f, col_names = c("candidate_ref", "seqlen", "mapped", "unmapped"),
              comment = "", show_col_types = FALSE) %>%
-      # Drop the `*` unmapped trailer row and any zero-read references.
-      filter(candidate_ref != "*", mapped > 0) %>%
+      # Drop only the `*` unmapped trailer row. A real candidate reference whose
+      # mapped count is 0 under competitive joint mapping (Phase 11 assigned all
+      # reads to the dominant) is KEPT — the Plan 01/02 evidence engine scores it
+      # on its own assembly evidence rather than relying on a silent upstream drop
+      # (EVID-02 / folded todo 2026-06-22). The 0 read count flows through as a
+      # numeric 0 (not NA), so the downstream case_when/percentage/fill logic
+      # stays NA-tolerant and the candidate_rank_lookup join stays one-row-per-rank.
+      filter(candidate_ref != "*") %>%
       # idxstats refnames are already the bare candidate reference; strip a
       # `_cand{rank}` slot defensively (no-op for combined-BAM idxstats).
       mutate(candidate_ref = str_remove(candidate_ref, "_cand[0-9]+$")) %>%
@@ -415,7 +421,10 @@ if (length(stats_files) > 0) {
     sampleName <- str_split(basename(f), "\\.")[[1]][1]
     read_tsv(f, col_names = c("candidate_ref", "seqlen", "mapped", "unmapped"),
              comment = "", show_col_types = FALSE) %>%
-      filter(candidate_ref != "*", mapped > 0) %>%
+      # Symmetric with the withdup loop: drop only the `*` trailer, keep a real
+      # candidate whose mapped count is 0 so a zero-read co-infection minor is not
+      # silently dropped (EVID-02 / folded todo 2026-06-22).
+      filter(candidate_ref != "*") %>%
       mutate(candidate_ref = str_remove(candidate_ref, "_cand[0-9]+$")) %>%
       transmute(sampleName, candidate_ref,
                 trimmed_reads_nodups_mapped = as.numeric(mapped))
