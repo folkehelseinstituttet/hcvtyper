@@ -71,7 +71,7 @@ cell_equal <- function(a, b) {
 # -------------------------------------------------------------------------
 run_summarize <- function(case, sampleName, cands,
                           minRead = 500, minCov = 30, n_candidates = 2,
-                          ref_length = 200) {
+                          ref_length = 200, denovo = NULL, return_mqc = FALSE) {
   wd <- tempfile(paste0("compat_", case, "_")); dir.create(wd)
   old <- getwd(); setwd(wd); on.exit(setwd(old), add = TRUE)
 
@@ -188,6 +188,47 @@ run_summarize <- function(case, sampleName, cands,
                                       paste0(base, ".nodup.tsv")))
   }
 
+  # --- OPTIONAL de novo fixtures (RPT-CONTIG): stage denovo/ so summarize.R
+  # resolves denovo_*_ref (from *.blastparse.csv) AND denovo_*_contig (top-bitscore
+  # qseqid whose sseqid == that ref, from *_blast_out.csv). Absent by default, so
+  # every existing caller stays a no-denovo run (four denovo_* columns NA-fill).
+  # `denovo` is a named list: major_ref/minor_ref (blastparse) + major_contig/
+  # minor_contig (the intended top-bitscore contig for each ref). Decoy lower-bitscore
+  # hits on each ref prove slice_max picks the named contig, not just the only row.
+  if (!is.null(denovo)) {
+    dir.create(file.path(wd, "denovo"))
+    # *.blastparse.csv: exact col-types summarize.R pins at L630-636.
+    blastparse <- tibble(
+      sample              = sampleName,
+      major_ref           = denovo$major_ref,
+      major_contig_length = 3000L,
+      minor_ref           = denovo$minor_ref,
+      minor_contig_length = 2500L
+    )
+    write_csv(blastparse, file.path(wd, "denovo",
+                                    paste0(sampleName, ".blastparse.csv")))
+
+    # <sample>_blast_out.csv: outfmt6+ schema summarize.R df_blast_out reads
+    # (L676-692). One row per (contig, ref) hit. Bitscore chosen so the top hit per
+    # (sampleName, sseqid) carries the intended contig; other columns constant/dummy.
+    blast_out <- tribble(
+      ~qseqid,               ~sseqid,            ~bitscore,
+      denovo$major_contig,   denovo$major_ref,   5000,   # top hit on major_ref
+      "NODE_99_len_400",     denovo$major_ref,   900,    # decoy on major_ref (lower)
+      denovo$minor_contig,   denovo$minor_ref,   4200,   # top hit on minor_ref
+      "NODE_98_len_350",     denovo$minor_ref,   800     # decoy on minor_ref (lower)
+    ) %>%
+      mutate(
+        subtype   = NA_character_, pident = 99, length = 3000, mismatch = 5,
+        gapopen   = 1, qstart = 1, qend = 3000, sstart = 1, send = 3000,
+        evalue    = 0, sc_length = 3000, kmer_cov = 40
+      ) %>%
+      select(qseqid, sseqid, subtype, pident, length, mismatch, gapopen,
+             qstart, qend, sstart, send, evalue, bitscore, sc_length, kmer_cov)
+    write_csv(blast_out, file.path(wd, "denovo",
+                                   paste0(sampleName, "_blast_out.csv")))
+  }
+
   # --- invoke the REAL summarize.R (positional arg contract, L27-86) ---
   # args: [1]=samplesheet [2]=version [3]=name [4-8] denovo params (empty=default)
   #       [9]=minRead [10]=minCov [11]=n_candidates
@@ -205,11 +246,25 @@ run_summarize <- function(case, sampleName, cands,
   )
 
   summary_path <- file.path(wd, "Summary.csv")
-  if (file.exists(summary_path)) {
+  summary_tbl <- if (file.exists(summary_path)) {
     read_csv(summary_path, show_col_types = FALSE)
   } else {
     NULL
   }
+
+  if (return_mqc) {
+    # summary_mqc.tsv = manual colname header line + write_tsv data rows (no second
+    # header). read_tsv treats the first line as the header (bin/summarize.R L1993-1995).
+    mqc_path <- file.path(wd, "summary_mqc.tsv")
+    mqc_tbl <- if (file.exists(mqc_path)) {
+      read_tsv(mqc_path, show_col_types = FALSE)
+    } else {
+      NULL
+    }
+    return(list(summary = summary_tbl, mqc = mqc_tbl))
+  }
+
+  summary_tbl
 }
 
 # Candidate-frame builder (one row per candidate).
@@ -518,5 +573,70 @@ if (nrow(shared_summary) != 1)
   fail(sprintf("JMAP-03 shared-ref: expected exactly 1 Summary.csv row, got %d (many-to-many join, 1d1a051 regression)",
                nrow(shared_summary)))
 ok("JMAP-03 shared-ref: two candidates sharing one reference yield exactly one Summary.csv row (many-to-many guard)")
+
+# =========================================================================
+# RPT-CONTIG (260703-dpj): de novo contig NAME + its BLAST ref surfaced per
+# strain. Summary.csv gains denovo_major_contig / denovo_minor_contig (the
+# top-bitscore contig qseqid backing each strain's ref) alongside the already-
+# present denovo_major_ref / denovo_minor_ref. summary_mqc.tsv carries the generic
+# denovo_best_contig / denovo_best_contig_ref, with the [minor] row promoted from
+# the denovo_minor_* counterparts (col_major/col_minor pairing) — so a [minor] row
+# shows the MINOR strain's contig+ref, not the major's (T-dpj-03).
+#
+# Drives the REAL summarize.R via run_summarize(denovo=, return_mqc=TRUE), which
+# stages denovo/<sample>.blastparse.csv + <sample>_blast_out.csv fixtures.
+# -------------------------------------------------------------------------
+contig_cands <- mk_cands(
+  mk_cand(1, "1a_M62321", "1a", 200000, 99),
+  mk_cand(2, "1b_D90208", "1b", 150000, 97)
+)
+contig_denovo <- list(
+  major_ref    = "1a_M62321", major_contig = "NODE_1_len_3000",
+  minor_ref    = "1b_D90208", minor_contig = "NODE_7_len_2500"
+)
+contig_out <- run_summarize("rptcontig", "RPTCONTIG", contig_cands,
+                            denovo = contig_denovo, return_mqc = TRUE)
+cs <- contig_out$summary
+cm <- contig_out$mqc
+if (is.null(cs)) fail("RPT-CONTIG: summarize.R wrote no Summary.csv")
+if (is.null(cm)) fail("RPT-CONTIG: summarize.R wrote no summary_mqc.tsv")
+
+# --- Summary.csv: all four denovo_*_ref / denovo_*_contig present AND populated ---
+contig_cols <- c("denovo_major_ref", "denovo_major_contig",
+                 "denovo_minor_ref", "denovo_minor_contig")
+missing_contig <- setdiff(contig_cols, colnames(cs))
+if (length(missing_contig) > 0)
+  fail(paste("RPT-CONTIG: Summary.csv missing columns:",
+             paste(missing_contig, collapse = ",")))
+if (!identical(as.character(cs$denovo_major_ref[1]), "1a_M62321"))
+  fail(sprintf("RPT-CONTIG: denovo_major_ref = '%s', expected 1a_M62321", cs$denovo_major_ref[1]))
+if (!identical(as.character(cs$denovo_major_contig[1]), "NODE_1_len_3000"))
+  fail(sprintf("RPT-CONTIG: denovo_major_contig = '%s', expected NODE_1_len_3000 (top-bitscore contig on 1a_M62321)", cs$denovo_major_contig[1]))
+if (!identical(as.character(cs$denovo_minor_ref[1]), "1b_D90208"))
+  fail(sprintf("RPT-CONTIG: denovo_minor_ref = '%s', expected 1b_D90208", cs$denovo_minor_ref[1]))
+if (!identical(as.character(cs$denovo_minor_contig[1]), "NODE_7_len_2500"))
+  fail(sprintf("RPT-CONTIG: denovo_minor_contig = '%s', expected NODE_7_len_2500 (top-bitscore contig on 1b_D90208)", cs$denovo_minor_contig[1]))
+ok("RPT-CONTIG: Summary.csv denovo_major/minor_contig + _ref present and populated per strain")
+
+# --- summary_mqc.tsv: generic columns exist; [major] row = major strain's
+#     contig+ref, [minor] row = minor strain's (per-strain correctness, T-dpj-03) ---
+mqc_contig_cols <- c("denovo_best_contig", "denovo_best_contig_ref")
+missing_mqc <- setdiff(mqc_contig_cols, colnames(cm))
+if (length(missing_mqc) > 0)
+  fail(paste("RPT-CONTIG: summary_mqc.tsv missing columns:",
+             paste(missing_mqc, collapse = ",")))
+major_row <- cm %>% filter(sampleName == "RPTCONTIG [major]")
+minor_row <- cm %>% filter(sampleName == "RPTCONTIG [minor]")
+if (nrow(major_row) != 1) fail("RPT-CONTIG: summary_mqc.tsv missing the 'RPTCONTIG [major]' row")
+if (nrow(minor_row) != 1) fail("RPT-CONTIG: summary_mqc.tsv missing the 'RPTCONTIG [minor]' row")
+if (!identical(as.character(major_row$denovo_best_contig[1]), "NODE_1_len_3000"))
+  fail(sprintf("RPT-CONTIG: [major] denovo_best_contig = '%s', expected NODE_1_len_3000", major_row$denovo_best_contig[1]))
+if (!identical(as.character(major_row$denovo_best_contig_ref[1]), "1a_M62321"))
+  fail(sprintf("RPT-CONTIG: [major] denovo_best_contig_ref = '%s', expected 1a_M62321", major_row$denovo_best_contig_ref[1]))
+if (!identical(as.character(minor_row$denovo_best_contig[1]), "NODE_7_len_2500"))
+  fail(sprintf("RPT-CONTIG: [minor] denovo_best_contig = '%s', expected NODE_7_len_2500 (minor strain's contig, not the major's)", minor_row$denovo_best_contig[1]))
+if (!identical(as.character(minor_row$denovo_best_contig_ref[1]), "1b_D90208"))
+  fail(sprintf("RPT-CONTIG: [minor] denovo_best_contig_ref = '%s', expected 1b_D90208 (minor strain's ref, not the major's)", minor_row$denovo_best_contig_ref[1]))
+ok("RPT-CONTIG: summary_mqc.tsv [major]/[minor] rows carry the correct per-strain contig + ref via col_major/col_minor pairing")
 
 cat("\nALL PASS\n")
