@@ -32,11 +32,20 @@
 #   D-05  k-mer-cov term is bonus-ONLY and capped: NA / "none" support => no boost,
 #         never a penalty.
 #   D-06  deterministic tie-break: score, then reads, then ref name.
-#   D-10  corroboration verdict = ANDed denovo floors (length/kmer_cov/pident) on
-#         the candidate's joined assembly_support_* metrics at match_level.
-#   D-11  asymmetric refute: cleared-floor candidate with no own support is
-#         `background`/refuted_denovo ONLY if the DOMINANT assembled substantially;
-#         if the dominant also failed de novo, keep it co-infection/uncorroborated_kept.
+#   D-10/D-11 (WR-01, 12-REVIEW: superseded by Phase-12 Plan-03 — see EVID-01..04
+#         below; kept here for the ID numbering, not for the OLD behaviour they used
+#         to describe). Role / role_reason are now DERIVED from a per-candidate,
+#         continuous `evidence_state` (confirmed/probable/weak/refuted) computed by
+#         score_assembly_support() + classify_roles()'s evidence-band derivation
+#         (see the D-01/D-09/D-10/D-05 comment above evidence_hi_cut/evidence_lo_cut,
+#         and the EVID-02/EVID-04 comments in classify_one_sample()). This REPLACED
+#         the old binary ANDed-floor `own_substantial` corroboration check and its
+#         dominance-DEPENDENT asymmetric refute (a no-own-support candidate used to
+#         be `background`/refuted_denovo only if the dominant ALSO assembled
+#         substantially, else kept as `co-infection`/uncorroborated_kept). Under the
+#         new model a candidate's evidence_state — and hence its role — is identical
+#         regardless of which candidate wins dominance (EVID-02); `uncorroborated_kept`
+#         no longer exists in the role_reason vocabulary at all.
 #   D-12  HCV exceptions (verbatim is_valid_minor): same-genotype (non-1a/1b) or a
 #         2k1b pair => DEMOTE to background (exceptions never promote).
 #   D-14  overall call: >=1 co-infection role => "co-infection"; 1 dominant + only
