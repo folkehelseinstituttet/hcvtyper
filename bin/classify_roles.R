@@ -64,6 +64,36 @@ if (!exists("group_by")) {
   library(tidyverse)
 }
 
+# own_denovo_conflict(map_genotype, assembly_support, assembly_support_subtype)
+#   WR-04 (12-REVIEW): single source of truth for the "candidate's OWN de novo
+#   assembly genotype genuinely differs from its OWN mapping genotype" predicate.
+#   Before this helper existed, apply_concordance()'s denovo_conflict leg (used to
+#   derive concordance_status == "discordant") and classify_roles()'s
+#   denovo_contradicts leg (used to derive evidence_state == "refuted") recomputed
+#   this near-verbatim, independently — nothing enforced that they stayed in sync,
+#   which is what let CR-02 exist (the discordant_identity hard gate in
+#   classify_one_sample() always runs before the refuted evidence_state branch is
+#   reached, so the two predicates MUST agree or the refuted branch silently
+#   becomes unreachable dead code). Both call sites now read from here.
+#   Pure; vectorised over the three input vectors (equal length, one row per
+#   candidate). NA-tolerant: an absent/blank subtype or genotype never contradicts.
+own_denovo_conflict <- function(map_genotype, assembly_support, assembly_support_subtype) {
+  map_gt <- as.character(map_genotype)
+  n <- length(map_gt)
+  asup_subtype <- if (is.null(assembly_support_subtype)) rep(NA_character_, n) else as.character(assembly_support_subtype)
+  supported <- if (is.null(assembly_support)) rep(FALSE, n) else (!is.na(assembly_support) & assembly_support == "supported")
+  has_denovo <- supported & !is.na(asup_subtype) & nzchar(asup_subtype)
+  denovo_gt <- ifelse(
+    has_denovo,
+    vapply(asup_subtype, function(s) {
+      if (is.na(s) || !nzchar(s)) NA_character_ else as.character(genotype_from_subtype(s))
+    }, character(1L)),
+    NA_character_
+  )
+  conflict <- has_denovo & !is.na(denovo_gt) & !is.na(map_gt) & map_gt != denovo_gt
+  list(has_denovo = has_denovo, denovo_gt = denovo_gt, conflict = conflict)
+}
+
 # apply_concordance(df) — D8 pre-annotation helper.
 # Compares three identity legs at genotype level and annotates each candidate with:
 #   concordance_status : "confirmed" (all legs present and agree),
@@ -88,18 +118,17 @@ apply_concordance <- function(df) {
   if (!"assembly_support"         %in% names(df)) df$assembly_support         <- "none"
   if (!"assembly_support_subtype" %in% names(df)) df$assembly_support_subtype <- NA_character_
 
-  has_glue   <- !is.na(df$candidate_glue_genotype) & nzchar(as.character(df$candidate_glue_genotype))
-  has_denovo <- df$assembly_support == "supported" & !is.na(df$assembly_support_subtype)
+  has_glue <- !is.na(df$candidate_glue_genotype) & nzchar(as.character(df$candidate_glue_genotype))
 
-  map_gt   <- as.character(df$candidate_genotype)
-  glue_gt  <- as.character(df$candidate_glue_genotype)
-  denovo_gt <- ifelse(
-    has_denovo,
-    vapply(df$assembly_support_subtype, function(s) {
-      if (is.na(s) || !nzchar(s)) NA_character_ else as.character(genotype_from_subtype(s))
-    }, character(1L)),
-    NA_character_
-  )
+  # WR-04: own-de-novo-vs-mapping contradiction, computed ONCE via the shared
+  # own_denovo_conflict() helper (also used by classify_roles()'s refuted-band
+  # evidence_state derivation, below) instead of a locally-duplicated predicate.
+  own_denovo <- own_denovo_conflict(df$candidate_genotype, df$assembly_support, df$assembly_support_subtype)
+  has_denovo <- own_denovo$has_denovo
+
+  map_gt    <- as.character(df$candidate_genotype)
+  glue_gt   <- as.character(df$candidate_glue_genotype)
+  denovo_gt <- own_denovo$denovo_gt
 
   # 2k1b structural exception (CLAUDE.md Constraints): HCV-GLUE's clade-placement
   # tree has no CRF_02k/1b category, so a genuine 2k/1b recombinant is ALWAYS
@@ -111,8 +140,8 @@ apply_concordance <- function(df) {
   # already agrees natively via genotype_from_subtype()'s 2k1b-aware rule.
   glue_2k1b_exempt <- map_gt == "2k1b" & glue_gt %in% c("1", "2")
 
-  glue_conflict   <- has_glue   & !is.na(glue_gt)   & map_gt != glue_gt & !glue_2k1b_exempt
-  denovo_conflict <- has_denovo & !is.na(denovo_gt) & map_gt != denovo_gt
+  glue_conflict   <- has_glue & !is.na(glue_gt) & map_gt != glue_gt & !glue_2k1b_exempt
+  denovo_conflict <- own_denovo$conflict
 
   status <- character(nrow(df))
   reason <- character(nrow(df))
@@ -488,31 +517,18 @@ classify_roles <- function(scored_df, minRead, minCov,
   asup_exists <- scored_df$assembly_exists
 
   # Contradiction leg (D-01): the candidate's OWN de novo genotype genuinely differs
-  # from its OWN mapping genotype. Reuse genotype_from_subtype() + the
-  # assembly_support_subtype leg EXACTLY as apply_concordance() does (L87-93) — never
-  # hand-roll substr(). NA / absent legs fall through to non-contradiction (T-12-02:
-  # an absent subtype or genotype can never drive a spurious refutation).
-  map_gt_state <- as.character(scored_df$candidate_genotype)
-  asup_subtype <- if ("assembly_support_subtype" %in% names(scored_df)) {
-    as.character(scored_df$assembly_support_subtype)
-  } else {
-    rep(NA_character_, nrow(scored_df))
-  }
-  supported_state <- if ("assembly_support" %in% names(scored_df)) {
-    !is.na(scored_df$assembly_support) & scored_df$assembly_support == "supported"
-  } else {
-    rep(FALSE, nrow(scored_df))
-  }
-  has_denovo_state <- supported_state & !is.na(asup_subtype) & nzchar(asup_subtype)
-  denovo_gt_state <- ifelse(
-    has_denovo_state,
-    vapply(asup_subtype, function(s) {
-      if (is.na(s) || !nzchar(s)) NA_character_ else as.character(genotype_from_subtype(s))
-    }, character(1L)),
-    NA_character_
+  # from its OWN mapping genotype. WR-04 (12-REVIEW): reuse the shared
+  # own_denovo_conflict() helper — the SAME predicate apply_concordance() uses for
+  # its denovo_conflict leg — rather than a locally re-derived copy, so the two
+  # can never drift apart (see the helper's docstring for why that mattered, CR-02).
+  # NA / absent legs fall through to non-contradiction (T-12-02: an absent subtype
+  # or genotype can never drive a spurious refutation).
+  own_denovo_state <- own_denovo_conflict(
+    scored_df$candidate_genotype,
+    if ("assembly_support" %in% names(scored_df)) scored_df$assembly_support else NULL,
+    if ("assembly_support_subtype" %in% names(scored_df)) scored_df$assembly_support_subtype else NULL
   )
-  denovo_contradicts <- has_denovo_state & !is.na(denovo_gt_state) &
-    !is.na(map_gt_state) & map_gt_state != denovo_gt_state
+  denovo_contradicts <- own_denovo_state$conflict
 
   # Quality re-check (D-03): reuse the existing ANDed denovo floor (own_substantial).
   # A genuine contradiction that survives to classify_roles.R with the original
