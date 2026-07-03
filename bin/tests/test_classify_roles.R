@@ -694,4 +694,84 @@ if (state_of(classify(apply_concordance(syn18)), "1a_ref") != "refuted")
   fail("Test18 synthetic own-assembly contradiction (1a mapping vs 2b de novo, low quality) must be refuted (D-07)")
 ok("Test18 (EVID-02/D-07): 2c evidence_state independent of competing 3a (role flips, state does not); synthetic contradiction is the sole refuted case")
 
+# --- Test 19: role/role_reason/overall_sample_call DERIVED from evidence_state ---
+# Phase-12 Plan-03 Task 1 (EVID-04, D-16/D-18). role is now re-derived from each
+# candidate's OWN per-candidate evidence_state instead of the old dominance-dependent
+# own_substantial + asymmetric-refute branch: a strong non-dominant candidate surfaces
+# as a co-infection MEMBER independent of which candidate wins dominance.
+
+# (a) EVID-04 flip: Sample51K-2c (89.009% strong contig) with a competing 3a that
+# wins dominance now surfaces as a co-infection MEMBER (was background/refuted_denovo
+# under the old ANDed 90% floor). The sample call flips monoinfection -> co-infection.
+s51k_role <- bind_rows(
+  mk_cand("Sample51Krole", "2c_JX227949", "2c", 26023, 81, 0.80,
+          sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009),
+  mk_cand("Sample51Krole", "3a_comp", "3a", 40000, 95, 0.90,
+          sup_len = 9450, sup_kmer = 600, sup_pid = 99)
+)
+r19a <- classify(s51k_role)
+if (role_of(r19a, "2c_JX227949") != "co-infection")
+  fail(sprintf("Test19a EVID-04: strong non-dominant 2c must be co-infection, got '%s'", role_of(r19a, "2c_JX227949")))
+if (reason_of(r19a, "2c_JX227949") != "corroborated")
+  fail(sprintf("Test19a 2c reason must be corroborated, got '%s'", reason_of(r19a, "2c_JX227949")))
+if (role_of(r19a, "3a_comp") != "dominant")
+  fail("Test19a the competing 3a must remain dominant")
+if ((r19a %>% pull(overall_sample_call) %>% unique()) != "co-infection")
+  fail("Test19a sample-level call must flip to co-infection (dominance no longer gates existence)")
+
+# (b) false-4g still nets out background/monoinfection: its state is weak
+# (no_own_assembly) and weak candidates do NOT count toward the co-infection call (D-02).
+r19b <- classify(false_4g)
+if (role_of(r19b, "4g_artif") != "background")
+  fail("Test19b false-4g must stay background")
+if (reason_of(r19b, "4g_artif") != "no_own_assembly")
+  fail(sprintf("Test19b false-4g reason must be no_own_assembly (weak, no assembly), got '%s'", reason_of(r19b, "4g_artif")))
+if (state_of(r19b, "4g_artif") != "weak")
+  fail("Test19b false-4g evidence_state must be weak")
+if ((r19b %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
+  fail("Test19b false-4g sample must stay monoinfection (weak does not count as co-infection)")
+
+# (c) weak-but-PRESENT assembly (below cutpoint) -> background/weak_own_assembly_below_floor
+# (D-06/D-18) — distinct from no_own_assembly.
+weak_present <- bind_rows(
+  mk_cand("W19", "1a_dom", "1a", 300000, 99, 0.95, sup_len = 9000, sup_kmer = 40, sup_pid = 99),
+  mk_cand("W19", "2c_weak", "2c", 4000, 60, 0.40, sup_len = 200, sup_kmer = NA, sup_pid = 70)
+)
+r19c <- classify(weak_present)
+if (state_of(r19c, "2c_weak") != "weak")
+  fail("Test19c present-but-below-floor assembly must be weak")
+if (!identical(r19c %>% filter(candidate_ref == "2c_weak") %>% pull(assembly_exists), TRUE))
+  fail("Test19c weak-present candidate assembly_exists must be TRUE (distinguishes it from no_own_assembly)")
+if (role_of(r19c, "2c_weak") != "background")
+  fail("Test19c weak-present candidate must be background")
+if (reason_of(r19c, "2c_weak") != "weak_own_assembly_below_floor")
+  fail(sprintf("Test19c weak-present reason must be weak_own_assembly_below_floor, got '%s'", reason_of(r19c, "2c_weak")))
+
+# (d) non-dominant genuine contradiction (refuted state) -> background/refuted_denovo
+# (D-18 retains refuted_denovo for a GENUINE own-assembly genotype contradiction).
+# No apply_concordance() is run, so the discordant hard gate does not pre-empt it.
+refuted_role <- bind_rows(
+  mk_cand("R19", "2a_dom", "2a", 300000, 99, 0.95, sup_len = 9500, sup_kmer = 40, sup_pid = 99),
+  mk_cand("R19", "1a_contra", "1a", 5000, 80, 0.70, sup_len = 600, sup_kmer = 3, sup_pid = 85) %>%
+    mutate(assembly_support = "supported", assembly_support_subtype = "3a")
+)
+r19d <- classify(refuted_role)
+if (state_of(r19d, "1a_contra") != "refuted")
+  fail(sprintf("Test19d genuine own-assembly contradiction must be refuted, got '%s'", state_of(r19d, "1a_contra")))
+if (role_of(r19d, "1a_contra") != "background")
+  fail("Test19d refuted candidate must be background")
+if (reason_of(r19d, "1a_contra") != "refuted_denovo")
+  fail(sprintf("Test19d refuted candidate reason must be refuted_denovo, got '%s'", reason_of(r19d, "1a_contra")))
+
+# (e) D-16: a dominant candidate is role=dominant regardless of a weak evidence_state.
+lone_weak <- mk_cand("L19", "1a_lone", "1a", 100000, 95, 0.90)   # no assembly -> weak
+r19e <- classify(lone_weak)
+if (state_of(r19e, "1a_lone") != "weak")
+  fail("Test19e lone no-assembly candidate must be weak")
+if (role_of(r19e, "1a_lone") != "dominant")
+  fail("Test19e a dominant candidate must stay dominant even when its evidence_state is weak (D-16)")
+if ((r19e %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
+  fail("Test19e lone dominant weak candidate -> monoinfection")
+ok("Test19 (EVID-04/D-16/D-18): role/role_reason/overall_sample_call derived from evidence_state — 2c co-infection flip, false-4g weak/background, weak-present vs no-assembly split, genuine contradiction refuted_denovo, dominant stays dominant when weak")
+
 cat("\nALL PASS\n")
