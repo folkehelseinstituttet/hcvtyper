@@ -446,7 +446,13 @@ classify_roles <- function(scored_df, minRead, minCov,
   # (quality_fails_state) feeding evidence_state, never as the role gate itself.
   # score_assembly_support() reads only the candidate's OWN assembly metrics
   # (identity/length/k-mer, D-11).
-  if (!"assembly_support_score" %in% names(scored_df)) {
+  # WR-03 (12-REVIEW): score_assembly_support() always sets assembly_support_score
+  # AND assembly_exists TOGETHER, so the recompute guard must check BOTH columns,
+  # not just one — a caller-supplied frame carrying assembly_support_score without
+  # assembly_exists (or vice versa) would otherwise skip recomputation and leave
+  # assembly_exists NULL, silently zero-length-vectoring the ifelse() below into a
+  # length-mismatch error instead of a clear diagnostic.
+  if (!all(c("assembly_support_score", "assembly_exists") %in% names(scored_df))) {
     scored_df <- score_assembly_support(scored_df)
   }
 
