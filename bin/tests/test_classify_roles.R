@@ -639,4 +639,59 @@ if ((classify(false_4g) %>% pull(overall_sample_call) %>% unique()) != "monoinfe
   fail("Test17 additive evidence_state must not change false_4g's monoinfection call (Plan 03 owns role changes)")
 ok("Test17 (EVID-02/EVID-03): per-candidate evidence_state — contradiction->refuted, no-assembly->weak, k-mer-cliff/89%-2c->not refuted; additive only")
 
+# --- Test 18: per-candidate independence + sole-refuted (EVID-02, D-07) -------
+# Phase-12 Plan-02 Task 2. The Sample51K paradox: the SAME 2c contig (89.009%,
+# ~9479bp, k-mer 514) is refuted at the ROLE layer only because a 3a co-infects the
+# sample and wins dominance — while in samples where no 3a competes (52K/53T/54T)
+# the identical 2c is the dominant monoinfection call. The new per-candidate
+# evidence_state must be IDENTICAL across both, proving it is a property of the
+# candidate's OWN evidence, not of which candidate happens to be dominant (EVID-02).
+
+# Sample51K-shaped: 2c (89.009%, strong contig) + a competing 3a that wins dominance.
+s51k_frame <- bind_rows(
+  mk_cand("Sample51K", "2c_JX227949", "2c", 26023, 81, 0.80,
+          sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009),
+  mk_cand("Sample51K", "3a_comp",     "3a", 40000, 95, 0.90,
+          sup_len = 9450, sup_kmer = 600,   sup_pid = 99)
+)
+# Sample52K-shaped: the IDENTICAL 2c contig, no competitor.
+s52k_frame <- mk_cand("Sample52K", "2c_JX227949", "2c", 26023, 81, 0.80,
+                      sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009)
+
+r51 <- classify(s51k_frame)
+r52 <- classify(s52k_frame)
+st_51 <- state_of(r51, "2c_JX227949")
+st_52 <- state_of(r52, "2c_JX227949")
+if (st_51 != st_52)
+  fail(sprintf("Test18 EVID-02: 2c evidence_state must be identical with/without a competing 3a, got '%s' vs '%s'", st_51, st_52))
+if (st_51 != "confirmed")
+  fail(sprintf("Test18 the strong 89%% 2c contig must be confirmed regardless of dominance, got '%s'", st_51))
+
+# The ROLE, by contrast, still flips with the competitor (old own_substantial logic
+# runs underneath this plan): background/refuted_denovo when the 3a wins dominance,
+# dominant when the 2c stands alone. This is exactly the dominance-dependence the
+# evidence_state removes — and which Plan 03 will re-derive role FROM the state.
+if (reason_of(r51, "2c_JX227949") != "refuted_denovo")
+  fail("Test18 precondition: 2c is still refuted_denovo at the ROLE layer under the competing 3a (old ANDed floor); Plan 03 rewires role from evidence_state")
+if (role_of(r52, "2c_JX227949") != "dominant")
+  fail("Test18: the lone 2c is dominant — its ROLE flips with the competitor even though its evidence_state does NOT (EVID-02)")
+
+# Sole-refuted (D-07): across every real/anchor fixture frame in the suite, NO
+# candidate reaches refuted — only a synthetic own-assembly contradiction can.
+all_states <- bind_rows(r1, r2, r3, r4, r5, r5b, r6, r7, r8, ra, rb, rc,
+                        r12a, r12b, r_err507, r14, r16, r17_no, r17_k, r51, r52)
+if (any(all_states$evidence_state == "refuted"))
+  fail("Test18 no real/anchor fixture may reach refuted — only the synthetic contradiction does (D-07)")
+
+# The synthetic contradiction (mapping 1a vs de novo 2b, low quality) is the sole
+# refuted case — assembly exists AND genotype differs AND fails quality (D-01).
+syn18 <- mk_cand("SYN18", "1a_ref", "1a", 5000, 80, 0.70,
+                 sup_len = 700, sup_kmer = 4, sup_pid = 86) %>%
+  mutate(candidate_glue_genotype  = NA_character_,
+         assembly_support         = "supported",
+         assembly_support_subtype = "2b")
+if (state_of(classify(apply_concordance(syn18)), "1a_ref") != "refuted")
+  fail("Test18 synthetic own-assembly contradiction (1a mapping vs 2b de novo, low quality) must be refuted (D-07)")
+ok("Test18 (EVID-02/D-07): 2c evidence_state independent of competing 3a (role flips, state does not); synthetic contradiction is the sole refuted case")
+
 cat("\nALL PASS\n")
