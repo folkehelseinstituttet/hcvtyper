@@ -232,6 +232,23 @@ is_valid_minor <- function(cand_subtype, cand_genotype, dom_subtype, dom_genotyp
 #
 #   Pure; no file I/O. NA-tolerant; never stop() on empty/NULL input (CLASS-03/
 #   T-08-01) — the typed zero-row/NULL guard carries the new columns.
+#
+#   WR-02 (12-REVIEW) — CALIBRATION-LOCKED BY DESIGN, not runtime-configurable:
+#   unlike score_candidates()'s score_weight_* args (threaded end-to-end from
+#   nextflow.config -> conf/modules_hcv.config ext.args -> summarize.R argv ->
+#   score_candidates(score_weights=...)), score_assembly_support()'s w/id_center/
+#   id_slope/len_ref/kmer_cap args and classify_roles()'s local evidence_hi_cut/
+#   evidence_lo_cut band cutpoints (defined just above the evidence_state_col
+#   ifelse() cascade) are ALWAYS called at their compiled-in defaults —
+#   classify_roles() invokes score_assembly_support(scored_df) with zero extra
+#   args. This is DELIBERATE, not an oversight: these six-plus numbers are
+#   calibration anchors validated against the real 203-candidate dataset
+#   (12-RESEARCH §Real Data Calibration) and are meant to move only via a new
+#   calibration pass with fresh named-anchor evidence, not via a per-run
+#   ext.args knob an operator could silently mistune. If a future need for
+#   runtime tuning arises, thread them through classify_roles()'s signature and
+#   summarize.R's arg list mirroring the score_weight_* pattern — but that is an
+#   intentional escalation, not the current design.
 score_assembly_support <- function(df, w = .default_assembly_weights(),
                                    id_center = 88, id_slope = 1.6,
                                    len_ref = 3000, kmer_cap = 50) {
