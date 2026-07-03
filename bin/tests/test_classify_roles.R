@@ -440,4 +440,67 @@ if ((r14 %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
                paste(r14 %>% pull(overall_sample_call) %>% unique(), collapse = ",")))
 ok("Test14 (COMPAT-04 e2e): lone 2k1b candidate reaches dominant / monoinfection through apply_concordance() -> classify()")
 
+# --- Test 15: score_assembly_support() unit behaviour (EVID-01, D-08..D-11) --
+# Phase-12 Plan-01 Task 1: the new bounded continuous assembly-support score.
+# Reuses mk_cand() (which emits the three assembly_support_best_contig_* columns)
+# to drive score_assembly_support() directly.
+score_of  <- function(df, the_ref) df %>% filter(candidate_ref == the_ref) %>% pull(assembly_support_score)
+exists_of <- function(df, the_ref) df %>% filter(candidate_ref == the_ref) %>% pull(assembly_exists)
+
+# D-09: no own assembly (all metrics NA) -> score EXACTLY 0 (not NA); exists FALSE.
+no_asm <- mk_cand("S15", "4d_none", "4d", 8, NA, 0)   # sup_* default to NA => no contig
+s15_no <- score_assembly_support(no_asm)
+if (!isTRUE(score_of(s15_no, "4d_none") == 0))
+  fail("Test15 no-assembly must score EXACTLY 0, not NA (D-09)")
+if (!identical(exists_of(s15_no, "4d_none"), FALSE))
+  fail("Test15 no-assembly assembly_exists must be FALSE (D-09)")
+
+# D-08: bounded [0,1] across a wide sweep (extreme kmer/length/identity, negatives).
+sweep <- bind_rows(
+  mk_cand("S15b", "lo",  "1a", 1, 1, 0, sup_len = 200,   sup_kmer = 0.5,    sup_pid = 70),
+  mk_cand("S15b", "mid", "1a", 1, 1, 0, sup_len = 3000,  sup_kmer = 50,     sup_pid = 90),
+  mk_cand("S15b", "hi",  "1a", 1, 1, 0, sup_len = 20000, sup_kmer = 909318, sup_pid = 99.9),
+  mk_cand("S15b", "neg", "1a", 1, 1, 0, sup_len = 500,   sup_kmer = -5,     sup_pid = 85)
+)
+s15_sweep <- score_assembly_support(sweep)
+if (any(is.na(s15_sweep$assembly_support_score)))
+  fail("Test15 assembly_support_score must never be NA for a present contig")
+if (any(s15_sweep$assembly_support_score < 0 | s15_sweep$assembly_support_score > 1))
+  fail("Test15 assembly_support_score must be bounded [0,1] for every input (D-08)")
+
+# D-10: k-mer is BONUS-ONLY — the 2714372 1a shape (id 90.996, k-mer 1.93) must NOT
+# score BELOW the identical contig with no k-mer at all.
+kcliff_with <- mk_cand("S15c", "1a_k", "1a", 4462, NA, 0, sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)
+kcliff_none <- mk_cand("S15c", "1a_k", "1a", 4462, NA, 0, sup_len = 6811, sup_kmer = NA,   sup_pid = 90.996)
+sc_with <- score_of(score_assembly_support(kcliff_with), "1a_k")
+sc_none <- score_of(score_assembly_support(kcliff_none), "1a_k")
+if (!(sc_with >= sc_none))
+  fail("Test15 k-mer must be bonus-only: k-mer 1.93 must not drag score below no-k-mer (D-10)")
+
+# D-11: score depends ONLY on identity/length/kmer — reads/cov/evenness have ZERO effect.
+base_row  <- mk_cand("S15d", "r", "1a", 1000,   50,  0.5,  sup_len = 9000, sup_kmer = 40, sup_pid = 92)
+perturbed <- mk_cand("S15d", "r", "1a", 999999, 100, 0.99, sup_len = 9000, sup_kmer = 40, sup_pid = 92) %>%
+  mutate(targeted_reads_nodup = 123456)
+if (score_of(score_assembly_support(base_row), "r") != score_of(score_assembly_support(perturbed), "r"))
+  fail("Test15 score must be independent of reads/cov/evenness (D-11)")
+
+# EVID-01: NO cliff across 90% — 89% vs 91% similar contigs => close, monotone scores.
+pair90 <- bind_rows(
+  mk_cand("S15e", "below", "2c", 1, NA, 0, sup_len = 9479, sup_kmer = 60, sup_pid = 89.0),
+  mk_cand("S15e", "above", "2c", 1, NA, 0, sup_len = 9479, sup_kmer = 60, sup_pid = 91.0)
+)
+s15_pair <- score_assembly_support(pair90)
+sb <- score_of(s15_pair, "below"); sa <- score_of(s15_pair, "above")
+if (!(sa >= sb)) fail("Test15 higher identity must score >= lower (monotone)")
+if ((sa - sb) > 0.15) fail("Test15 no discontinuity: 89->91% must not jump (EVID-01)")
+
+# CLASS-03/T-08-01: zero-row and NULL input carry the typed new columns, never abort.
+s15_empty <- score_assembly_support(no_asm[0, ])
+for (col in c("assembly_support_score", "assembly_exists")) {
+  if (!col %in% names(s15_empty)) fail(sprintf("Test15 zero-row frame must carry %s", col))
+}
+if (nrow(score_assembly_support(NULL)) != 0)
+  fail("Test15 NULL input must yield a zero-row frame, not abort")
+ok("Test15 (EVID-01/D-08..D-11): score_assembly_support bounded, k-mer bonus-only, reads-independent, no 90% cliff")
+
 cat("\nALL PASS\n")
