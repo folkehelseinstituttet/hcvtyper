@@ -388,4 +388,56 @@ conc_null <- apply_concordance(NULL)
 if (nrow(conc_null) != 0) fail("Test11: NULL input must yield zero-row frame")
 ok("Test11 (D8): apply_concordance() correctly classifies confirmed/unconfirmed/discordant cases")
 
+# --- Test 13: apply_concordance() 2k1b GLUE exemption (COMPAT-04) ------------
+# HCV-GLUE has no CRF_02k/1b clade, so a genuine 2k/1b recombinant is always
+# reported by GLUE as genotype 1 or 2, never 2k1b. apply_concordance() must NOT
+# flag that as discordant. Reuses mk_conc()/status_of()/reason_of_c() from Test 11.
+# NOTE: labelled Test 13 (not 12) — the file already reuses the "Test 12" label
+# for the D2 indeterminate-dominance test above.
+conc_2k1b <- bind_rows(
+  # Exact shape of the three failing TEST-run samples: mapping 2k1b + GLUE gt1 +
+  # de novo 2k1b -> confirmed / confirmed_2k1b_recombinant.
+  mk_conc("S6", "2k1b", "1", "supported", "2k1b"),
+  # GLUE gt2 still exempt; no de novo leg -> unconfirmed / two_legs_2k1b_recombinant_glue_only.
+  mk_conc("S7", "2k1b", "2", "none",       NA),
+  # GLUE gt3 is NOT in the exemption list -> still discordant (proves narrow scope).
+  mk_conc("S8", "2k1b", "3", "supported", "2k1b")
+)
+conc_2k1b_out <- apply_concordance(conc_2k1b)
+
+if (status_of(conc_2k1b_out, "S6") != "confirmed")
+  fail(sprintf("Test13: S6 (2k1b + GLUE gt1 + de novo 2k1b) must be confirmed, got '%s'", status_of(conc_2k1b_out, "S6")))
+if (reason_of_c(conc_2k1b_out, "S6") != "confirmed_2k1b_recombinant")
+  fail(sprintf("Test13: S6 reason must be confirmed_2k1b_recombinant, got '%s'", reason_of_c(conc_2k1b_out, "S6")))
+if (status_of(conc_2k1b_out, "S7") != "unconfirmed")
+  fail(sprintf("Test13: S7 (2k1b + GLUE gt2, no de novo) must be unconfirmed, got '%s'", status_of(conc_2k1b_out, "S7")))
+if (reason_of_c(conc_2k1b_out, "S7") != "two_legs_2k1b_recombinant_glue_only")
+  fail(sprintf("Test13: S7 reason must be two_legs_2k1b_recombinant_glue_only, got '%s'", reason_of_c(conc_2k1b_out, "S7")))
+if (status_of(conc_2k1b_out, "S8") != "discordant")
+  fail(sprintf("Test13: S8 (2k1b vs GLUE gt3) must STILL be discordant, got '%s'", status_of(conc_2k1b_out, "S8")))
+if (reason_of_c(conc_2k1b_out, "S8") != "discordant_mapping_vs_glue")
+  fail(sprintf("Test13: S8 reason must be discordant_mapping_vs_glue, got '%s'", reason_of_c(conc_2k1b_out, "S8")))
+ok("Test13 (COMPAT-04): apply_concordance() 2k1b GLUE exemption — S6 confirmed, S7 unconfirmed-glue-only, S8 gt3 still discordant")
+
+# --- Test 14: end-to-end 2k1b -> dominant/monoinfection ----------------------
+# The regression that shipped once: a lone 2k1b candidate (mapping 2k1b + GLUE
+# gt1 + de novo 2k1b) was flagged discordant, zeroing its eligibility and
+# yielding overall_sample_call = indeterminate / role = background. Prove the
+# full apply_concordance() -> classify() chain now admits it as dominant.
+# mk_cand() does not emit the concordance legs, so add them via mutate(); and
+# classify_roles() does not call apply_concordance() internally (Test 7 relies on
+# concordance_status being pre-set), so run apply_concordance() FIRST.
+cand_2k1b <- mk_cand("S14", "2k1b_ref", "2k1b", 200000, 98, 0.90,
+                     sup_len = 9000, sup_kmer = 40, sup_pid = 99) %>%
+  mutate(candidate_glue_genotype  = "1",
+         assembly_support         = "supported",
+         assembly_support_subtype = "2k1b")
+r14 <- classify(apply_concordance(cand_2k1b))
+if (role_of(r14, "2k1b_ref") != "dominant")
+  fail(sprintf("Test14: lone 2k1b candidate must become dominant, got '%s'", role_of(r14, "2k1b_ref")))
+if ((r14 %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
+  fail(sprintf("Test14: lone 2k1b sample must be monoinfection, got '%s'",
+               paste(r14 %>% pull(overall_sample_call) %>% unique(), collapse = ",")))
+ok("Test14 (COMPAT-04 e2e): lone 2k1b candidate reaches dominant / monoinfection through apply_concordance() -> classify()")
+
 cat("\nALL PASS\n")
