@@ -400,6 +400,7 @@ classify_roles <- function(scored_df, minRead, minCov,
         dominance_score        = if ("dominance_score" %in% names(.)) dominance_score else double(),
         assembly_support_score = if ("assembly_support_score" %in% names(.)) assembly_support_score else double(),
         assembly_exists        = if ("assembly_exists" %in% names(.)) assembly_exists else logical(),
+        evidence_state         = character(),
         role                   = character(),
         role_reason            = character(),
         overall_sample_call    = character()
@@ -433,6 +434,77 @@ classify_roles <- function(scored_df, minRead, minCov,
     has_kmer >= denovo_min_kmer_cov &
     has_pid  >= denovo_min_blast_identity
 
+  # --- EVID-02 / EVID-03: per-candidate evidence_state (Plan 02, ADDITIVE) -----
+  # Computed for EACH candidate from its OWN assembly_support_score + assembly_exists
+  # (Plan 01) and its OWN de novo contradiction — NEVER from another candidate's
+  # dominance (EVID-02: the state is identical whether or not a stronger candidate
+  # shares the sample; this vectorised outer computation cannot see dom_idx, which is
+  # only determined per-sample inside classify_one_sample()). Purely ADDITIVE this
+  # plan: role / role_reason / overall_sample_call still derive from own_substantial
+  # below, unchanged — Plan 03 re-derives them from evidence_state (D-14).
+  #
+  # Band cutpoints are calibration-VALIDATED against the real 203-candidate dataset
+  # (12-RESEARCH §4, D-13): the 15 genuine corroborated minors + the Sample51K/61K 2c
+  # (~0.87) + 2714372 1a (~0.94) anchors all score >= hi_cut (confirmed); the
+  # no-assembly floor scores 0 (weak). GLUE agreement is NOT read here — it can only
+  # help reach confirmed, never gate it (D-05).
+  evidence_hi_cut <- 0.72   # confirmed when assembly_support_score >= hi_cut (D-13)
+  evidence_lo_cut <- 0.50   # probable in [lo_cut, hi_cut); weak below lo_cut (D-13)
+
+  asup_score  <- scored_df$assembly_support_score
+  asup_exists <- scored_df$assembly_exists
+
+  # Contradiction leg (D-01): the candidate's OWN de novo genotype genuinely differs
+  # from its OWN mapping genotype. Reuse genotype_from_subtype() + the
+  # assembly_support_subtype leg EXACTLY as apply_concordance() does (L87-93) — never
+  # hand-roll substr(). NA / absent legs fall through to non-contradiction (T-12-02:
+  # an absent subtype or genotype can never drive a spurious refutation).
+  map_gt_state <- as.character(scored_df$candidate_genotype)
+  asup_subtype <- if ("assembly_support_subtype" %in% names(scored_df)) {
+    as.character(scored_df$assembly_support_subtype)
+  } else {
+    rep(NA_character_, nrow(scored_df))
+  }
+  supported_state <- if ("assembly_support" %in% names(scored_df)) {
+    !is.na(scored_df$assembly_support) & scored_df$assembly_support == "supported"
+  } else {
+    rep(FALSE, nrow(scored_df))
+  }
+  has_denovo_state <- supported_state & !is.na(asup_subtype) & nzchar(asup_subtype)
+  denovo_gt_state <- ifelse(
+    has_denovo_state,
+    vapply(asup_subtype, function(s) {
+      if (is.na(s) || !nzchar(s)) NA_character_ else as.character(genotype_from_subtype(s))
+    }, character(1L)),
+    NA_character_
+  )
+  denovo_contradicts <- has_denovo_state & !is.na(denovo_gt_state) &
+    !is.na(map_gt_state) & map_gt_state != denovo_gt_state
+
+  # Quality re-check (D-03): reuse the existing ANDed denovo floor (own_substantial).
+  # A genuine contradiction that survives to classify_roles.R with the original
+  # reference intact is by construction a failed-rescue / low-quality case; refuted
+  # requires the contradicting assembly to ALSO fail these floors. A high-quality
+  # contradiction (own_substantial TRUE) is NOT refuted here — it should already have
+  # been reassigned by rescue_evaluation.R upstream (D-03).
+  quality_fails_state <- !own_substantial
+
+  # Bands (D-01/D-09/D-10/D-05): assembly_exists==FALSE forces weak regardless of
+  # score (D-09); refuted requires ALL THREE of D-01 (own assembly exists AND its de
+  # novo genotype differs from its own mapping genotype AND it fails quality); k-mer
+  # never forces refutation because it only enters through the bonus-only score, never
+  # a raw floor (D-10).
+  evidence_state_col <- ifelse(
+    !asup_exists,
+    "weak",
+    ifelse(
+      denovo_contradicts & quality_fails_state,
+      "refuted",
+      ifelse(asup_score >= evidence_hi_cut, "confirmed",
+             ifelse(asup_score >= evidence_lo_cut, "probable", "weak"))
+    )
+  )
+
   # Per-candidate floor pass (D-07/D-09: now informational annotation only, not a hard gate).
   reads <- scored_df$candidate_reads
   cov   <- if ("candidate_cov" %in% names(scored_df)) scored_df$candidate_cov else rep(NA_real_, nrow(scored_df))
@@ -449,7 +521,8 @@ classify_roles <- function(scored_df, minRead, minCov,
       .own_substantial = own_substantial,
       below_floor      = clears_floor,
       .eligible        = eligible,
-      .row_order       = row_number()
+      .row_order       = row_number(),
+      evidence_state   = evidence_state_col
     )
 
   # Group by sample so dominant determination + the asymmetric refute are per-sample.
