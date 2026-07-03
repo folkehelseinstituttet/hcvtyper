@@ -503,4 +503,82 @@ if (nrow(score_assembly_support(NULL)) != 0)
   fail("Test15 NULL input must yield a zero-row frame, not abort")
 ok("Test15 (EVID-01/D-08..D-11): score_assembly_support bounded, k-mer bonus-only, reads-independent, no 90% cliff")
 
+# --- Test 16: calibrated anchors + columns wired onto classify_roles() output -
+# Phase-12 Plan-01 Task 2. Constants are VALIDATED against the real 203-candidate
+# calibration dataset (12-RESEARCH §Real Data Calibration): the named anchors below
+# reproduce the in-place-analysed scores. These fixtures LOCK the calibration and
+# the smooth-across-90% behaviour (EVID-01). role/role_reason/overall_sample_call
+# stay UNCHANGED this plan (the columns are purely additive, D-14).
+
+# Sample51K-2c: 89.009% id, 9479 bp, k-mer 514.2 -> ~0.874 (genuine-corroborated band).
+s51k <- score_of(score_assembly_support(
+  mk_cand("S51K", "2c_JX227949", "2c", 26023, NA, 0, sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009)),
+  "2c_JX227949")
+if (abs(s51k - 0.874) > 0.01)
+  fail(sprintf("Test16 Sample51K-2c must score ~0.874 (calibrated), got %.4f", s51k))
+if (s51k < 0.80)
+  fail("Test16 Sample51K-2c must land in the genuine-corroborated band, not near 0 (EVID-01)")
+
+# Sample61K-2c: 88.987% id, 9477 bp, k-mer 102.8 -> ~0.872.
+s61k <- score_of(score_assembly_support(
+  mk_cand("S61K", "2c_JX227949", "2c", 6919, NA, 0, sup_len = 9477, sup_kmer = 102.8, sup_pid = 88.987)),
+  "2c_JX227949")
+if (abs(s61k - 0.872) > 0.01)
+  fail(sprintf("Test16 Sample61K-2c must score ~0.872 (calibrated), got %.4f", s61k))
+if (s61k < 0.80)
+  fail("Test16 Sample61K-2c must land in the genuine-corroborated band, not near 0 (EVID-01)")
+
+# 2714372 1a k-mer cliff: 90.996% id, 6811 bp, k-mer 1.93 -> ~0.941 (k-mer no longer refutes).
+s2714 <- score_of(score_assembly_support(
+  mk_cand("S2714", "1a_HQ850279", "1a", 4462, NA, 0, sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)),
+  "1a_HQ850279")
+if (abs(s2714 - 0.941) > 0.01)
+  fail(sprintf("Test16 2714372 1a (k-mer 1.93) must score ~0.941, got %.4f", s2714))
+
+# 2768856 4d no-assembly -> exactly 0, assembly_exists FALSE.
+s4d_df <- score_assembly_support(mk_cand("S4d", "4d_DQ418786", "4d", 8, NA, 0))
+if (score_of(s4d_df, "4d_DQ418786") != 0)
+  fail("Test16 4d no-assembly anchor must score exactly 0")
+if (!identical(exists_of(s4d_df, "4d_DQ418786"), FALSE))
+  fail("Test16 4d no-assembly anchor assembly_exists must be FALSE")
+
+# No discontinuous drop across the old 90% cliff: sweep 86->93% (fixed len/kmer),
+# assert monotone non-decreasing with no consecutive jump > 0.10.
+cliff_sweep <- bind_rows(lapply(seq(86, 93, by = 1), function(p)
+  mk_cand("Scliff", paste0("id_", p), "2c", 1, NA, 0, sup_len = 9479, sup_kmer = 100, sup_pid = p)))
+sc_cliff <- score_assembly_support(cliff_sweep)
+sc_vals  <- sc_cliff$assembly_support_score[order(sc_cliff$assembly_support_best_contig_pident)]
+d_cliff  <- diff(sc_vals)
+if (any(d_cliff < -1e-9)) fail("Test16 score must be monotone non-decreasing in identity")
+if (any(d_cliff > 0.10))  fail("Test16 no discontinuous jump allowed across the old 90% cliff (EVID-01)")
+
+# WIRING: assembly_support_score + assembly_exists appear on classify_roles() output
+# rows (D-14 additive), and role/role_reason are unchanged vs today.
+wire_in <- bind_rows(
+  mk_cand("WIRE", "1a_dom", "1a", 200000, 99,   0.90, sup_len = 9189, sup_kmer = 40, sup_pid = 100),
+  mk_cand("WIRE", "2c_min", "2c", 30000,  92,   0.80, sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009),
+  mk_cand("WIRE", "4d_no",  "4d", 8,      1,    0.10)  # no assembly
+)
+r16 <- classify(wire_in)
+for (col in c("assembly_support_score", "assembly_exists")) {
+  if (!col %in% names(r16)) fail(sprintf("Test16 classify_roles() output must carry the %s column (D-14)", col))
+}
+# The wired column must equal the standalone score for the same row.
+r16_2c <- r16 %>% filter(candidate_ref == "2c_min") %>% pull(assembly_support_score)
+if (abs(r16_2c - 0.874) > 0.01)
+  fail(sprintf("Test16 wired assembly_support_score for 2c must match standalone ~0.874, got %.4f", r16_2c))
+if ((r16 %>% filter(candidate_ref == "4d_no") %>% pull(assembly_support_score)) != 0)
+  fail("Test16 wired no-assembly row must score 0")
+if (!identical(r16 %>% filter(candidate_ref == "4d_no") %>% pull(assembly_exists), FALSE))
+  fail("Test16 wired no-assembly row assembly_exists must be FALSE")
+if (!identical(r16 %>% filter(candidate_ref == "2c_min") %>% pull(assembly_exists), TRUE))
+  fail("Test16 wired present-contig row assembly_exists must be TRUE")
+
+# Zero-row classify_roles() output still carries the new columns (CLASS-03).
+r16_empty <- classify(wire_in[0, ])
+for (col in c("assembly_support_score", "assembly_exists")) {
+  if (!col %in% names(r16_empty)) fail(sprintf("Test16 zero-row classify output must carry %s", col))
+}
+ok("Test16 (EVID-01/D-14): calibrated anchors reproduced; assembly_support_score + assembly_exists wired additively onto classify_roles() output")
+
 cat("\nALL PASS\n")
