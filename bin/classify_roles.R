@@ -92,7 +92,17 @@ apply_concordance <- function(df) {
     NA_character_
   )
 
-  glue_conflict   <- has_glue   & !is.na(glue_gt)   & map_gt != glue_gt
+  # 2k1b structural exception (CLAUDE.md Constraints): HCV-GLUE's clade-placement
+  # tree has no CRF_02k/1b category, so a genuine 2k/1b recombinant is ALWAYS
+  # reported by GLUE as genotype 1 or 2 (whichever region/majority-length portion
+  # dominates the consensus), never "2k1b". This is expected GLUE behaviour, not
+  # evidence of a wrong mapping/de novo call. Mirrors the 2k1b-aware exception
+  # already applied to co-infection pairing in is_valid_minor() (below) and to
+  # the D-03 rescue rule in rescue_evaluation.R. GLUE leg only — the de novo leg
+  # already agrees natively via genotype_from_subtype()'s 2k1b-aware rule.
+  glue_2k1b_exempt <- map_gt == "2k1b" & glue_gt %in% c("1", "2")
+
+  glue_conflict   <- has_glue   & !is.na(glue_gt)   & map_gt != glue_gt & !glue_2k1b_exempt
   denovo_conflict <- has_denovo & !is.na(denovo_gt) & map_gt != denovo_gt
 
   status <- character(nrow(df))
@@ -110,10 +120,14 @@ apply_concordance <- function(df) {
       }
     } else if (has_glue[i] && has_denovo[i]) {
       status[i] <- "confirmed"
-      reason[i] <- "all_legs_concordant"
+      reason[i] <- if (glue_2k1b_exempt[i]) "confirmed_2k1b_recombinant" else "all_legs_concordant"
     } else if (has_glue[i] || has_denovo[i]) {
       status[i] <- "unconfirmed"
-      reason[i] <- if (has_glue[i]) "two_legs_glue_only" else "two_legs_denovo_only"
+      reason[i] <- if (has_glue[i]) {
+        if (glue_2k1b_exempt[i]) "two_legs_2k1b_recombinant_glue_only" else "two_legs_glue_only"
+      } else {
+        "two_legs_denovo_only"
+      }
     } else {
       status[i] <- "unconfirmed"
       reason[i] <- "no_corroborating_legs"
