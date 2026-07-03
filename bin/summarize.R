@@ -695,6 +695,7 @@ if (length(blast_out_files) > 0) {
   df_blast_out <- tibble(
     sampleName = character(),
     qseqid     = character(),
+    sseqid     = character(),
     subtype    = character(),
     pident     = double(),
     evalue     = double(),
@@ -1412,6 +1413,40 @@ final <- final %>%
     )
   )
 
+# De novo contig NAME per strain (RPT-CONTIG-01/02). We already carry the best
+# BLAST-hit reference for each strain (denovo_major_ref / denovo_minor_ref, ingested
+# from *.blastparse.csv above). Here we surface the contig (qseqid) that produced
+# that hit, by resolving the per-contig long BLAST table (df_blast_out) to the
+# major/minor grain — a pure summarize.R join, no change to blast_parse.R.
+#
+# Pairing rationale: for a given (sample, reference), the contig backing that call is
+# the top-bitscore hit whose sseqid == that reference. So column (1) denovo_*_contig
+# and column (2) denovo_*_ref come from ONE BLAST-hit row — a coherent same-row pair
+# (the named contig's best hit landed on that reference).
+#
+# slice_max(..., with_ties = FALSE) collapses to one contig per (sampleName, sseqid)
+# BEFORE the left_join, so a reference shared by several contigs cannot explode rows
+# (T-dpj-02 many-to-many guard; mirrors the JMAP-03 1d1a051 fix). An empty
+# df_blast_out (skip-assembly / no-denovo batch — the sseqid empty-tibble fix above
+# is what lets this build) yields a zero-row contig_by_ref, so both left_joins still
+# ADD the denovo_*_contig columns NA-filled (always present downstream).
+contig_by_ref <- df_blast_out %>%
+  filter(!is.na(sseqid)) %>%
+  group_by(sampleName, sseqid) %>%
+  slice_max(bitscore, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  select(sampleName, .ref = sseqid, .contig = qseqid)
+
+final <- final %>%
+  left_join(
+    contig_by_ref %>% rename(denovo_major_ref = .ref, denovo_major_contig = .contig),
+    by = c("sampleName", "denovo_major_ref")
+  ) %>%
+  left_join(
+    contig_by_ref %>% rename(denovo_minor_ref = .ref, denovo_minor_contig = .contig),
+    by = c("sampleName", "denovo_minor_ref")
+  )
+
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {
   final <- final %>%
@@ -1856,6 +1891,8 @@ triage <- final %>%
     Genotype,                                        # placement 4
     Major_avg_depth,                                 # placement 6
     subtype_conflict,                                # placement 10
+    any_of(c("denovo_major_contig",                  # placement 11 — de novo contig NAME (major strain)
+             "denovo_major_ref")),                   # placement 12 — that contig's best BLAST-hit ref
     rescue_flag,                                     # placement 20
     rescue_effect,                                   # placement 20b — where a surviving rescue landed
     total_trimmed_reads,                             # placement 25
@@ -1874,7 +1911,9 @@ triage <- final %>%
              "Minor_cov_breadth_min_5",
              "Percent_reads_mapped_of_trimmed_with_dups_minor",
              "Minor_consensus_similarity_pct",
-             "Minor_consensus_n_differences"))
+             "Minor_consensus_n_differences",
+             "denovo_minor_contig",                   # promoted onto the [minor] row's denovo_best_contig
+             "denovo_minor_ref"))                     # promoted onto the [minor] row's denovo_best_contig_ref
   )
 
 # Paired metric columns.  major → the column present in triage;
@@ -1887,7 +1926,9 @@ col_major   <- c("Major_avg_depth",
                  "Major_cov_breadth_min_5",
                  "Percent_reads_mapped_of_trimmed_with_dups_major",
                  "Major_consensus_similarity_pct",
-                 "Major_consensus_n_differences")
+                 "Major_consensus_n_differences",
+                 "denovo_major_contig",
+                 "denovo_major_ref")
 col_minor   <- c("Minor_avg_depth",
                  "Reads_nodup_mapped_minor",
                  "percent_mapped_reads_minor_firstmapping",
@@ -1895,7 +1936,9 @@ col_minor   <- c("Minor_avg_depth",
                  "Minor_cov_breadth_min_5",
                  "Percent_reads_mapped_of_trimmed_with_dups_minor",
                  "Minor_consensus_similarity_pct",
-                 "Minor_consensus_n_differences")
+                 "Minor_consensus_n_differences",
+                 "denovo_minor_contig",
+                 "denovo_minor_ref")
 col_generic <- c("average_depth_0",
                  "Reads_nodup_mapped",
                  "percent_mapped_reads_firstmapping",
@@ -1903,7 +1946,9 @@ col_generic <- c("average_depth_0",
                  "cov_breadth_min_5",
                  "Percent_reads_mapped_of_trimmed_with_dups",
                  "pct_similarity_to_nearest_reference",
-                 "n_differences_to_nearest_reference")
+                 "n_differences_to_nearest_reference",
+                 "denovo_best_contig",
+                 "denovo_best_contig_ref")
 
 # Restrict to pairs where the major column actually exists in triage
 present     <- col_major %in% colnames(triage)

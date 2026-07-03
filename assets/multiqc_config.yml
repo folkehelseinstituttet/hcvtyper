@@ -118,6 +118,12 @@ custom_data:
                 - s_eq: "OK"
             - fail:
                 - s_eq: "CONFLICT"
+        denovo_best_contig:
+          title: "De novo contig"
+          description: "SPAdes node ID (qseqid) of the best de novo contig backing this strain's reference — the top-bitscore contig whose BLAST hit landed on the strain's de novo reference. Major row = major strain's contig; [minor] row = minor strain's contig. Empty when no de novo contig backs this strain (skip-assembly or no de novo evidence)."
+        denovo_best_contig_ref:
+          title: "De novo contig ref"
+          description: "Best BLAST-hit reference for the contig named in \"De novo contig\" (denovo_major_ref / denovo_minor_ref). It should match the strain's mapping reference when de novo and mapping agree; a mismatch signals de novo and mapping disagree on the strain identity. Empty when no de novo contig backs this strain."
         rescue_flag:
           title: "Rescue"
           description: "TRUE when the de-novo rescue step replaced the first-mapping reference for at least one candidate. The per-sample rescue_audit.csv is the authoritative from/to + trigger ledger, and additionally records rescues that fired then were dropped by genotype-collapse or the candidate cap."
