@@ -2018,7 +2018,13 @@ final <- final %>%
          everything()) %>%
   distinct() %>% # Remove any duplicated rows from the different joins
   # If there are no minor genotype reports, then the identical_geno and identical_subgeno columns will not exist. Therefore use any_of in case they are not there
-  select(-any_of(c("Major_minor", "identical_geno", "identical_subgeno", "dominant_cand_rank")))
+  # CR-02 (13-REVIEW): Major_/Minor_best_contig_length/pident/kmer_cov are transient
+  # scratch inputs consumed by build_evidence() to build the Major_evidence/Minor_evidence
+  # prose token (EVID-05/D-04) — they were never meant to be their own visible columns
+  # and must be dropped here alongside the other transients, or they leak into Summary.csv.
+  select(-any_of(c("Major_minor", "identical_geno", "identical_subgeno", "dominant_cand_rank",
+                    "Major_best_contig_length", "Major_best_contig_pident", "Major_best_contig_kmer_cov",
+                    "Minor_best_contig_length", "Minor_best_contig_pident", "Minor_best_contig_kmer_cov")))
 
 # Write file
 write_csv(final, file = "Summary.csv")
