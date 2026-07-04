@@ -858,6 +858,23 @@ role_dominant_rank <- if (nrow(candidate_support) > 0) {
   tibble(sampleName = character(), dominant_cand_rank = integer())
 }
 
+# EVID-06/D-11: per-sample REFERENCE name of the role-dominant candidate. role_dominant_rank
+# (above) carries only the rank; sample_review_message() also needs the ref to NAME the
+# dominant candidate in its D-11 triggers (dominant_unconfirmed / major_ref_changed) and the
+# enriched monoinfection subtype-conflict messages (RESEARCH Pattern 3 / Pitfall 3: enrich the
+# sample-level trigger with the candidate rank+ref from the L850 lookup). Transient — joined
+# into final just before the review_flag mutate and dropped in the same select() afterwards.
+role_dominant_ref <- if (nrow(candidate_support) > 0) {
+  candidate_support %>%
+    filter(role == "dominant") %>%
+    group_by(sampleName) %>%
+    slice(1) %>%
+    ungroup() %>%
+    transmute(sampleName, dominant_cand_ref = as.character(candidate_ref))
+} else {
+  tibble(sampleName = character(), dominant_cand_ref = character())
+}
+
 # EVID-05: one contig-language evidence_summary sentence per candidate, built by the
 # pure Plan-01 helper build_evidence_summary() (defined in classify_roles.R). Threads
 # the candidate's role/state + its OWN best-contig metrics so a reader can reconstruct
@@ -1624,6 +1641,47 @@ if (nrow(candidate_support) > 0) {
 final <- final %>%
   left_join(role_review, join_by(sampleName))
 
+# EVID-06 hybrid split (RESEARCH Pattern 3): the PER-CANDIDATE review reasons
+# (weak/probable/refuted/discordant evidence states + the D-08 demotions) are built
+# row-wise on the long candidate_support frame via the pure Plan-01 helper
+# candidate_review_fragment(), then collapsed to ONE fragment string per sample —
+# arranged by candidate_rank first for a DETERMINISTIC order (RESEARCH anti-pattern:
+# non-deterministic collapse), NA-filtered before paste (Pitfall 2: never render a
+# literal "NA"), joined with " | ". A clean sample (every fragment NA) yields NA. This
+# collapsed column is transient: sample_review_message() merges it into review_flag
+# below, then it is dropped in the same select() as the role_review helper booleans.
+if (nrow(candidate_support) > 0) {
+  candidate_flag_review <- candidate_support %>%
+    mutate(.frag = pmap_chr(
+      list(role, role_reason, evidence_state, concordance_status,
+           candidate_rank, candidate_ref, candidate_subtype,
+           assembly_support_best_contig_length,
+           assembly_support_best_contig_pident,
+           assembly_support_best_contig_kmer_cov),
+      candidate_review_fragment
+    )) %>%
+    arrange(sampleName, candidate_rank) %>%
+    group_by(sampleName) %>%
+    summarise(
+      candidate_flag_fragment = {
+        f <- .frag[!is.na(.frag)]
+        if (length(f) == 0) NA_character_ else paste(f, collapse = " | ")
+      },
+      .groups = "drop"
+    )
+} else {
+  candidate_flag_review <- tibble(
+    sampleName              = character(),
+    candidate_flag_fragment = character()
+  )
+}
+
+final <- final %>%
+  left_join(candidate_flag_review, join_by(sampleName)) %>%
+  # EVID-06/D-11: name of the dominant candidate's reference, consumed by
+  # sample_review_message() below and dropped in the same select() as the helper booleans.
+  left_join(role_dominant_ref, join_by(sampleName))
+
 # Phase-10 rescue_flag (D-08): a per-sample boolean, NEW and INDEPENDENT of review_flag.
 # TRUE iff ANY candidate of the sample had its mapped reference REPLACED by a de-novo
 # rescue (rescued_from non-NA). Copies the role_review group_by/summarise/left_join
@@ -1729,60 +1787,35 @@ final <- final %>%
 # colours any non-NA value orange (warn class). See the pconfig.cond_formatting_rules
 # key added there. If that config is absent (older deployments), MultiQC falls back
 # to plain text — the column is still useful as a text summary.
+# EVID-06 (D-05/D-09/D-10/D-11): the sample-level review_flag is now built by the pure,
+# unit-tested Plan-01 helper sample_review_message() (classify_roles.R) instead of an inline
+# anonymous closure (RESEARCH Pitfall 4: do not widen an 11-arg positional closure). It keeps
+# the D-10 triggers generic (is_indet / gate_flag / is_indet_dom), enriches the monoinfection
+# subtype-conflict + different-genotype-contig triggers with the NAMED dominant candidate
+# (rank+ref) and the actual conflicting subtype values, resolves D-11 by naming the dominant
+# candidate for dominant_unconfirmed and rescue_effect == "major_ref_changed", and merges the
+# pre-collapsed per-candidate fragment (candidate_flag_fragment, built above via
+# candidate_review_fragment) with " | ". It returns NA_character_ when nothing fires so a clean
+# sample stays NA (the MultiQC cond_formatting_rules colours any non-NA review_flag orange).
+# Args are threaded POSITIONALLY to match sample_review_message()'s signature.
 final <- final %>%
-  mutate(review_flag = {
-    pmap_chr(
-      list(
-        denovo_major_subtype_match,
-        denovo_minor_subtype_match,
-        overall_sample_call,
-        any_refuted_denovo,
-        any_discordant_identity,
-        any_probable_only,
-        dominant_unconfirmed,
-        gate_flag,
-        denovo_minor_subtype,
-        Major_subtype,
-        rescue_effect
-      ),
-      function(maj_match, min_match, sample_call, refuted, discordant_id, probable_only, dom_unconf, gflag,
-               dv_minor_sub, major_sub, resc_effect) {
-        msgs        <- character(0)
-        is_coinf    <- !is.na(sample_call) && sample_call == "co-infection"
-        is_mono     <- !is.na(sample_call) && sample_call == "monoinfection"
-        is_indet    <- !is.na(sample_call) && sample_call == "indeterminate"
-        subtype_dis <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
-        is_indet_dom <- !is.na(sample_call) && sample_call == "co-infection (indeterminate dominance)"
-        if (is_indet_dom)
-          msgs <- c(msgs, "Dominance ordering uncertain — read-count and k-mer-coverage rankings disagree. Both genotypes reported as present; co-infection vs contamination agnostic. Please review.")
-        if (is_coinf && subtype_dis)
-          msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
-        if (is_mono && !is.na(maj_match) && maj_match == "NO")
-          msgs <- c(msgs, "Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review.")
-        if (is_mono && !is.na(dv_minor_sub) && !is.na(major_sub) &&
-            substr(dv_minor_sub, 1, 1) != substr(major_sub, 1, 1))
-          msgs <- c(msgs, paste0(
-            "Monoinfection called, but de novo assembly found a different-genotype contig (",
-            dv_minor_sub, ") — possible missed co-infection or contamination. Please review."
-          ))
-        if (isTRUE(dom_unconf) && is_mono)
-          msgs <- c(msgs, "Genotype call is provisional — identity not corroborated (mapping evidence only; no GLUE or de novo confirmation). Please review.")
-        if (isTRUE(refuted))
-          msgs <- c(msgs, "Minor strain candidate refuted by de novo assembly — likely single infection.")
-        if (isTRUE(discordant_id))
-          msgs <- c(msgs, "Candidate's mapping identity conflicts with its own GLUE and/or de novo assembly identity — likely single infection or contamination. Please review.")
-        if (isTRUE(probable_only))
-          msgs <- c(msgs, "Co-infection minor is only marginally corroborated by de novo assembly (evidence_state=probable) — please review contigs/QC before reporting as a genuine co-infection.")
-        if (is_indet)
-          msgs <- c(msgs, "No candidate passed the major-gate — overall sample call indeterminate.")
-        if (!is.na(gflag) && gflag != "ok")
-          msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
-        if (!is.na(resc_effect) && resc_effect == "major_ref_changed")
-          msgs <- c(msgs, "De novo rescue overrode the dominant/Major reference chosen by first-mapping — the primary call was reassigned automatically. Confirm against rescue_audit.csv (from/to + trigger) before reporting. Please review.")
-        if (length(msgs) == 0) NA_character_ else paste(msgs, collapse = " | ")
-      }
-    )
-  }) %>%
+  mutate(review_flag = pmap_chr(
+    list(
+      overall_sample_call,
+      denovo_major_subtype_match,
+      denovo_minor_subtype_match,
+      gate_flag,
+      denovo_minor_subtype,
+      denovo_major_subtype,
+      Major_subtype,
+      rescue_effect,
+      dominant_unconfirmed,
+      dominant_cand_rank,
+      dominant_cand_ref,
+      candidate_flag_fragment
+    ),
+    sample_review_message
+  )) %>%
   # call_confidence (evidence-tier axis) — an EXPLICIT rollup of the confidence
   # signals that are otherwise scattered across review_flag / gate_flag /
   # rescue_effect / subtype-match / role columns. It does NOT introduce new science:
@@ -1832,7 +1865,11 @@ final <- final %>%
     )
   ) %>%
   # Drop the per-sample role-review helper booleans now they have been consumed.
-  select(-any_refuted_denovo, -any_discordant_identity, -any_probable_only, -dominant_unconfirmed)
+  # Also drop the two EVID-06 transients: candidate_flag_fragment (per-sample collapsed
+  # per-candidate fragment) and dominant_cand_ref (dominant reference name) — both merged
+  # into review_flag by sample_review_message() above and not part of the emitted schema.
+  select(-any_refuted_denovo, -any_discordant_identity, -any_probable_only, -dominant_unconfirmed,
+         -candidate_flag_fragment, -dominant_cand_ref)
 
 # Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
 # Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no
