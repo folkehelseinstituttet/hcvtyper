@@ -7,14 +7,24 @@
 # helpers, build small in-memory tibbles anchored to the handoff §2 evidence
 # table, and assert on the real functions (no inline re-implementation).
 #
+# Regression-anchor traceability (Phase 14, REGR-01..04) — jump straight to the
+# anchoring Test without reading all 888 lines (line numbers move; grep the
+# "Test N:" header comment + its trailing ok() to confirm each mapping):
+#   REGR-01 false-4g -> background/monoinfection ......... Test 1
+#   REGR-02 ERR1810447 genuine 2b -> co-infection ........ Test 2 (+ Test 2b corollary)
+#   REGR-03 2k1b GLUE exemption non-conflicting .......... Test 13 (unit) + Test 14 (e2e)
+#   REGR-04 whole named suite green (new state model) .... Tests 1-20 as a set
+#
 # Asserted behaviours (08-01-PLAN Task 3):
 #   - false 4g (no 4g contig, dominant 1a HAS a substantial contig)
-#       -> role=="background" && role_reason=="refuted_denovo"          (D-11)
+#       -> role=="background" && role_reason=="no_own_assembly"         (D-18/D-02)
 #   - ERR1810447 full 9207bp 2b + ERR1810453 2949bp partial 2b (kmer ~5)
 #       -> role=="co-infection" && role_reason=="corroborated"          (CLASS-02)
 #   - sim1 1a:1b + sim2 2a:3a true co-infections preserved as co-infection
-#   - IVT extreme-ratio genuine minor, de novo failed for BOTH
-#       -> role=="co-infection" && role_reason=="uncorroborated_kept"   (D-11)
+#   - IVT extreme-ratio minor, de novo failed for BOTH (no own assembly)
+#       -> role=="background" && role_reason=="no_own_assembly"         (D-16/D-02;
+#          the old uncorroborated_kept carve-out was REMOVED — a candidate's fate
+#          must not depend on whether the DOMINANT assembled)
 #   - same-genotype non-1a/1b candidate -> background/same_genotype_as_dominant (D-12)
 #   - 2k1b pair -> background/recombinant_2k1b                          (D-12)
 #   - no candidate passes the gate -> overall_sample_call=="indeterminate" (D-01/D-14)
