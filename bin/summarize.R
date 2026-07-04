@@ -858,6 +858,23 @@ role_dominant_rank <- if (nrow(candidate_support) > 0) {
   tibble(sampleName = character(), dominant_cand_rank = integer())
 }
 
+# EVID-05: one contig-language evidence_summary sentence per candidate, built by the
+# pure Plan-01 helper build_evidence_summary() (defined in classify_roles.R). Threads
+# the candidate's role/state + its OWN best-contig metrics so a reader can reconstruct
+# the candidate's evidence_state from candidates.csv alone (success criteria 1+2). The
+# three contig_*_contribution columns already ride along from score_assembly_support()
+# (Plan 01), so the un-select()ed raw write_csv below surfaces all four automatically.
+# pmap_chr over a zero-row frame returns character(0), so this is empty-batch safe.
+candidate_support <- candidate_support %>%
+  mutate(evidence_summary = pmap_chr(
+    list(role, role_reason, evidence_state, concordance_status,
+         candidate_rank, candidate_ref, candidate_subtype, assembly_exists,
+         assembly_support_best_contig_length,
+         assembly_support_best_contig_pident,
+         assembly_support_best_contig_kmer_cov),
+    build_evidence_summary
+  ))
+
 # Enriched long *.candidates.csv (D-16, CLASS-03). Write EVERY candidate — incl.
 # background / refuted — carrying the new role / dominance_score / role_reason +
 # overall_sample_call alongside the original Phase-6 candidate columns and the
@@ -890,7 +907,13 @@ if (nrow(candidate_support) > 0) {
       # band on the wide, human-facing Summary.csv — before this, evidence_state
       # survived only in the long candidates.csv, so a marginal 0.50-score
       # co-infection call was indistinguishable from a strong 0.95 one at a glance.
-      Major_evidence_state     = evidence_state
+      Major_evidence_state     = evidence_state,
+      # EVID-05/D-04: carry this slot's OWN best-contig metrics into the wide frame
+      # so build_evidence() can append a contig-corroboration token to Major_evidence.
+      # Transient — consumed by build_evidence() then dropped by the reorder select.
+      Major_best_contig_length   = assembly_support_best_contig_length,
+      Major_best_contig_pident   = assembly_support_best_contig_pident,
+      Major_best_contig_kmer_cov = assembly_support_best_contig_kmer_cov
     )
 
   role_minor <- candidate_support %>%
@@ -909,7 +932,11 @@ if (nrow(candidate_support) > 0) {
       Minor_dominance_score    = dominance_score,
       Minor_role_reason        = role_reason,
       # WR-05: see the Major_evidence_state comment above.
-      Minor_evidence_state     = evidence_state
+      Minor_evidence_state     = evidence_state,
+      # EVID-05/D-04: this slot's OWN best-contig metrics for the Minor_evidence token.
+      Minor_best_contig_length   = assembly_support_best_contig_length,
+      Minor_best_contig_pident   = assembly_support_best_contig_pident,
+      Minor_best_contig_kmer_cov = assembly_support_best_contig_kmer_cov
     )
 
   overall_call <- candidate_support %>%
@@ -929,11 +956,17 @@ if (nrow(candidate_support) > 0) {
     Major_dominance_score    = double(),
     Major_role_reason        = character(),
     Major_evidence_state     = character(),
+    Major_best_contig_length   = double(),
+    Major_best_contig_pident   = double(),
+    Major_best_contig_kmer_cov = double(),
     Minor_role_reference     = character(),
     Minor_role_subtype       = character(),
     Minor_dominance_score    = double(),
     Minor_role_reason        = character(),
-    Minor_evidence_state     = character()
+    Minor_evidence_state     = character(),
+    Minor_best_contig_length   = double(),
+    Minor_best_contig_pident   = double(),
+    Minor_best_contig_kmer_cov = double()
   )
 }
 
@@ -1823,7 +1856,13 @@ evidence_cols <- c(
   "Major_reference", "Reads_nodup_mapped_major", "Major_cov_breadth_min_10",
   "denovo_major_subtype", "Major_consensus_similarity_pct",
   "Minor_reference", "Reads_nodup_mapped_minor", "Minor_cov_breadth_min_10",
-  "denovo_minor_subtype", "Minor_consensus_similarity_pct"
+  "denovo_minor_subtype", "Minor_consensus_similarity_pct",
+  # EVID-05/D-04: contig-corroboration source columns for the extended build_evidence().
+  # NA-filled here so a batch missing any of them NA-fills instead of erroring row-wise.
+  "Major_evidence_state", "Major_best_contig_length", "Major_best_contig_pident",
+  "Major_best_contig_kmer_cov",
+  "Minor_evidence_state", "Minor_best_contig_length", "Minor_best_contig_pident",
+  "Minor_best_contig_kmer_cov"
 )
 for (col in evidence_cols) {
   if (!col %in% colnames(final)) final <- final %>% add_column(!!col := NA)
@@ -1831,7 +1870,10 @@ for (col in evidence_cols) {
 
 # Build one strain's evidence string from its (already-computed) parts. `rescued`
 # is TRUE when the de-novo rescue reassigned THIS slot's reference (from rescue_effect).
-build_evidence <- function(ref, reads, breadth10, dn_sub, cons_pct, rescued) {
+build_evidence <- function(ref, reads, breadth10, dn_sub, cons_pct, rescued,
+                           ev_state = NA_character_,
+                           contig_len = NA_real_, contig_pid = NA_real_,
+                           contig_kmer = NA_real_) {
   if (is.na(ref)) return(NA_character_)
   toks <- ref
   if (!is.na(reads))     toks <- c(toks, paste0(format(round(reads), big.mark = ",", trim = TRUE, scientific = FALSE), " reads (nodup)"))
@@ -1839,6 +1881,17 @@ build_evidence <- function(ref, reads, breadth10, dn_sub, cons_pct, rescued) {
   if (!is.na(dn_sub))    toks <- c(toks, paste0("de novo ", dn_sub))
   if (!is.na(cons_pct))  toks <- c(toks, paste0(round(cons_pct, 1), "% consensus id"))
   toks <- c(toks, if (isTRUE(rescued)) "ref REASSIGNED by de-novo rescue" else "ref from first-mapping")
+  # EVID-05/D-04: append the contig-corroboration basis (the own best-contig
+  # identity/length/k-mer, in contig language) plus the calibrated evidence_state, so
+  # Major_evidence / Minor_evidence answer "on what CONTIG evidence?" in the same cell.
+  # Purely additive — no existing token above is changed. Each metric emits only when
+  # its source value is non-NA (never renders a literal "NA").
+  contig_toks <- character(0)
+  if (length(contig_len)  == 1 && !is.na(contig_len))  contig_toks <- c(contig_toks, paste0(round(contig_len), " bp contig"))
+  if (length(contig_pid)  == 1 && !is.na(contig_pid))  contig_toks <- c(contig_toks, paste0(round(contig_pid, 1), "% contig identity"))
+  if (length(contig_kmer) == 1 && !is.na(contig_kmer)) contig_toks <- c(contig_toks, paste0(round(contig_kmer, 2), " k-mer cov"))
+  if (length(contig_toks) > 0) toks <- c(toks, paste0("contig support: ", paste(contig_toks, collapse = ", ")))
+  if (length(ev_state) == 1 && !is.na(ev_state)) toks <- c(toks, paste0("evidence_state=", ev_state))
   paste(toks, collapse = " | ")
 }
 
@@ -1847,13 +1900,17 @@ final <- final %>%
     Major_evidence = pmap_chr(
       list(Major_reference, Reads_nodup_mapped_major, Major_cov_breadth_min_10,
            denovo_major_subtype, Major_consensus_similarity_pct,
-           !is.na(rescue_effect) & rescue_effect == "major_ref_changed"),
+           !is.na(rescue_effect) & rescue_effect == "major_ref_changed",
+           Major_evidence_state,
+           Major_best_contig_length, Major_best_contig_pident, Major_best_contig_kmer_cov),
       build_evidence
     ),
     Minor_evidence = pmap_chr(
       list(Minor_reference, Reads_nodup_mapped_minor, Minor_cov_breadth_min_10,
            denovo_minor_subtype, Minor_consensus_similarity_pct,
-           !is.na(rescue_effect) & rescue_effect == "minor_ref_changed"),
+           !is.na(rescue_effect) & rescue_effect == "minor_ref_changed",
+           Minor_evidence_state,
+           Minor_best_contig_length, Minor_best_contig_pident, Minor_best_contig_kmer_cov),
       build_evidence
     )
   )
