@@ -64,8 +64,10 @@ read_blast_out_frame <- function(path_denovo) {
 # --- Block 1: summarize.R smoke check -------------------------------------
 # The downgrade logic is now exercised through the REAL apply_denovo_layer()
 # below, so the brittle source-text greps were dropped (04-01). We keep only a
-# parse() smoke check to catch a syntactically broken script.
-parse(file.path(bin_dir, "summarize.R"))
+# parse() smoke check to catch a syntactically broken script. Bind the result
+# to a variable so Rscript does NOT auto-print the ~900-line deparsed AST into
+# CI logs (D-04); a syntax error still makes parse() raise and fail the test.
+parsed <- parse(file.path(bin_dir, "summarize.R"))
 ok("summarize.R parses")
 
 # Sanity: D-15 retirement contract. Phase 8 replaced the legacy minor-coupled
