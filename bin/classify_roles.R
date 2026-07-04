@@ -283,7 +283,18 @@ score_assembly_support <- function(df, w = .default_assembly_weights(),
                                    len_ref = 3000, kmer_cap = 50) {
   if (is.null(df) || nrow(df) == 0) {
     out <- if (is.null(df)) tibble() else df
-    return(out %>% mutate(assembly_support_score = double(), assembly_exists = logical()))
+    # EVID-05/D-03: the zero-row / NULL path declares the SAME schema as the
+    # populated path so a header-only candidates.csv stays byte-stable (T-08-01).
+    # Mirrors the assembly_support_join.R:52-79 declare-once lockstep — the three
+    # contribution columns are carried here as length-0 doubles in step with the
+    # populated mutate below.
+    return(out %>% mutate(
+      assembly_support_score       = double(),
+      assembly_exists              = logical(),
+      contig_identity_contribution = double(),
+      contig_length_contribution   = double(),
+      contig_kmer_contribution     = double()
+    ))
   }
 
   wi <- w$identity   %||% 0.65
@@ -321,13 +332,28 @@ score_assembly_support <- function(df, w = .default_assembly_weights(),
 
   raw   <- base + kbonus
   # D-09: floor to 0 for no assembly / NA identity or length; D-08: bound to [0,1].
-  score <- ifelse(!assembly_exists | is.na(pid) | is.na(len), 0, pmin(raw, 1))
+  floored <- !assembly_exists | is.na(pid) | is.na(len)
+  score <- ifelse(floored, 0, pmin(raw, 1))
   score <- pmax(0, pmin(1, score))
+
+  # EVID-05/D-03: surface the already-computed weighted per-metric contribution
+  # terms (wi*id_term, wl*len_term, kbonus) so a reader can see each metric's push
+  # into the score — ATTACHED, never recomputed. On a floored row (no contig / NA
+  # identity or length) all three report 0 in lockstep with the floored 0 score, so
+  # the reported contributions never leak NA on a scored row and never sum above a
+  # zeroed score. On a scored row the three sum to the PRE-CLAMP score (base + kbonus
+  # = raw), which is what "contribution to the score" means.
+  contig_identity_contribution <- ifelse(floored, 0, wi * id_term)
+  contig_length_contribution   <- ifelse(floored, 0, wl * len_term)
+  contig_kmer_contribution     <- ifelse(floored, 0, kbonus)
 
   df %>%
     mutate(
-      assembly_support_score = score,
-      assembly_exists        = assembly_exists
+      assembly_support_score       = score,
+      assembly_exists              = assembly_exists,
+      contig_identity_contribution = contig_identity_contribution,
+      contig_length_contribution   = contig_length_contribution,
+      contig_kmer_contribution     = contig_kmer_contribution
     )
 }
 
@@ -455,6 +481,11 @@ classify_roles <- function(scored_df, minRead, minCov,
         dominance_score        = if ("dominance_score" %in% names(.)) dominance_score else double(),
         assembly_support_score = if ("assembly_support_score" %in% names(.)) assembly_support_score else double(),
         assembly_exists        = if ("assembly_exists" %in% names(.)) assembly_exists else logical(),
+        # EVID-05/D-03: carry the three contribution columns on the zero-row path so a
+        # header-only candidates.csv keeps the same schema as a populated run.
+        contig_identity_contribution = if ("contig_identity_contribution" %in% names(.)) contig_identity_contribution else double(),
+        contig_length_contribution   = if ("contig_length_contribution"   %in% names(.)) contig_length_contribution   else double(),
+        contig_kmer_contribution     = if ("contig_kmer_contribution"     %in% names(.)) contig_kmer_contribution     else double(),
         evidence_state         = character(),
         role                   = character(),
         role_reason            = character(),

@@ -524,12 +524,45 @@ if (!(sa >= sb)) fail("Test15 higher identity must score >= lower (monotone)")
 if ((sa - sb) > 0.15) fail("Test15 no discontinuity: 89->91% must not jump (EVID-01)")
 
 # CLASS-03/T-08-01: zero-row and NULL input carry the typed new columns, never abort.
+# EVID-05/D-03: the three contribution columns join the zero-row/NULL schema too, so a
+# header-only candidates.csv keeps a stable schema (Pitfall 1: schema drift).
 s15_empty <- score_assembly_support(no_asm[0, ])
-for (col in c("assembly_support_score", "assembly_exists")) {
+for (col in c("assembly_support_score", "assembly_exists",
+              "contig_identity_contribution", "contig_length_contribution",
+              "contig_kmer_contribution")) {
   if (!col %in% names(s15_empty)) fail(sprintf("Test15 zero-row frame must carry %s", col))
 }
-if (nrow(score_assembly_support(NULL)) != 0)
+s15_null <- score_assembly_support(NULL)
+if (nrow(s15_null) != 0)
   fail("Test15 NULL input must yield a zero-row frame, not abort")
+for (col in c("contig_identity_contribution", "contig_length_contribution",
+              "contig_kmer_contribution")) {
+  if (!col %in% names(s15_null)) fail(sprintf("Test15 NULL-input frame must carry %s", col))
+}
+
+# EVID-05/D-03: the three weighted contribution columns are additive on the populated
+# path — they sum to the PRE-CLAMP score (base + kbonus) for a mid-range present contig
+# (raw < 1, so no clamp), and a scored row never leaks NA into the columns.
+mid_row <- mk_cand("S15f", "mid_id", "2c", 1, NA, 0, sup_len = 3000, sup_kmer = 30, sup_pid = 88)
+s15_mid <- score_assembly_support(mid_row)
+contrib_sum <- with(s15_mid, contig_identity_contribution + contig_length_contribution + contig_kmer_contribution)
+if (s15_mid$assembly_support_score >= 1)
+  fail("Test15 mid-range fixture must stay below the clamp so pre-clamp == score")
+if (abs(contrib_sum - s15_mid$assembly_support_score) > 1e-9)
+  fail(sprintf("Test15 the three contribution columns must sum to the (pre-clamp) score, got %.6f vs %.6f",
+               contrib_sum, s15_mid$assembly_support_score))
+if (any(is.na(c(s15_mid$contig_identity_contribution, s15_mid$contig_length_contribution,
+                s15_mid$contig_kmer_contribution))))
+  fail("Test15 contribution columns must never be NA for a scored (present-contig) row")
+
+# EVID-05/D-03: a no-assembly row (score floored to 0) carries the three contributions at
+# 0, not NA — in lockstep with the floored score (Pitfall 1 / D-09 no-NA-leak).
+s15_floor <- score_assembly_support(no_asm)
+if (!identical(unname(unlist(s15_floor[1, c("contig_identity_contribution",
+                                            "contig_length_contribution",
+                                            "contig_kmer_contribution")])),
+               c(0, 0, 0)))
+  fail("Test15 no-assembly row must carry the three contribution columns at 0, not NA (D-09 floor lockstep)")
 ok("Test15 (EVID-01/D-08..D-11): score_assembly_support bounded, k-mer bonus-only, reads-independent, no 90% cliff")
 
 # --- Test 16: calibrated anchors + columns wired onto classify_roles() output -
@@ -589,9 +622,22 @@ wire_in <- bind_rows(
   mk_cand("WIRE", "4d_no",  "4d", 8,      1,    0.10)  # no assembly
 )
 r16 <- classify(wire_in)
-for (col in c("assembly_support_score", "assembly_exists")) {
-  if (!col %in% names(r16)) fail(sprintf("Test16 classify_roles() output must carry the %s column (D-14)", col))
+for (col in c("assembly_support_score", "assembly_exists",
+              "contig_identity_contribution", "contig_length_contribution",
+              "contig_kmer_contribution")) {
+  if (!col %in% names(r16)) fail(sprintf("Test16 classify_roles() output must carry the %s column (D-14/EVID-05)", col))
 }
+# EVID-05/D-03: the wired contribution columns sum to the (pre-clamp) score for the
+# present-contig 2c row (score ~0.874 < 1, so pre-clamp == score) — additive, no NA.
+r16_2c_contrib <- r16 %>% filter(candidate_ref == "2c_min") %>%
+  summarise(s = contig_identity_contribution + contig_length_contribution + contig_kmer_contribution) %>% pull(s)
+if (abs(r16_2c_contrib - (r16 %>% filter(candidate_ref == "2c_min") %>% pull(assembly_support_score))) > 1e-9)
+  fail("Test16 wired contribution columns for 2c must sum to its assembly_support_score (pre-clamp additivity)")
+# EVID-05/D-03: the no-assembly 4d row carries the three columns at 0, not NA.
+r16_4d_contrib <- r16 %>% filter(candidate_ref == "4d_no") %>%
+  select(contig_identity_contribution, contig_length_contribution, contig_kmer_contribution)
+if (!identical(unname(unlist(r16_4d_contrib[1, ])), c(0, 0, 0)))
+  fail("Test16 wired no-assembly 4d row must carry the three contribution columns at 0, not NA")
 # The wired column must equal the standalone score for the same row.
 r16_2c <- r16 %>% filter(candidate_ref == "2c_min") %>% pull(assembly_support_score)
 if (abs(r16_2c - 0.874) > 0.01)
@@ -605,7 +651,9 @@ if (!identical(r16 %>% filter(candidate_ref == "2c_min") %>% pull(assembly_exist
 
 # Zero-row classify_roles() output still carries the new columns (CLASS-03).
 r16_empty <- classify(wire_in[0, ])
-for (col in c("assembly_support_score", "assembly_exists")) {
+for (col in c("assembly_support_score", "assembly_exists",
+              "contig_identity_contribution", "contig_length_contribution",
+              "contig_kmer_contribution")) {
   if (!col %in% names(r16_empty)) fail(sprintf("Test16 zero-row classify output must carry %s", col))
 }
 ok("Test16 (EVID-01/D-14): calibrated anchors reproduced; assembly_support_score + assembly_exists wired additively onto classify_roles() output")
