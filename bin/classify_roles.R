@@ -843,3 +843,142 @@ build_evidence_summary <- function(role, role_reason, evidence_state,
 
   paste0(label, ": ", body, state_tok, ".")
 }
+
+# candidate_review_fragment(): per-candidate review_flag fragment (EVID-06). Returns
+# NA_character_ for a clean dominant / clean confirmed / clean background candidate,
+# else "candidate <rank> (<subtype>_<ref>): <reason with the concrete driving value>".
+# Fires for EVERY non-dominant, non-clean candidate — weak/probable/refuted evidence
+# states and the D-08 demotions (same_genotype_as_dominant / recombinant_2k1b) that
+# fire even though the candidate's own contig evidence was good. NO numeric flag-gating
+# threshold is introduced (D-06); severity is conveyed by the concrete measured value in
+# the wording (D-07). Scalar; apply row-wise via pmap_chr, then collapse per sample.
+candidate_review_fragment <- function(role, role_reason, evidence_state, concordance_status,
+                                      candidate_rank, candidate_ref, candidate_subtype,
+                                      best_contig_length = NA_real_,
+                                      best_contig_pident = NA_real_,
+                                      best_contig_kmer_cov = NA_real_) {
+  rr     <- if (length(role_reason)    == 1 && !is.na(role_reason))    as.character(role_reason)    else NA_character_
+  st     <- if (length(evidence_state) == 1 && !is.na(evidence_state)) as.character(evidence_state) else NA_character_
+  role_s <- if (length(role)           == 1 && !is.na(role))           as.character(role)           else NA_character_
+
+  # The dominant candidate's review is surfaced at the SAMPLE level
+  # (dominant_unconfirmed), and the dominance-ordering conflict is a generic sample
+  # message (D-10) — neither yields a per-candidate fragment here.
+  if (identical(role_s, "dominant") || identical(rr, "dominant")) return(NA_character_)
+  if (identical(rr, "indeterminate_dominance_conflict")) return(NA_character_)
+
+  is_demotion  <- !is.na(rr) && rr %in% c("same_genotype_as_dominant", "recombinant_2k1b")
+  is_conflict  <- !is.na(rr) && rr %in% c("refuted_denovo", "discordant_identity")
+  is_weakstate <- !is.na(st) && st %in% c("weak", "probable", "refuted")
+
+  # D-06: flag every non-dominant, non-clean candidate. A clean confirmed co-infection
+  # / clean background (no flaggable state, not a demotion or conflict) => NA.
+  if (!(is_demotion || is_conflict || is_weakstate)) return(NA_character_)
+
+  label   <- .candidate_label(candidate_rank, candidate_ref, candidate_subtype)
+  metrics <- .contig_metrics_phrase(best_contig_length, best_contig_pident, best_contig_kmer_cov)
+  m_paren <- if (nzchar(metrics)) paste0(" (", metrics, ")") else ""
+
+  reason <- if (identical(rr, "weak_own_assembly_below_floor")) {
+    paste0("matching contig but weak — ", if (nzchar(metrics)) metrics else "no measurable contig support")
+  } else if (identical(rr, "no_own_assembly")) {
+    "no contig with the same genotype/subtype as the candidate"
+  } else if (identical(rr, "corroborated") && identical(st, "probable")) {
+    paste0("co-infection only marginally corroborated by contig", m_paren)
+  } else if (identical(rr, "refuted_denovo")) {
+    paste0("contig genotype contradicts the mapping assignment", m_paren)
+  } else if (identical(rr, "discordant_identity")) {
+    paste0("mapping identity conflicts with the contig/GLUE identity", m_paren)
+  } else if (identical(rr, "same_genotype_as_dominant")) {
+    paste0("demoted — same genotype as the dominant candidate",
+           if (nzchar(metrics)) paste0(", though its own contig evidence was ", metrics) else "")
+  } else if (identical(rr, "recombinant_2k1b")) {
+    paste0("demoted — 2k/1b recombinant pair",
+           if (nzchar(metrics)) paste0(", though its own contig evidence was ", metrics) else "")
+  } else {
+    rr_tok <- if (!is.na(rr)) rr else "flagged"
+    paste0(rr_tok, if (nzchar(metrics)) paste0(" — ", metrics) else "")
+  }
+
+  # Every fragment carries the evidence_state token so severity is reconstructable.
+  suffix <- if (!is.na(st) && !grepl("evidence_state", reason, fixed = TRUE)) paste0(" [evidence_state=", st, "]") else ""
+  paste0(label, ": ", reason, suffix)
+}
+
+# sample_review_message(): the rewritten sample-level review_flag builder (EVID-06).
+# Keeps the D-10 triggers (is_indet, gate_flag != "ok", is_indet_dom) GENERIC with no
+# candidate name; enriches the subtype-conflict / different-genotype-contig triggers
+# with the named candidate + the actual conflicting subtype values (D-02 pattern 2,
+# sample-level per RESEARCH Pitfall 3); resolves D-11 by NAMING the candidate for
+# dominant_unconfirmed and rescue_effect == "major_ref_changed"; accepts the
+# pre-collapsed per-candidate fragment string (from candidate_review_fragment) as one
+# argument and merges everything with " | "; returns NA_character_ when nothing fires
+# (the MultiQC NA sentinel — Pitfall 2: filter !is.na before paste, never render "NA").
+sample_review_message <- function(overall_sample_call,
+                                  denovo_major_subtype_match,
+                                  denovo_minor_subtype_match,
+                                  gate_flag,
+                                  denovo_minor_subtype,
+                                  denovo_major_subtype,
+                                  major_subtype,
+                                  rescue_effect,
+                                  dominant_unconfirmed,
+                                  dominant_rank = NA_integer_,
+                                  dominant_ref = NA_character_,
+                                  candidate_fragment = NA_character_) {
+  one <- function(x) if (length(x) == 0) NA else x[[1]]
+  sc        <- one(overall_sample_call)
+  maj_match <- one(denovo_major_subtype_match)
+  min_match <- one(denovo_minor_subtype_match)
+  gflag     <- one(gate_flag)
+  resc      <- one(rescue_effect)
+  dv_minor  <- one(denovo_minor_subtype)
+  dv_major  <- one(denovo_major_subtype)
+  maj_sub   <- one(major_subtype)
+  dom_unconf <- one(dominant_unconfirmed)
+  cf        <- one(candidate_fragment)
+  tok <- function(x) if (length(x) == 0 || is.na(x)) "unknown" else as.character(x)
+
+  msgs <- character(0)
+  is_coinf     <- !is.na(sc) && sc == "co-infection"
+  is_mono      <- !is.na(sc) && sc == "monoinfection"
+  is_indet     <- !is.na(sc) && sc == "indeterminate"
+  is_indet_dom <- !is.na(sc) && sc == "co-infection (indeterminate dominance)"
+  subtype_dis  <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
+  dom_label    <- .candidate_label(dominant_rank, dominant_ref, maj_sub)
+
+  # D-10 generic (no candidate name).
+  if (is_indet_dom)
+    msgs <- c(msgs, "Dominance ordering uncertain — read-count and k-mer-coverage rankings disagree. Both genotypes reported as present; co-infection vs contamination agnostic. Please review.")
+  # Co-infection subtype conflict (sample-level de novo vs mapping).
+  if (is_coinf && subtype_dis)
+    msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
+  # Monoinfection major subtype conflict: name the candidate + the actual subtype values (D-02 pattern 2).
+  if (is_mono && !is.na(maj_match) && maj_match == "NO")
+    msgs <- c(msgs, paste0(
+      "Major subtype conflict for ", dom_label, " — mapping (", tok(maj_sub),
+      ") vs contig (", tok(dv_major), "). Possible reference mismatch or highly divergent strain. Please review."))
+  # Monoinfection different-genotype contig: names the contig subtype value.
+  if (is_mono && !is.na(dv_minor) && !is.na(maj_sub) &&
+      substr(dv_minor, 1, 1) != substr(maj_sub, 1, 1))
+    msgs <- c(msgs, paste0(
+      "Monoinfection called for ", dom_label, ", but de novo assembly found a different-genotype contig (",
+      dv_minor, ") — possible missed co-infection or contamination. Please review."))
+  # D-11: name the dominant candidate for a provisional (uncorroborated) call.
+  if (isTRUE(dom_unconf) && is_mono)
+    msgs <- c(msgs, paste0("Genotype call for ", dom_label,
+      " is provisional — identity not corroborated (mapping evidence only; no GLUE or de novo confirmation). Please review."))
+  # D-10 generic (no candidate name).
+  if (is_indet)
+    msgs <- c(msgs, "No candidate passed the major-gate — overall sample call indeterminate.")
+  if (!is.na(gflag) && gflag != "ok")
+    msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
+  # D-11: name the reassigned dominant candidate for a Major-slot rescue.
+  if (!is.na(resc) && resc == "major_ref_changed")
+    msgs <- c(msgs, paste0("De novo rescue overrode the dominant/Major reference for ", dom_label,
+      " — the primary call was reassigned automatically. Confirm against rescue_audit.csv (from/to + trigger) before reporting. Please review."))
+  # Merge the pre-collapsed per-candidate fragment(s), NA-filtered (Pitfall 2).
+  if (!is.na(cf) && nzchar(cf)) msgs <- c(msgs, cf)
+
+  if (length(msgs) == 0) NA_character_ else paste(msgs, collapse = " | ")
+}
