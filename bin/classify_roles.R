@@ -749,3 +749,97 @@ classify_roles <- function(scored_df, minRead, minCov,
     arrange(.row_order) %>%
     select(-.eligible, -.row_order)
 }
+
+# =============================================================================
+# Phase 13 interpretability helpers (EVID-05 / EVID-06)
+#
+# Pure, scalar-per-candidate functions that turn the already-computed
+# role / role_reason / evidence_state / concordance_status + measured contig
+# metrics into human-readable, contig-language text. They RECOMPUTE nothing
+# (D-03) and read only fields already present on candidate_support after
+# classify_roles(). Language rule D-01: always "contig", never "own
+# assembly"/"own support". Severity is conveyed by concrete measured values,
+# never editorial words (D-07).
+# =============================================================================
+
+# Candidate identity token per D-05: "candidate <rank> (<subtype>_<ref>)".
+# Production reference names already carry the subtype prefix (e.g. "2c_JX227949"),
+# so we avoid doubling it when ref already starts with "<subtype>_"; if ref is the
+# bare accession we prepend the subtype. NA-tolerant (T-13-01): never stop().
+.candidate_label <- function(rank, ref, subtype) {
+  ref_s <- if (length(ref) == 0 || is.na(ref)) NA_character_ else as.character(ref)
+  sub_s <- if (length(subtype) == 0 || is.na(subtype)) NA_character_ else as.character(subtype)
+  ident <- if (!is.na(ref_s) && !is.na(sub_s)) {
+    if (startsWith(ref_s, paste0(sub_s, "_")) || identical(ref_s, sub_s)) ref_s
+    else paste0(sub_s, "_", ref_s)
+  } else if (!is.na(ref_s)) {
+    ref_s
+  } else if (!is.na(sub_s)) {
+    sub_s
+  } else {
+    "unknown"
+  }
+  rank_s <- if (length(rank) == 0 || is.na(rank)) "?" else as.character(rank)
+  paste0("candidate ", rank_s, " (", ident, ")")
+}
+
+# Measured contig metrics as a plain, factual phrase (D-02 pattern 3 / D-07): emits
+# ONLY the tokens whose source value is non-NA — never renders a literal "NA"
+# (T-13-02). Returns "" when no metric is present so callers can test length.
+.contig_metrics_phrase <- function(len, pid, kmer) {
+  toks <- character(0)
+  if (length(len)  == 1 && !is.na(len))  toks <- c(toks, paste0("contig length ", round(len), " bp"))
+  if (length(pid)  == 1 && !is.na(pid))  toks <- c(toks, paste0("identity ", sprintf("%.1f", pid), "%"))
+  if (length(kmer) == 1 && !is.na(kmer)) toks <- c(toks, paste0("k-mer coverage ", sprintf("%.2f", kmer)))
+  paste(toks, collapse = ", ")
+}
+
+# build_evidence_summary(): one contig-language sentence per candidate stating its
+# role + evidence_state + contig corroboration/conflict (EVID-05/D-01/D-02). Scalar;
+# apply row-wise via purrr::pmap_chr(). Reads ONLY contig support (never
+# reads/cov/evenness — D-11 spirit). Every reachable role_reason from
+# classify_one_sample() maps to a non-empty, candidate-named sentence; an unmapped
+# reason falls through to a defined generic sentence (never empty, never stop()).
+build_evidence_summary <- function(role, role_reason, evidence_state,
+                                   concordance_status,
+                                   candidate_rank, candidate_ref, candidate_subtype,
+                                   assembly_exists,
+                                   best_contig_length = NA_real_,
+                                   best_contig_pident = NA_real_,
+                                   best_contig_kmer_cov = NA_real_) {
+  label <- .candidate_label(candidate_rank, candidate_ref, candidate_subtype)
+  metrics <- .contig_metrics_phrase(best_contig_length, best_contig_pident, best_contig_kmer_cov)
+  st  <- if (length(evidence_state) == 1 && !is.na(evidence_state)) as.character(evidence_state) else NA_character_
+  rr  <- if (length(role_reason)    == 1 && !is.na(role_reason))    as.character(role_reason)    else NA_character_
+  state_tok <- if (!is.na(st)) paste0(" (evidence_state=", st, ")") else ""
+  # A trailing "; contig <metrics>" clause when a matching contig is present.
+  contig_clause <- if (nzchar(metrics)) paste0("; contig ", metrics) else ""
+
+  body <- if (identical(rr, "dominant")) {
+    paste0("dominant candidate", if (nzchar(metrics)) paste0(", contig ", metrics) else "")
+  } else if (identical(rr, "corroborated")) {
+    paste0("co-infection member corroborated by a matching-genotype contig",
+           if (nzchar(metrics)) paste0(" (", metrics, ")") else "")
+  } else if (identical(rr, "refuted_denovo")) {
+    paste0("background — the sample's contig genotype contradicts the mapping assignment", contig_clause)
+  } else if (identical(rr, "discordant_identity")) {
+    paste0("background — mapping identity conflicts with the contig/GLUE identity", contig_clause)
+  } else if (identical(rr, "no_own_assembly")) {
+    "background — no contig with the same genotype/subtype as the candidate"
+  } else if (identical(rr, "weak_own_assembly_below_floor")) {
+    paste0("background — a matching contig was found but is weak: ",
+           if (nzchar(metrics)) metrics else "no measurable contig support")
+  } else if (identical(rr, "same_genotype_as_dominant")) {
+    paste0("demoted to background — same genotype as the dominant candidate",
+           if (nzchar(metrics)) paste0(", though its own contig evidence was ", metrics) else "")
+  } else if (identical(rr, "recombinant_2k1b")) {
+    "demoted to background — 2k/1b recombinant pair (reported as genotype 1 or 2, no 2k1b GLUE clade)"
+  } else if (identical(rr, "indeterminate_dominance_conflict")) {
+    "indeterminate — read-count and k-mer-coverage dominance rankings disagree"
+  } else {
+    role_s <- if (length(role) == 1 && !is.na(role)) as.character(role) else "unclassified"
+    paste0(role_s, if (nzchar(metrics)) paste0("; contig ", metrics) else "")
+  }
+
+  paste0(label, ": ", body, state_tok, ".")
+}
