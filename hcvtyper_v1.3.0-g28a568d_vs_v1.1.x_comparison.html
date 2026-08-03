@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCVTyper v1.3.0-g28a568d vs v1.1.x — comparison</title>
+<style>
+ :root{--fg:#1c2733;--muted:#5b6b7b;--line:#d8e0e8;--accent:#1769aa;--bg:#fff;
+  --diff:#fff3cd;--chg:#e3f0ff;--drop:#fdecea;--new:#eaf7ee;--same:#f6f8fa;}
+ *{box-sizing:border-box}
+ body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--fg);
+  line-height:1.5;margin:0;background:#eef2f6}
+ .wrap{max-width:1140px;margin:0 auto;background:var(--bg);padding:42px 54px 80px;
+  box-shadow:0 1px 4px rgba(0,0,0,.08)}
+ h1{font-size:26px;margin:0 0 4px;border-bottom:3px solid var(--accent);padding-bottom:12px}
+ h2{font-size:21px;margin:46px 0 10px;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:6px}
+ h3{font-size:17px;margin:30px 0 8px}
+ h4{font-size:13px;margin:22px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+ p,li{font-size:14.5px}
+ .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+ table{border-collapse:collapse;width:100%;margin:8px 0 18px;font-size:12.7px}
+ th,td{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+ th{background:#f1f5f9;font-weight:600}
+ tr.diff{background:var(--diff)} tr.chg{background:var(--chg)} tr.drop{background:var(--drop)}
+ tr.new{background:var(--new)} tr.same{background:var(--same)}
+ code{background:#f0f3f6;padding:1px 5px;border-radius:4px;font-size:12.3px}
+ .kpi{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 6px}
+ .card{flex:1 1 200px;border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:#fafcfe}
+ .card .big{font-size:30px;font-weight:700;color:var(--accent);line-height:1}
+ .card .lbl{font-size:12.5px;color:var(--muted);margin-top:4px}
+ .ok{color:#1a7f37;font-weight:600}.warn{color:#b26a00;font-weight:600}.bad{color:#b3261e;font-weight:600}
+ .note{background:#f6f8fa;border-left:4px solid var(--accent);padding:10px 14px;margin:14px 0;font-size:13.5px}
+ .note.warnbox{border-left-color:#b26a00;background:#fffaf0}
+ .legend{font-size:12px;color:var(--muted);margin:-8px 0 14px}
+ ul{margin:6px 0 14px} .small{font-size:12.5px;color:var(--muted)}
+ footer{margin-top:50px;border-top:1px solid var(--line);padding-top:14px;font-size:12px;color:var(--muted)}
+ .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+ .tag{display:inline-block;padding:0 6px;border-radius:4px;font-size:11px;font-weight:600}
+ .t-high{background:#e6f4ea;color:#1a7f37}.t-prov{background:#fff3cd;color:#8a6100}
+ .t-rev{background:#fdecea;color:#b3261e}.t-ind{background:#eceff2;color:#5b6b7b}
+</style></head><body><div class="wrap">
+
+<h1>HCVTyper — v1.3.0-g28a568d vs v1.1.x release comparison</h1>
+<p class="sub">Five NGS runs &middot; 140 samples &middot; de novo-informed strain selection with the new evidence/confidence layer
+(<code>v1.3.0-g28a568d</code>) vs legacy releases <code>v1.1.5</code> &amp; <code>v1.1.6</code> &middot; generated 2026-08-03</p>
+<div class="note"><strong>Scope.</strong> Primary metrics: identified <strong>major subtype</strong> and <strong>resistance results</strong>.
+Secondary metric: <strong>minor strain call</strong> differences. Coverage / mapping / read-count metrics are out of scope.
+Source: <code>summary/Summary.csv</code> per run from
+<code>HCV/2026/HCV_paper_revisjon/</code> (new) and the matching <code>HCV/2025/</code> &amp; <code>HCV/2026/</code> routine result folders (legacy).
+Read-only &mdash; nothing was written to <code>/mnt/N</code>. Samples matched on the ID prefix before <code>-HCV</code>; all
+140 samples are present in both versions of every run.</div>
+<div class="note"><strong>Which column is the call?</strong> In v1.3.0 the reported strain identity lives in
+<code>Major</code>/<code>Minor</code> (and the identical <code>Major_subtype</code>/<code>Minor_subtype</code>). Unlike v1.1.x, these are
+<em>no longer GLUE-only</em>: when HCV-GLUE cannot be run the mapping subtype is reported instead, with the shortfall recorded in
+<code>call_confidence</code>. The legacy <code>Major_genotype</code>/<code>Minor_genotype</code> columns are stale in this build &mdash;
+see Section&nbsp;6. All comparisons below use <code>Major_subtype</code>/<code>Minor_subtype</code>.</div>
+
+<h2>1. Executive summary</h2>
+<div class="kpi">
+ <div class="card"><div class="big">140</div><div class="lbl">samples across 5 runs</div></div>
+ <div class="card"><div class="big ok">134</div><div class="lbl">major subtypes identical (134/140)</div></div>
+ <div class="card"><div class="big warn">1</div><div class="lbl">genuine major-subtype flip</div></div>
+ <div class="card"><div class="big ok">5</div><div class="lbl">subtypes newly reported where legacy gave NA</div></div>
+ <div class="card"><div class="big warn">1</div><div class="lbl">resistance-result change (same sample)</div></div>
+</div>
+<ul>
+<li><strong>Major subtype: 134/140 concordant.</strong> Six samples differ. Five are <em>gains</em> &mdash;
+legacy reported <code>NA</code> because HCV-GLUE could not be run on the sample, and v1.3.0 now falls back to the mapping subtype
+(<code>2753256</code>, <code>Sample52K</code>, <code>Sample62K</code>, <code>Sample82K</code> in run 20260521-01; <code>2768882</code> in run 20260625-02).
+All five carry <code>call_confidence=review</code> and an explicit "identity not corroborated" review flag, so the extra information is
+correctly labelled as provisional rather than presented as a confirmed call. The sixth, <strong>Sample51K</strong>, is a genuine
+change and is discussed below.</li>
+<li><strong>Resistance: 139/140 concordant.</strong> All NS3/4A, NS5A and NS5B calls match except
+<strong>Sample51K</strong>, where the major/minor swap changes which strain the resistance report is built from
+(NS3/4A <code>NA</code>&rarr;<code>56Y;168Q;170I</code>, NS5B <code>NA</code>&rarr;<code>206E</code>). The five GLUE-less
+samples above produce no resistance output in either version, so they contribute no resistance difference.</li>
+<li><strong>Sample51K is now reported as a co-infection, not a mis-call.</strong> Legacy called a 2c major with a typable 3a minor;
+v1.3.0 calls a <strong>3a major with a typable 2c minor</strong> &mdash; the same two strains, dominance reversed
+(3a: 6,051 reads/100% breadth@10&times;; 2c: 26,023 reads/98% breadth@10&times;), both de-novo-confirmed (9,479&nbsp;bp 2c contig,
+3,854&nbsp;bp 3a contig), flagged <code>review</code> with "major/minor assignment uncertain". This is the sample that the
+2026-07-03 dev snapshot collapsed to a 3a monoinfection with the 2c surviving only as a de novo contig; the strain is no longer lost
+(Section 5.1). The read counts favour 2c as dominant, so the reversal itself still warrants a look.</li>
+<li><strong>Secondary metric &mdash; typable minors.</strong> Legacy reported a minor strain in <strong>45</strong>
+samples, of which <strong>13</strong> were <code>typable=YES</code>. v1.3.0 reports a minor in <strong>16</strong>
+samples, <strong>11</strong> of them typable: <strong>8 retained</strong>, <strong>3 added</strong>
+(Section 3), <strong>5 dropped</strong> (Section 4.1). The 29 dropped non-typable minors are the familiar
+within-genotype-1 subtype bleed-through artefacts.</li>
+<li><strong>New in this build: an explicit confidence and evidence layer.</strong> <code>call_confidence</code>,
+<code>Major_evidence_state</code>/<code>Minor_evidence_state</code>, human-readable <code>Major_evidence</code>/<code>Minor_evidence</code>
+strings and per-candidate review sentences (Section 5). Only 38/140 samples reach
+<code>high</code> confidence; 78 are <code>provisional</code> &mdash; almost entirely
+because of one over-firing trigger (Section 5.3).</li>
+</ul>
+<div class="note warnbox"><strong>Two issues to fix before this build ships.</strong>
+(1) The <em>"de novo found a different-genotype contig"</em> review trigger fires on <strong>72 of 140 samples (51%)</strong>
+with no contig-length floor &mdash; median contig 606&nbsp;bp, 51 of 72 under 1&nbsp;kb.
+It accounts for 92% of the cohort's <code>provisional</code> calls (Section 5.3).
+(2) <code>Major_genotype</code>/<code>Minor_genotype</code> are broken: absent from 2 of the 5 runs, and swapped relative to
+<code>Major_subtype</code>/<code>Minor_subtype</code> on Sample51K (Section 6).
+Both are written up for the pipeline repo in
+<code>Access_Microbiology/Revision_1/hcvtyper_handoff_summary_defects_2026-08-03.md</code>.</div>
+
+<h4>Minor-call breakdown per run</h4><table class="small"><thead><tr><th>Minor-call category</th>
+<th>20251113-02 (n=23)</th>
+<th>20251212-01 (n=22)</th>
+<th>20260326-01 (n=28)</th>
+<th>20260521-01 (n=36)</th>
+<th>20260625-02 (n=31)</th>
+<th>total</th></tr></thead><tbody>
+<tr><td>same (unchanged)</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td>4</td>
+<td>0</td>
+<td><strong>6</strong></td></tr>
+<tr><td>changed subtype</td>
+<td>0</td>
+<td>0</td>
+<td>2</td>
+<td>3</td>
+<td>0</td>
+<td><strong>5</strong></td></tr>
+<tr><td>new in v1.3.0</td>
+<td>0</td>
+<td>1</td>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td><strong>5</strong></td></tr>
+<tr><td>dropped in v1.3.0</td>
+<td>5</td>
+<td>6</td>
+<td>10</td>
+<td>9</td>
+<td>4</td>
+<td><strong>34</strong></td></tr>
+<tr><td>no minor in either</td>
+<td>18</td>
+<td>14</td>
+<td>13</td>
+<td>19</td>
+<td>26</td>
+<td><strong>90</strong></td></tr>
+</tbody></table>
+<h2>2. Primary metrics — major subtype &amp; resistance</h2>
+<p>Per-sample, all five runs. <code>Major</code> is <code>Major_subtype</code>; resistance columns are the per-class short summaries
+(<code>NS34A_short</code>, <code>NS5A_short</code>, <code>NS5B_short</code>). <code>conf</code> is the new
+<code>call_confidence</code> field (v1.3.0 only). <code>Δ = —</code> means identical; <code>⚠</code> flags a difference.</p>
+<h4>Run 20251113-02 &mdash; major subtype &amp; resistance (v1.3.0-g28a568d vs legacy v1.1.5-ged4b838)</h4>
+<table><thead><tr><th>Sample</th><th>Major (new)</th><th>Major (old)</th><th>NS3/4A new</th><th>NS3/4A old</th><th>NS5A new</th><th>NS5A old</th><th>NS5B new</th><th>NS5B old</th><th>conf</th><th>Δ</th></tr></thead><tbody>
+<tr><td>2604444</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2605174</td><td>1a</td><td>1a</td><td>80K;132I;156A;168D</td><td>80K;132I;156A;168D</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2605195</td><td>1a</td><td>1a</td><td>80L</td><td>80L</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2605216</td><td>1a</td><td>1a</td><td>170V</td><td>170V</td><td>30H;28V</td><td>30H;28V</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2605642</td><td>1b</td><td>1b</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2606426</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2606506</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2607744</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2609249</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2609658</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>93H;62T</td><td>93H;62T</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2609947</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2610361</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2611087</td><td>1b</td><td>1b</td><td>122T;170I</td><td>122T;170I</td><td>31I;37L</td><td>31I;37L</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2611955</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2614228</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2614266</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>93H;30R;37L;92V</td><td>93H;30R;37L;92V</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2614308</td><td>2b</td><td>2b</td><td>NA</td><td>NA</td><td>28L</td><td>28L</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2614889</td><td>6q</td><td>6q</td><td>NA</td><td>NA</td><td>31V;28V;30S</td><td>31V;28V;30S</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2615399</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2617257</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37L</td><td>37L</td><td>556G</td><td>556G</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2618753</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2619168</td><td>3a</td><td>3a</td><td>166S</td><td>166S</td><td>93H</td><td>93H</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2619169</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+</tbody></table>
+<h4>Run 20251212-01 &mdash; major subtype &amp; resistance (v1.3.0-g28a568d vs legacy v1.1.5-ged4b838)</h4>
+<table><thead><tr><th>Sample</th><th>Major (new)</th><th>Major (old)</th><th>NS3/4A new</th><th>NS3/4A old</th><th>NS5A new</th><th>NS5A old</th><th>NS5B new</th><th>NS5B old</th><th>conf</th><th>Δ</th></tr></thead><tbody>
+<tr><td>2619488</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>30Q;31M;37L</td><td>30Q;31M;37L</td><td>316N;159F</td><td>316N;159F</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2620329</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37I</td><td>37I</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2620976</td><td>1b</td><td>1b</td><td>56F;170I</td><td>56F;170I</td><td>37L;54H</td><td>37L;54H</td><td>445F</td><td>445F</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2621008</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2622044</td><td>3a</td><td>3a</td><td>166S;56Y;168Q;170I</td><td>166S;56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2622415</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37L</td><td>37L</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2622436</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr><td>2623163</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2625911</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>31M;93H;30R;37L;54H</td><td>31M;93H;30R;37L;54H</td><td>159F;451S;316H;321I</td><td>159F;451S;316H;321I</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2626415</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>30Q;31M;37L</td><td>30Q;31M;37L</td><td>316N;159F</td><td>316N;159F</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2627883</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>30R;31M</td><td>30R;31M</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2631255</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2633726</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2633901</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2634016</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2634037</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37L;54H;58S</td><td>37L;54H;58S</td><td>316N;159F</td><td>316N;159F</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2634236</td><td>6e</td><td>6e</td><td>NA</td><td>NA</td><td>28V;30S</td><td>28V;30S</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2634392</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2634413</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>30K</td><td>30K</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2635873</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2637466</td><td>3a</td><td>3a</td><td>166S</td><td>166S</td><td>93H</td><td>93H</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2637467</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+</tbody></table>
+<h4>Run 20260326-01 &mdash; major subtype &amp; resistance (v1.3.0-g28a568d vs legacy v1.1.6-gc1293a7)</h4>
+<table><thead><tr><th>Sample</th><th>Major (new)</th><th>Major (old)</th><th>NS3/4A new</th><th>NS3/4A old</th><th>NS5A new</th><th>NS5A old</th><th>NS5B new</th><th>NS5B old</th><th>conf</th><th>Δ</th></tr></thead><tbody>
+<tr><td>2714371</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>556G</td><td>556G</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2714372</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2714373</td><td>3a</td><td>3a</td><td>168L;56Y;168Q;170I</td><td>168L;56Y;168Q;170I</td><td>30K</td><td>30K</td><td>150V</td><td>150V</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2714374</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2714375</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2714376</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2720737</td><td>3a</td><td>3a</td><td>166S</td><td>166S</td><td>93H</td><td>93H</td><td>206E</td><td>206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2720738</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2720778</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2720779</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2720780</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2720781</td><td>3a</td><td>3a</td><td>166S</td><td>166S</td><td>93H</td><td>93H</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2725978</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37L;54H</td><td>37L;54H</td><td>316N;556G;159F</td><td>316N;556G;159F</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726017</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726018</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>30K</td><td>30K</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726019</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr><td>2726020</td><td>1a</td><td>1a</td><td>170V</td><td>170V</td><td>30H;31M;93C</td><td>30H;31M;93C</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726021</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2726022</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726023</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37L;54H</td><td>37L;54H</td><td>316N</td><td>316N</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr><td>2726024</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726025</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>37L;54H</td><td>37L;54H</td><td>316N;159F</td><td>316N;159F</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726026</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726027</td><td>1a</td><td>1a</td><td>80K;132I;156A;168D</td><td>80K;132I;156A;168D</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2726028</td><td>2k</td><td>2k</td><td>NA</td><td>NA</td><td>31M;24S;28F</td><td>31M;24S;28F</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726029</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2726269</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2726270</td><td>3a</td><td>3a</td><td>166S</td><td>166S</td><td>93H</td><td>93H</td><td>206E</td><td>206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+</tbody></table>
+<h4>Run 20260521-01 &mdash; major subtype &amp; resistance (v1.3.0-g28a568d vs legacy v1.1.6-gc1293a7)</h4>
+<table><thead><tr><th>Sample</th><th>Major (new)</th><th>Major (old)</th><th>NS3/4A new</th><th>NS3/4A old</th><th>NS5A new</th><th>NS5A old</th><th>NS5B new</th><th>NS5B old</th><th>conf</th><th>Δ</th></tr></thead><tbody>
+<tr><td>2724348</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>93H;62T</td><td>93H;62T</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr><td>2724944</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L</td><td>37L</td><td>316N;556G;159F</td><td>316N;556G;159F</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2725808</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr><td>2732070</td><td>3a</td><td>3a</td><td>166S;56Y;168Q;170I</td><td>166S;56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2732725</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2734658</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>30K</td><td>30K</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2735693</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2738207</td><td>2b</td><td>2b</td><td>NA</td><td>NA</td><td>28L</td><td>28L</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2738371</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2740250</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2743986</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2745085</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>28V</td><td>28V</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2746037</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>93H;31F;99A</td><td>93H;31F;99A</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2746971</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>54L;93H;30R</td><td>54L;93H;30R</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2750967</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>316N;556G;585V</td><td>316N;556G;585V</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr><td>2751612</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2753054</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2753092</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr class="chg"><td>2753256</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>⚠</td></tr>
+<tr><td>2753257</td><td>3a</td><td>3a</td><td>166S</td><td>166S</td><td>93H</td><td>93H</td><td>206E</td><td>206E</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr class="chg"><td>Sample51K</td><td>3a</td><td>2c</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>NA</td><td>206E</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>⚠</td></tr>
+<tr class="chg"><td>Sample52K</td><td>2c</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>⚠</td></tr>
+<tr><td>Sample53T</td><td>2c</td><td>2c</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample54T</td><td>2c</td><td>2c</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample61K</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-rev'>review</span></td><td>—</td></tr>
+<tr class="chg"><td>Sample62K</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>⚠</td></tr>
+<tr><td>Sample63T</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample64T</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample71K</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L;54H;54Y</td><td>37L;54H;54Y</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample72K</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L;54H;54Y</td><td>37L;54H;54Y</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample73T</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L;54H;54Y</td><td>37L;54H;54Y</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample74T</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L;54H;54Y</td><td>37L;54H;54Y</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample81K</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr class="chg"><td>Sample82K</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>⚠</td></tr>
+<tr><td>Sample83T</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample84T</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+</tbody></table>
+<h4>Run 20260625-02 &mdash; major subtype &amp; resistance (v1.3.0-g28a568d vs legacy v1.1.6-gc1293a7)</h4>
+<table><thead><tr><th>Sample</th><th>Major (new)</th><th>Major (old)</th><th>NS3/4A new</th><th>NS3/4A old</th><th>NS5A new</th><th>NS5A old</th><th>NS5B new</th><th>NS5B old</th><th>conf</th><th>Δ</th></tr></thead><tbody>
+<tr><td>2756561</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>556G</td><td>556G</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2757202</td><td>2b</td><td>2b</td><td>NA</td><td>NA</td><td>28L</td><td>28L</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2757798</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2758004</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2758156</td><td>2b</td><td>2b</td><td>NA</td><td>NA</td><td>28L;31M</td><td>28L;31M</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2759262</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2759687</td><td>2b</td><td>2b</td><td>NA</td><td>NA</td><td>28L</td><td>28L</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2760171</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>30K</td><td>30K</td><td>150V</td><td>150V</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2761272</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>93H;62T</td><td>93H;62T</td><td>206E</td><td>206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2761293</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L</td><td>37L</td><td>556G</td><td>556G</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2761489</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2761668</td><td>3a</td><td>3a</td><td>56Y;168Q;170I;132I;156V</td><td>56Y;168Q;170I;132I;156V</td><td>30K;93H</td><td>30K;93H</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2762409</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>244I</td><td>244I</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2765515</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V</td><td>150V</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2766998</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2767664</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>150V;206E</td><td>150V;206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>2768793</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2768814</td><td>1b</td><td>1b</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2768835</td><td>3a</td><td>3a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>2768856</td><td>1a</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr class="chg"><td>2768882</td><td>1a</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-rev'>review</span></td><td>⚠</td></tr>
+<tr><td>2771382</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>2771383</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-ind'>indeterminate</span></td><td>—</td></tr>
+<tr><td>Sample52K2</td><td>2c</td><td>2c</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample54T2</td><td>2c</td><td>2c</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample62K2</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample64T2</td><td>3a</td><td>3a</td><td>56Y;168Q;170I</td><td>56Y;168Q;170I</td><td>NA</td><td>NA</td><td>206E</td><td>206E</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample72K2</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L;54H;54Y</td><td>37L;54H;54Y</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample74T2</td><td>1b</td><td>1b</td><td>56F</td><td>56F</td><td>37L;54H;54Y</td><td>37L;54H;54Y</td><td>NA</td><td>NA</td><td><span class='tag t-prov'>provisional</span></td><td>—</td></tr>
+<tr><td>Sample82K2</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+<tr><td>Sample84T2</td><td>1a</td><td>1a</td><td>122G</td><td>122G</td><td>NA</td><td>NA</td><td>NA</td><td>NA</td><td><span class='tag t-high'>high</span></td><td>—</td></tr>
+</tbody></table>
+<h2>3. Secondary metric — strains newly typable in v1.3.0 (<code>typable=YES</code> in v1.3.0, not in v1.1.x)</h2>
+<p>v1.3.0 adds <strong>3</strong> confidently-reported minor strains that legacy could not type. Every one is a
+genuine <strong>3a</strong> co-infection with a multi-kilobase de novo contig, that legacy had logged as an untypable
+within-genotype-1 (1a&harr;1b) cross-mapping artefact. Two of the three reach <code>call_confidence=high</code> with no review flag at all.</p>
+<table><thead><tr><th>Run</th><th>Sample</th><th>legacy minor (<code>typable=NO</code>)</th><th>v1.3.0 minor (<code>typable=YES</code>)</th>
+<th>major</th><th>overall call</th><th>de novo corroboration</th><th>minor breadth@10&times; / reads</th><th>conf</th><th>review flag</th></tr></thead><tbody>
+<tr class='new'><td>20260326-01</td><td>2714371</td><td>1b</td><td><strong>3a</strong></td><td>1a</td><td>co-infection</td><td>3438 bp 3a contig, match YES</td><td>43.14% / 3901</td><td><span class='tag t-high'>high</span></td><td class='small'>—</td></tr>
+<tr class='new'><td>20260521-01</td><td>2724944</td><td>1a</td><td><strong>3a</strong></td><td>1b</td><td>co-infection</td><td>4467 bp 3a contig, match YES</td><td>87.44% / 4213</td><td><span class='tag t-high'>high</span></td><td class='small'>—</td></tr>
+<tr class='new'><td>20260521-01</td><td>2738371</td><td>1b</td><td><strong>3a</strong></td><td>1a</td><td>co-infection</td><td>8967 bp 3a contig, match YES</td><td>98.83% / 15745</td><td><span class='tag t-high'>high</span></td><td class='small'>—</td></tr>
+</tbody></table>
+<h3>3.1 Minors whose subtype changed (typable in both versions)</h3>
+<p>5 samples carried a minor in both versions but with a different subtype. All are de-novo-confirmed
+(<code>Minor_evidence_state=confirmed</code>).</p>
+<table><thead><tr><th>Run</th><th>Sample</th><th>legacy major/minor</th><th>v1.3.0 major/minor</th><th>overall call</th>
+<th>minor evidence</th><th>conf</th></tr></thead><tbody>
+<tr class='chg'><td>20260326-01</td><td>2714371</td><td>1a/1b (NO)</td><td>1a/3a (YES)</td><td>co-infection</td><td class='small'>3a_D17763 | 3,901 reads (nodup) | 43% breadth@10x | de novo 3a | 91.9% consensus id | ref from first-mapping | contig support: 3438 bp contig, 91.7% contig identity, 2.65 k-mer cov</td><td><span class='tag t-high'>high</span></td></tr>
+<tr class='chg'><td>20260326-01</td><td>2726019</td><td>3a/1b (YES)</td><td>3a/1a (YES)</td><td>co-infection</td><td class='small'>1a_AF009606 | 1,337 reads (nodup) | 90% breadth@10x | de novo 3a | 91.9% consensus id | ref from first-mapping | contig support: 9130 bp contig, 93.1% contig identity, 5.46 k-mer c</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='chg'><td>20260521-01</td><td>2724944</td><td>1b/1a (NO)</td><td>1b/3a (YES)</td><td>co-infection</td><td class='small'>3a_D17763 | 4,213 reads (nodup) | 87% breadth@10x | de novo 3a | 91% consensus id | ref from first-mapping | contig support: 4467 bp contig, 92.7% contig identity, 5.91 k-mer cov |</td><td><span class='tag t-high'>high</span></td></tr>
+<tr class='chg'><td>20260521-01</td><td>2738371</td><td>1a/1b (NO)</td><td>1a/3a (YES)</td><td>co-infection</td><td class='small'>3a_D17763 | 15,745 reads (nodup) | 99% breadth@10x | de novo 3a | 90% consensus id | ref from first-mapping | contig support: 8967 bp contig, 91.7% contig identity, 7.37 k-mer cov </td><td><span class='tag t-high'>high</span></td></tr>
+<tr class='chg'><td>20260521-01</td><td>Sample51K</td><td>2c/3a (YES)</td><td>3a/2c (YES)</td><td>co-infection</td><td class='small'>2c_JX227949 | 26,023 reads (nodup) | 98% breadth@10x | de novo 3a | 88.8% consensus id | ref from first-mapping | contig support: 9479 bp contig, 89% contig identity, 514.19 k-mer </td><td><span class='tag t-rev'>review</span></td></tr>
+</tbody></table>
+<h2>4. Legacy minor strains — dropped by v1.3.0, and typable in both</h2>
+<p>Legacy reported a minor strain in <strong>45</strong> samples across the five runs. v1.3.0 drops
+<strong>34</strong> of them &mdash; reporting a monoinfection where legacy reported a second strain &mdash;
+retains 8 as typable in both (&sect;4.3), changes the subtype on 5 (&sect;3.1) and reports 5 minors
+where legacy had none (&sect;4.4).</p>
+<div class="kpi">
+ <div class="card"><div class="big">45</div><div class="lbl">legacy minor calls</div></div>
+ <div class="card"><div class="big warn">34</div><div class="lbl">dropped by v1.3.0 (75%)</div></div>
+ <div class="card"><div class="big ok">29</div><div class="lbl">artefacts correctly dropped (<code>typable=NO</code>)</div></div>
+ <div class="card"><div class="big warn">5</div><div class="lbl">were <code>typable=YES</code> &mdash; review</div></div>
+</div>
+<h3>4.1 Legacy <code>typable=YES</code> minors dropped — potential co-infections (review)</h3>
+<p>5 dropped minors were <code>typable=YES</code> in legacy. All five are genotype-1 minors (1a/1b) against a
+genotype-3a major, recruited at a trivial first-mapping share (0.01&ndash;0.07%), each with a 2.7&ndash;4.5&nbsp;kb off-genotype de novo
+contig. v1.3.0 raises a review flag on every one, so none is silently lost &mdash; but the strain no longer appears in the reported call.
+These are the samples worth a manual look.</p>
+<table><thead><tr><th>Run</th><th>Sample</th><th>legacy minor</th><th>legacy major</th><th>legacy minor first-map %</th>
+<th>v1.3.0 call</th><th>off-genotype contig</th><th>conf</th><th>review flag</th></tr></thead><tbody>
+<tr class='drop'><td>20260326-01</td><td>2714375</td><td>1b</td><td>3a</td><td>0.02</td><td>monoinfection</td><td>2706 bp 1b</td><td><span class='tag t-prov'>provisional</span></td><td class='small'>Monoinfection called for candidate 1 (3a_D17763), but de novo assembly found a different-genotype contig (1b) — possible missed co-infection or contamination. Please review.</td></tr>
+<tr class='drop'><td>20260326-01</td><td>2726018</td><td>1a</td><td>3a</td><td>0.07</td><td>monoinfection</td><td>2787 bp 1a</td><td><span class='tag t-prov'>provisional</span></td><td class='small'>Monoinfection called for candidate 1 (3a_D17763), but de novo assembly found a different-genotype contig (1a) — possible missed co-infection or contamination. Please review.</td></tr>
+<tr class='drop'><td>20260521-01</td><td>2724348</td><td>1a</td><td>3a</td><td>0.01</td><td>monoinfection</td><td>1816 bp 3a</td><td><span class='tag t-rev'>review</span></td><td class='small'>Major subtype conflict for candidate 1 (3a_D28917) — mapping (3a) vs contig (1a). Possible reference mismatch or highly divergent strain. Please review.</td></tr>
+<tr class='drop'><td>20260521-01</td><td>2743986</td><td>1b</td><td>3a</td><td>0.01</td><td>monoinfection</td><td>4467 bp 1b</td><td><span class='tag t-prov'>provisional</span></td><td class='small'>Monoinfection called for candidate 1 (3a_D17763), but de novo assembly found a different-genotype contig (1b) — possible missed co-infection or contamination. Please review.</td></tr>
+<tr class='drop'><td>20260521-01</td><td>2753257</td><td>1a</td><td>3a</td><td>0.04</td><td>monoinfection</td><td>1078 bp 3a</td><td><span class='tag t-rev'>review</span></td><td class='small'>Major subtype conflict for candidate 1 (3a_D17763) — mapping (3a) vs contig (1a). Possible reference mismatch or highly divergent strain. Please review.</td></tr>
+</tbody></table>
+<h3>4.2 Legacy <code>typable=NO</code> minors dropped — the artefact class</h3>
+<p>29 samples. Within-genotype-1 subtype bleed-through: the legacy "minor" is the opposite subtype of genotype 1 to the
+major, recruited at a trivial first-mapping share (0.02&ndash;0.44%), <code>typable=NO</code>. v1.3.0 reports a clean monoinfection.
+28 of the 29 are 1a&harr;1b pairs; the exception is <code>2732725</code> (4k against a 3a major, 0.02%).</p>
+<table class="small"><thead><tr><th>Run</th><th>Sample</th><th>legacy minor</th><th>legacy major</th>
+<th>legacy minor first-map %</th><th>v1.3.0 call</th><th>conf</th></tr></thead><tbody>
+<tr><td>20251113-02</td><td>2605195</td><td>1b</td><td>1a</td><td>0.12</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251113-02</td><td>2605216</td><td>1b</td><td>1a</td><td>0.21</td><td>monoinfection</td><td><span class='tag t-high'>high</span></td></tr>
+<tr><td>20251113-02</td><td>2614228</td><td>1b</td><td>1a</td><td>0.19</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251113-02</td><td>2614266</td><td>1a</td><td>1b</td><td>0.3</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251113-02</td><td>2617257</td><td>1a</td><td>1b</td><td>0.44</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251212-01</td><td>2619488</td><td>1a</td><td>1b</td><td>0.21</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251212-01</td><td>2620976</td><td>1a</td><td>1b</td><td>0.17</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251212-01</td><td>2622415</td><td>1a</td><td>1b</td><td>0.16</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251212-01</td><td>2626415</td><td>1a</td><td>1b</td><td>0.26</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251212-01</td><td>2627883</td><td>1b</td><td>1a</td><td>0.11</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20251212-01</td><td>2634016</td><td>1b</td><td>1a</td><td>0.11</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2725978</td><td>1a</td><td>1b</td><td>0.14</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2726017</td><td>1b</td><td>1a</td><td>0.17</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2726020</td><td>1b</td><td>1a</td><td>0.19</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2726023</td><td>1a</td><td>1b</td><td>0.23</td><td>monoinfection</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr><td>20260326-01</td><td>2726024</td><td>1b</td><td>1a</td><td>0.16</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2726025</td><td>1a</td><td>1b</td><td>0.17</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2726026</td><td>1a</td><td>1b</td><td>0.33</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260326-01</td><td>2726027</td><td>1b</td><td>1a</td><td>0.14</td><td>monoinfection</td><td><span class='tag t-high'>high</span></td></tr>
+<tr><td>20260521-01</td><td>2732725</td><td>4k</td><td>3a</td><td>0.02</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260521-01</td><td>2745085</td><td>1b</td><td>1a</td><td>0.11</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260521-01</td><td>2746971</td><td>1a</td><td>1b</td><td>0.42</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260521-01</td><td>2750967</td><td>1a</td><td>1b</td><td>0.19</td><td>monoinfection</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr><td>20260521-01</td><td>2751612</td><td>1b</td><td>1a</td><td>0.24</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260521-01</td><td>Sample74T</td><td>1a</td><td>1b</td><td>0.09</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260625-02</td><td>2756561</td><td>1b</td><td>1a</td><td>0.11</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260625-02</td><td>2759262</td><td>1b</td><td>1a</td><td>0.11</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260625-02</td><td>2761293</td><td>1a</td><td>1b</td><td>0.41</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr><td>20260625-02</td><td>Sample72K2</td><td>1a</td><td>1b</td><td>0.13</td><td>monoinfection</td><td><span class='tag t-prov'>provisional</span></td></tr>
+</tbody></table>
+<h3>4.3 Minors typable in both versions (retained)</h3>
+<p>8 samples carried a <code>typable=YES</code> minor in <em>both</em> versions &mdash; the co-infection calls v1.3.0 preserves.
+6 are identical; 2 changed subtype
+(&sect;3.1). All are de-novo-corroborated (<code>Minor_evidence_state=confirmed</code>).</p>
+<table><thead><tr><th>Run</th><th>Sample</th><th>legacy major/minor</th><th>v1.3.0 major/minor</th><th>overall call</th>
+<th>status</th><th>conf</th></tr></thead><tbody>
+<tr class='same'><td>20251212-01</td><td>2622436</td><td>3a/1b</td><td>3a/1b</td><td>co-infection</td><td>same</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='same'><td>20260326-01</td><td>2714372</td><td>3a/1a</td><td>3a/1a</td><td>co-infection</td><td>same</td><td><span class='tag t-prov'>provisional</span></td></tr>
+<tr class='chg'><td>20260326-01</td><td>2726019</td><td>3a/1b</td><td>3a/1a</td><td>co-infection</td><td>changed</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='same'><td>20260521-01</td><td>2725808</td><td>3a/1a</td><td>3a/1a</td><td>co-infection</td><td>same</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='same'><td>20260521-01</td><td>2732070</td><td>3a/1a</td><td>3a/1a</td><td>co-infection</td><td>same</td><td><span class='tag t-high'>high</span></td></tr>
+<tr class='chg'><td>20260521-01</td><td>Sample51K</td><td>2c/3a</td><td>3a/2c</td><td>co-infection</td><td>changed</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='same'><td>20260521-01</td><td>Sample61K</td><td>3a/2c</td><td>3a/2c</td><td>co-infection</td><td>same</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='same'><td>20260521-01</td><td>Sample81K</td><td>1a/3a</td><td>1a/3a</td><td>co-infection</td><td>same</td><td><span class='tag t-prov'>provisional</span></td></tr>
+</tbody></table>
+<h3>4.4 Minors reported by v1.3.0 where legacy had none</h3>
+<p>5 samples. Four sit on a below-threshold major (<code>gate_flag=major_below_threshold</code>) and are reported as
+<code>typable=UNKNOWN</code> &mdash; the second candidate is surfaced for inspection, not asserted. One
+(<code>2768856</code>) is an 8-read 4d candidate explicitly labelled <code>evidence_state=weak</code>.</p>
+<table><thead><tr><th>Run</th><th>Sample</th><th>v1.3.0 major/minor</th><th>minor typable</th><th>overall call</th>
+<th>minor evidence</th><th>conf</th></tr></thead><tbody>
+<tr class='new'><td>20251212-01</td><td>2637467</td><td>1b/3a</td><td>UNKNOWN</td><td>untypable</td><td class='small'>3a_D17763 | 30 reads (nodup) | ref from first-mapping | contig support: 692 bp contig, 90.6% contig identity, 0.62 k-mer cov | evidence_state=probable</td><td><span class='tag t-ind'>indeterminate</span></td></tr>
+<tr class='new'><td>20260326-01</td><td>2720738</td><td>1b/3a</td><td>UNKNOWN</td><td>untypable</td><td class='small'>3a_D28917 | 2 reads (nodup) | ref from first-mapping</td><td><span class='tag t-ind'>indeterminate</span></td></tr>
+<tr class='new'><td>20260326-01</td><td>2720778</td><td>1a/1b</td><td>UNKNOWN</td><td>untypable</td><td class='small'>1b_EU781828 | 4 reads (nodup) | ref from first-mapping</td><td><span class='tag t-ind'>indeterminate</span></td></tr>
+<tr class='new'><td>20260521-01</td><td>2753256</td><td>1a/1b</td><td>UNKNOWN</td><td>co-infection</td><td class='small'>1b_EU781827 | 72 reads (nodup) | de novo 3a | ref from first-mapping | contig support: 1208 bp contig, 90.4% contig identity, 0.99 k-mer cov | evidence_state=probable</td><td><span class='tag t-rev'>review</span></td></tr>
+<tr class='new'><td>20260625-02</td><td>2768856</td><td>1a/4d</td><td>NO</td><td>monoinfection</td><td class='small'>4d_DQ418786 | 8 reads (nodup) | ref from first-mapping</td><td><span class='tag t-prov'>provisional</span></td></tr>
+</tbody></table>
+<h2>5. What changed in the pipeline</h2>
+<p>Relative to <strong>v1.1.x</strong>, de novo assembly + BLAST evidence has moved from output-only QC to an input to the strain call
+(<code>bin/rescue_evaluation.R</code>, <code>bin/classify_roles.R</code>). Relative to the <strong>2026-07-03 dev snapshot</strong>
+documented in <code>hcvtyper_dev_vs_v1.1.x_comparison.html</code>, this build adds a graded evidence and confidence layer and makes the
+reported subtype independent of HCV-GLUE availability.</p>
+
+<h3>5.1 Regressions from the previous dev snapshot that are now fixed</h3>
+<table><thead><tr><th>Sample(s)</th><th>Behaviour in the 2026-07-03 dev snapshot</th><th>Behaviour in v1.3.0-g28a568d</th></tr></thead><tbody>
+<tr class="new"><td><code>Sample51K</code>, <code>Sample61K</code> (20260521-01)</td>
+<td>2c&harr;3a pair collapsed to a <strong>3a monoinfection</strong>; the 2c strain survived only as a de novo contig. Sample51K was
+the snapshot's single major-genotype change and its worst outcome.</td>
+<td>Both reported as <strong>3a/2c co-infections</strong> with <code>typable=YES</code> on the minor and
+<code>Minor_evidence_state=confirmed</code>. No strain is lost. Sample51K's major/minor ordering is still flagged for review.</td></tr>
+<tr class="new"><td><code>2714372</code> (20260326-01)</td>
+<td>Legacy <code>typable=YES</code> 1a minor dropped to a 3a monoinfection.</td>
+<td>Retained as a 3a/1a co-infection, minor <code>typable=YES</code>, de-novo-confirmed.</td></tr>
+<tr class="new"><td><code>2768793</code>, <code>2768814</code>, <code>2768835</code> (20260625-02)</td>
+<td>Major reported as <code>NA/NA</code> because HCV-GLUE is skipped below <code>glue_min_reads=100</code>, losing the genotype
+legacy had reported.</td>
+<td>Mapping subtype reported (3a, 1b, 3a &mdash; matching legacy) with <code>call_confidence=provisional</code> and an explicit
+"identity not corroborated (mapping evidence only)" review sentence.</td></tr>
+</tbody></table>
+<p class="small">The 2026-07-03 dev outputs were overwritten in place by these re-runs, so the "previous snapshot" column is taken from
+the published comparison document rather than from files.</p>
+
+<h3>5.2 New columns in <code>Summary.csv</code></h3>
+<table><thead><tr><th>Column</th><th>What it holds</th><th>Distribution across the 140 samples</th></tr></thead><tbody>
+<tr><td><code>call_confidence</code></td><td>One graded verdict per sample, replacing the reader's need to parse
+<code>review_flag</code> prose.</td><td>high 38 &middot; provisional 78 &middot;
+review 14 &middot; indeterminate 10</td></tr>
+<tr><td><code>Major_evidence_state</code> / <code>Minor_evidence_state</code></td>
+<td>Per-candidate corroboration ladder: <code>confirmed</code> &rarr; <code>probable</code> &rarr; <code>weak</code>.</td>
+<td>major: confirmed 126 &middot; probable 2 &middot; weak 2 &middot; NA 10<br>
+minor: confirmed 11 &middot; probable 2</td></tr>
+<tr><td><code>Major_evidence</code> / <code>Minor_evidence</code></td>
+<td>Human-readable one-line justification: reference, dedup read count, breadth@10&times;, de novo subtype, consensus identity,
+contig length/identity/k-mer coverage, and where the reference came from.</td><td>populated for every candidate slot</td></tr>
+<tr><td><code>rescue_effect</code></td><td>What a de novo rescue actually changed, alongside the existing boolean
+<code>rescue_flag</code>.</td><td><code>none</code> 139 &middot;
+<code>minor_ref_changed</code> 1 (sample <code>2637467</code>, run 20251212-01)</td></tr>
+<tr><td><code>cand_N_rescue_trigger</code></td><td>Which rule fired for a rescue, per candidate slot.</td><td>no rescue triggered in these five runs</td></tr>
+</tbody></table>
+<p class="small">Overall sample calls: monoinfection 118 &middot; co-infection 12 &middot;
+untypable 9 &middot; unset 1. <code>gate_flag</code>:
+ok 125 &middot; major_below_threshold 14.
+Review flags are now <em>per candidate</em> &mdash; each sentence names the candidate slot and reference it applies to
+(e.g. <code>candidate 2 (1b_EU781827): …</code>), which the previous flat sample-level wording did not.</p>
+
+<h3 id="s53">5.3 The off-genotype-contig trigger fires on half the cohort</h3>
+<p>The review sentence <em>"Monoinfection called for candidate N, but de novo assembly found a different-genotype contig (X) —
+possible missed co-infection or contamination. Please review."</em> fires on <strong>72 of 140 samples
+(51%)</strong>, and on every one of them it is the <em>only</em> review sentence emitted. Those
+72 samples are 72 of the 78 samples sitting at
+<code>provisional</code> &mdash; i.e. this single rule accounts for 92%
+of all provisional calls in the cohort.</p>
+<p>It has no contig-length, identity or k-mer-coverage floor, so it fires on assembly noise:</p>
+<div class="kpi">
+ <div class="card"><div class="big warn">606</div><div class="lbl">median triggering contig (bp)</div></div>
+ <div class="card"><div class="big warn">51</div><div class="lbl">of 72 contigs &lt; 1&nbsp;kb</div></div>
+ <div class="card"><div class="big">6</div><div class="lbl">triggering contigs &ge; 2,500&nbsp;bp</div></div>
+ <div class="card"><div class="big">142&ndash;4467</div><div class="lbl">contig length range (bp)</div></div>
+</div>
+<p>Only 28 of the 72 flagged samples had a legacy minor call at all, and
+the triggering subtype is frequently <code>2k1b</code> (n=15) or a
+short 3a fragment (n=20) &mdash; the recombinant reference and the commonest
+run-mate genotype respectively, i.e. exactly the profile expected of low-level index-hopping and mis-assembly rather than
+true co-infection.</p>
+<p>The shortest triggering contig is 142&nbsp;bp &mdash; below even the most lenient floor the pipeline already defines
+(<code>denovo_min_contig_length = 500</code>), so the trigger is applying no floor at all.</p>
+
+<h4>Which floor to gate on</h4>
+<p>Reading each flagged contig's own record from <code>blastparse/*.assembly_support.csv</code> (all 72 resolved) lets the
+existing floors be tested directly:</p>
+<table><thead><tr><th>Floor applied</th><th>flags kept</th><th>flags suppressed</th></tr></thead><tbody>
+<tr><td><code>denovo_min_contig_length</code> &ge; 500 only</td><td>49</td><td>23</td></tr>
+<tr><td><code>denovo_min_blast_identity</code> &ge; 90 only</td><td>56</td><td>16</td></tr>
+<tr class="drop"><td><code>denovo_min_kmer_cov</code> &ge; 2.0 only</td><td>16</td><td>56</td></tr>
+<tr class="drop"><td>all three corroboration floors (500 / 90 / 2.0)</td><td>7</td><td>65</td></tr>
+<tr class="drop"><td>rescue floors (3000 / 85 / aln 3000 / 2.0)</td><td>0</td><td>72</td></tr>
+</tbody></table>
+<div class="note warnbox"><strong>The k-mer-coverage leg is anti-correlated with what this flag should catch, and the rescue floors
+suppress everything.</strong> The three legacy <code>typable=YES</code> minors that v1.3.0 demotes to monoinfection (&sect;4.1) &mdash;
+the cases that most deserve a flag &mdash; all sit <em>below</em> k-mer coverage 2.0: <code>2743986</code> (4,467&nbsp;bp 1b, 91.9%, k-mer 1.42),
+<code>2726018</code> (2,787&nbsp;bp 1a, 93.3%, k-mer 1.97), <code>2714375</code> (2,706&nbsp;bp 1b, 92.6%, k-mer 1.62). The artefacts run the
+other way: <code>2622415</code> (2k1b, k-mer 3,257) and <code>2605642</code> (2k1b, k-mer 2,797) are fragments co-assembled off the
+abundant major. <strong>Contig length is the leg that separates signal from noise here.</strong></div>
+
+<h4>Recommendation</h4>
+<p><strong>(a) Gate the trigger on <code>denovo_min_contig_length</code>, and give it a higher effective value.</strong> That is the right
+parameter &mdash; this trigger makes a corroboration-style claim &mdash; but its 500&nbsp;bp default is tuned for confirming a minor that
+mapping already supports, whereas here the contig is the <em>only</em> evidence. At 500&nbsp;bp the flag still fires on
+49/140 samples. Sweep, with "must-keep" = the three legacy-typable minors above:</p>
+<table><thead><tr><th>Cutoff</th><th>flags kept</th><th>suppressed</th><th>must-keep retained</th></tr></thead><tbody>
+<tr><td>none (current)</td><td>72</td><td>0</td><td>3/3</td></tr>
+<tr><td>500 bp (<code>denovo_min_contig_length</code> default)</td><td>49</td><td>23</td><td>3/3</td></tr>
+<tr><td>1,000 bp</td><td>21</td><td>51</td><td>3/3</td></tr>
+<tr class="new"><td>2,000 bp</td><td>7</td><td>65</td><td>3/3</td></tr>
+<tr class="new"><td>2,500 bp</td><td>6</td><td>66</td><td>3/3</td></tr>
+<tr class="drop"><td>3,000 bp (<code>rescue_min_length</code>)</td><td>2</td><td>70</td><td><strong>1/3</strong></td></tr>
+</tbody></table>
+<p>Either raise the default, or add a dedicated parameter (e.g. <code>review_min_offgenotype_contig_length</code>, defaulting to
+<code>denovo_min_contig_length</code>) so the confirmation floor and the review floor can be tuned independently.</p>
+<p><strong>(b) Exclude the 2k1b recombinant from the "different genotype" test.</strong>
+13 of the 72 flags are a <code>2k1b</code>
+contig against a <code>1b</code> (or <code>2k</code>) major. 2k1b is a 2k/1b recombinant reference &mdash; its 1b portion is not a
+different genotype from a 1b major, so these are a pure taxonomy artefact.</p>
+<p>Combined, a 2,500&nbsp;bp floor plus the 2k1b exclusion takes the flag from <strong>72 samples to
+6</strong>, retaining all three legacy-typable minors. Since no other trigger fires on any of the
+72, the suppressed samples would have an empty <code>review_flag</code> and should rise out of <code>provisional</code>.</p>
+<p class="small">Per-contig length / identity / k-mer figures from <code>blastparse/&lt;sample&gt;-HCV.assembly_support.csv</code>, matched on the
+subtype named in the review flag. Parameter names and defaults read from <code>nextflow.config</code> in the local <code>hcvtyper</code>
+checkout at commit <code>5ff7166</code>, which predates the <code>g28a568d</code> build these runs used &mdash; worth re-checking against
+the build actually deployed. Written up as
+<code>Access_Microbiology/Revision_1/hcvtyper_handoff_summary_defects_2026-08-03.md</code>.</p>
+<h2>6. Data-quality issues in the new <code>Summary.csv</code></h2>
+<table><thead><tr><th>Issue</th><th>Where</th><th>Effect</th></tr></thead><tbody>
+<tr class="drop"><td><code>Major_genotype</code> and <code>Minor_genotype</code> columns missing entirely</td>
+<td>Runs <strong>20251113-02</strong> (134 columns) and <strong>20260625-02</strong> (134 columns); present in the other three (136 columns).
+All five runs report the same pipeline version <code>v1.3.0-g28a568d</code>.</td>
+<td>Any downstream consumer that reads <code>Major_genotype</code> breaks on 2 of 5 runs, or silently reports no genotype.
+Column count is not stable across runs of the same version.</td></tr>
+<tr class="drop"><td><code>Major_genotype</code>/<code>Minor_genotype</code> swapped relative to the subtype columns</td>
+<td><code>Sample51K</code> (20260521-01): <code>Major_genotype=2</code> with <code>Major_subtype=3a</code>;
+<code>Minor_genotype=3</code> with <code>Minor_subtype=2c</code>.</td>
+<td>The one sample in the cohort where role assignment was reversed relative to first-mapping is also the one where these columns
+disagree with <code>Major</code>/<code>Minor</code> &mdash; the genotype fields appear not to be re-ordered when roles are.
+<code>Major</code>/<code>Minor</code> and <code>Major_subtype</code>/<code>Minor_subtype</code> agree on all 140 samples;
+only the genotype columns are wrong.</td></tr>
+</tbody></table>
+<p>Both issues point the same way: <code>Major_genotype</code>/<code>Minor_genotype</code> are legacy columns that the new role model no
+longer maintains. Either derive them from <code>Major_subtype</code>/<code>Minor_subtype</code> at write time, or drop them and
+document <code>Major</code>/<code>Minor</code> as the reported call.</p>
+
+<footer>HCVTyper de novo-informed strain selection &middot; comparison report &middot; generated 2026-08-03.
+Read-only analysis of <code>summary/Summary.csv</code> across five runs (140 samples).
+New = <code>folkehelseinstituttet/hcvtyper v1.3.0-g28a568d</code> (Nextflow 25.04.3), results under
+<code>HCV/2026/HCV_paper_revisjon/</code>, produced 2026-07-08 to 2026-07-16.
+Legacy = <code>v1.1.5-ged4b838</code> (runs 20251113-02, 20251212-01) and <code>v1.1.6-gc1293a7</code>
+(runs 20260326-01, 20260521-01, 20260625-02). GLUE engine <code>1.1.113</code>, HCV project <code>0.1.63</code>,
+PHE resistance extension <code>0.1.33</code> identical across all runs.
+Supersedes <code>hcvtyper_dev_vs_v1.1.x_comparison.html</code> (2026-07-03, 7 runs / 180 samples); runs 20260115-02 and
+20260210-01 were not re-run with this build and are therefore not covered here.</footer>
+</div></body></html>
