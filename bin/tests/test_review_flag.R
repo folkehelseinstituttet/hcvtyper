@@ -180,4 +180,113 @@ if (!grepl("candidate 2", collapsed, fixed = TRUE) || !grepl("candidate 3", coll
   fail(sprintf("collapsed fragment must retain both flagged candidates, got: %s", collapsed))
 ok("ReviewFlag-8: candidate_review_fragment vectorizes via pmap_chr and collapses NA-filtered per sample")
 
+# --- 260803-ogc: offgenotype_contig_reviewable() -------------------------------
+# The gate for the monoinfection different-genotype-contig review sentence. Two
+# legs: the 2k1b recombinant pair exclusion (is_valid_minor rule 2) and the
+# contig-length floor. Empirical basis: hcvtyper_offgenotype_flag_sweep_results_
+# 2026-08-03.md (5 runs / 140 samples; flag fired on 72 with no floor).
+
+ogc <- offgenotype_contig_reviewable
+
+# Genuine off-genotype contigs still fire.
+if (!ogc("1b", "3a")) fail("OGC-1: a 1b contig against a 3a major must remain reviewable")
+if (!ogc("3a", "1a")) fail("OGC-1: a 3a contig against a 1a major must remain reviewable")
+# Same genotype never fires (the within-genotype-1 artefact class stays suppressed:
+# this is why the trigger must NOT delegate wholesale to is_valid_minor(), whose
+# rule 1 admits 1a/1b as a valid co-infection pair).
+if (ogc("1a", "1b")) fail("OGC-1: a 1a contig against a 1b major must NOT fire (rule-1 trap)")
+if (ogc("3a", "3a")) fail("OGC-1: same subtype must not fire")
+ok("OGC-1: genotype-difference test keeps genuine off-genotype contigs and rejects within-genotype pairs")
+
+# 2k1b recombinant pairs are excluded against genotype 1 and 2, in both directions.
+for (mj in c("1a", "1b", "2c", "2k1b")) {
+  if (ogc("2k1b", mj))
+    fail(sprintf("OGC-2: a 2k1b contig against a %s major must be excluded (is_valid_minor rule 2)", mj))
+  if (ogc(mj, "2k1b"))
+    fail(sprintf("OGC-2: a %s contig against a 2k1b major must be excluded (is_valid_minor rule 2)", mj))
+}
+# ...but 2k1b against a genotype OUTSIDE {1,2,2k1b} is a real conflict and survives
+# (observed: 2610361, a 1116 bp 2k1b contig against a 3a major).
+if (!ogc("2k1b", "3a")) fail("OGC-2: a 2k1b contig against a 3a major must still fire")
+if (!ogc("3a", "2k1b")) fail("OGC-2: a 3a contig against a 2k1b major must still fire")
+ok("OGC-2: 2k1b pairs excluded against genotype {1,2,2k1b} only, both directions")
+
+# The genotype_from_subtype()-alone trap: swapping the old substr(x,1,1) comparison
+# for genotype_from_subtype() does NOT suppress 2k1b, because it maps "2k1b" ->
+# "2k1b" and so "2k1b" != "1" still differs. Assert the pair test is what does the
+# work, and that we did not regress to the naive comparison.
+if (as.character(genotype_from_subtype("2k1b")) != "2k1b")
+  fail("OGC-3: genotype_from_subtype('2k1b') must return '2k1b' (2k1b-aware rule)")
+if (genotype_from_subtype("2k1b") == genotype_from_subtype("1b"))
+  fail("OGC-3: precondition — gfs('2k1b') and gfs('1b') must differ, which is why the pair test is required")
+if (ogc("2k1b", "1b"))
+  fail("OGC-3: gfs alone would let 2k1b-vs-1b through; the explicit pair test must suppress it")
+# substr() would NOT have fired on 2k1b-vs-2c ("2" == "2"); gfs does, and the pair
+# test must suppress it so behaviour is unchanged for that case.
+if (ogc("2k1b", "2c"))
+  fail("OGC-3: 2k1b-vs-2c must stay unflagged (substr parity), suppressed by the pair test not by gfs")
+ok("OGC-3: the 2k1b suppression comes from the explicit pair test, not from genotype_from_subtype()")
+
+# Contig-length floor.
+if (!ogc("1b", "3a", contig_length = 1000, min_length = 1000))
+  fail("OGC-4: a contig exactly at the floor must be reviewable (>=, not >)")
+if (ogc("1b", "3a", contig_length = 999, min_length = 1000))
+  fail("OGC-4: a contig below the floor must be suppressed")
+if (!ogc("1b", "3a", contig_length = 142, min_length = 0))
+  fail("OGC-4: min_length = 0 must reproduce the pre-260803-ogc behaviour")
+# The three must-keep samples: the legacy typable=YES minors this build demotes to
+# monoinfection. Any floor that drops one of these is disqualified.
+for (L in c(4467, 2787, 2706)) {
+  if (!ogc("1b", "3a", contig_length = L, min_length = 1000))
+    fail(sprintf("OGC-4: must-keep contig of %d bp must survive the 1000 bp floor", L))
+}
+ok("OGC-4: contig-length floor is inclusive, suppresses sub-floor contigs, retains all three must-keeps")
+
+# NA handling: an unmeasurable length fails OPEN (keeps the flag); an NA subtype
+# never fires.
+if (!ogc("1b", "3a", contig_length = NA_real_, min_length = 1000))
+  fail("OGC-5: NA contig length must fail OPEN and keep the flag")
+if (ogc(NA_character_, "3a", contig_length = 5000, min_length = 1000))
+  fail("OGC-5: NA contig subtype must never fire")
+if (ogc("1b", NA_character_, contig_length = 5000, min_length = 1000))
+  fail("OGC-5: NA major subtype must never fire")
+ok("OGC-5: NA contig length fails open; NA subtypes never fire")
+
+# Vectorised over a frame, returning a bare logical with no NAs (it is used inside
+# a mutate() across the whole sample frame).
+vec <- ogc(
+  contig_subtype = c("1b",  "2k1b", "1b",  NA,    "3a"),
+  major_subtype  = c("3a",  "1b",   "3a",  "3a",  "3a"),
+  contig_length  = c(2706,  9000,   606,   9000,  NA),
+  min_length     = 1000
+)
+if (!is.logical(vec) || anyNA(vec))
+  fail("OGC-6: must return a bare logical vector with no NAs")
+if (!identical(vec, c(TRUE, FALSE, FALSE, FALSE, FALSE)))
+  fail(sprintf("OGC-6: vectorised result wrong, got: %s", paste(vec, collapse = ",")))
+ok("OGC-6: vectorises over a frame and returns a bare NA-free logical")
+
+# End-to-end through sample_review_message(): the caller masks the length leg, so a
+# sub-floor contig arrives as NA and no sentence is emitted; a substantial one fires.
+srm_mono <- function(dv_minor, maj = "3a") sample_review_message(
+  overall_sample_call = "monoinfection",
+  denovo_major_subtype_match = "YES", denovo_minor_subtype_match = NA,
+  gate_flag = "ok", denovo_minor_subtype = dv_minor, denovo_major_subtype = maj,
+  major_subtype = maj, rescue_effect = "none", dominant_unconfirmed = FALSE,
+  dominant_rank = 1L, dominant_ref = paste0(maj, "_ref"), candidate_fragment = NA_character_)
+
+msg_fires <- srm_mono("1b")
+if (is.na(msg_fires) || !grepl("different-genotype contig (1b)", msg_fires, fixed = TRUE))
+  fail(sprintf("OGC-7: a substantial off-genotype contig must still emit the sentence, got: %s", msg_fires))
+# The length leg is applied by the caller, which masks a sub-floor contig to NA.
+if (!is.na(srm_mono(NA_character_)))
+  fail("OGC-7: a length-masked (NA) contig must emit no sentence — the caller's floor is what suppresses")
+# The 2k1b leg is applied INSIDE the helper: 2k1b vs a 1b major is suppressed...
+if (!is.na(srm_mono("2k1b", maj = "1b")))
+  fail("OGC-7: a 2k1b contig against a 1b major must emit no sentence (pair rule)")
+# ...while 2k1b vs a 3a major is a real conflict and still fires (sample 2610361).
+if (is.na(srm_mono("2k1b", maj = "3a")))
+  fail("OGC-7: a 2k1b contig against a 3a major must still emit the sentence")
+ok("OGC-7: sample_review_message() honours the masked slot, the pair rule, and still fires on a real conflict")
+
 cat("ALL PASS\n")
