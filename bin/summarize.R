@@ -647,6 +647,9 @@ if (length(blastparse_files) > 0) {
     major_ref           = col_character(),
     major_contig_length = col_double(),
     minor_ref           = col_character(),
+    # 260803-ogc: the contig NAME behind the minor selection, now emitted by
+    # blast_parse.R from the same row as minor_ref / minor_contig_length.
+    minor_contig        = col_character(),
     minor_contig_length = col_double()
   ))) %>%
     rename(
@@ -654,6 +657,7 @@ if (length(blastparse_files) > 0) {
       denovo_major_ref           = major_ref,
       denovo_major_contig_length = major_contig_length,
       denovo_minor_ref           = minor_ref,
+      denovo_minor_contig        = minor_contig,
       denovo_minor_contig_length = minor_contig_length
     )
 } else {
@@ -668,6 +672,7 @@ if (length(blastparse_files) > 0) {
     denovo_major_ref           = character(),
     denovo_major_contig_length = integer(),
     denovo_minor_ref           = character(),
+    denovo_minor_contig        = character(),
     denovo_minor_contig_length = integer()
   )
 }
@@ -1547,11 +1552,21 @@ final <- final %>%
   left_join(
     contig_by_ref %>% rename(denovo_major_ref = .ref, denovo_major_contig = .contig),
     by = c("sampleName", "denovo_major_ref")
-  ) %>%
-  left_join(
-    contig_by_ref %>% rename(denovo_minor_ref = .ref, denovo_minor_contig = .contig),
-    by = c("sampleName", "denovo_minor_ref")
   )
+# The MINOR-slot re-derivation that used to sit here is GONE (260803-ogc).
+# denovo_minor_contig now arrives from blastparse.csv, read off the same scaf_top row
+# that produced denovo_minor_ref and denovo_minor_contig_length.
+#
+# Re-resolving it here was wrong: contig_by_ref answers "which contig has the best
+# hit TO this reference?" over the FULL hit table, whereas the reference itself was
+# chosen from the restricted set of contigs whose OWN top hit is off-genotype. The two
+# grains disagree whenever an on-genotype contig hits the off-genotype reference
+# harder than the off-genotype contig does — the conserved 5'UTR/core case. Sample
+# 2633901: reference and length described NODE_3, the name described NODE_2.
+#
+# The major slot keeps its re-derivation and is safe by construction: denovo_major_ref
+# is the globally best hit, so its row is necessarily the top-bitscore row for that
+# reference and contig_by_ref cannot return a different contig.
 
 # If the GLUE report is missing, and GLUE columns with NAs
 if (!"GLUE_genotype" %in% colnames(final)) {

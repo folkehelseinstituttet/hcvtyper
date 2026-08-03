@@ -305,15 +305,35 @@ major_contig <- scaf_top %>%
   select(qseqid, sc_length) %>% distinct() %>% # Remove duplicates if several hits against the same reference
   pull(qseqid)
 
-minor_vec  <- scaf_top %>%
+# The minor selection is captured as ONE ROW, and the reference, the contig name and
+# the contig length are all read off that row (260803-ogc). Previously only sseqid was
+# pulled here and the contig name was re-derived downstream in summarize.R from the
+# full BLAST table as "the best-bitscore hit to this reference" — a DIFFERENT grain.
+# scaf_top holds one row per contig (its own top hit), so this filter keeps contigs
+# whose OWN top hit is off-genotype; the downstream re-derivation searched all contigs
+# unrestricted and could therefore return a contig that this filter had excluded.
+#
+# Sample 2633901 is the case in the wild: NODE_3 (1620 bp, top hit 6i_DQ835770,
+# bitscore 97) wins here, but NODE_2 — a 1a contig whose 5'UTR/core region hits the
+# same 6i reference at bitscore 1074 — won the downstream lookup. Summary.csv reported
+# denovo_minor_ref = 6i_DQ835770 and denovo_minor_contig_length = 1620 (both NODE_3)
+# next to denovo_minor_contig = NODE_2_length_3232. Three fields, two contigs, and an
+# analyst sent to the wrong sequence.
+#
+# Structurally this could only ever bite the MINOR slot: major_name is the globally
+# best hit, so its row is necessarily also the top-bitscore row for that reference.
+minor_row  <- scaf_top %>%
   filter(!str_starts(subtype, major_geno)) %>%   # must be different genotype
-  slice_head(n = 1) %>%
-  pull(sseqid)
-minor_name <- if (length(minor_vec) == 0) NA_character_ else minor_vec
+  slice_head(n = 1)
+minor_name   <- if (nrow(minor_row) == 0) NA_character_ else minor_row$sseqid[1]
+minor_contig <- if (nrow(minor_row) == 0) NA_character_ else minor_row$qseqid[1]
+minor_len    <- if (nrow(minor_row) == 0) NA_real_      else minor_row$sc_length[1]
 } else {
   major_name <- NA_character_
   major_contig <- NA_character_
   minor_name <- NA_character_
+  minor_contig <- NA_character_
+  minor_len <- NA_real_
 }
 
 # b) summary CSV
@@ -325,11 +345,18 @@ summary_tbl <- tibble(
                    # If the major contig have multiple blast hits against the same reference, the length will be duplicated
                    select(qseqid, sc_length) %>% distinct() %>% pull(sc_length),
   minor_ref    = minor_name,
-  minor_contig_length = if (is.na(minor_name)) NA_integer_ else
-                   scaf_top %>% filter(sseqid == minor_name) %>%
-                    filter(qseqid != major_contig) %>%
-                    slice_max(sc_length, n = 1) %>%
-                    select(qseqid, sc_length) %>% distinct() %>% pull(sc_length)
+  # Both read straight off minor_row, so minor_ref / minor_contig /
+  # minor_contig_length always describe ONE contig (260803-ogc).
+  #
+  # This REPLACES a lookup that re-queried scaf_top for the longest contig sharing
+  # minor_ref as its top hit, excluding major_contig. Where exactly one contig has
+  # that reference as its top hit — the overwhelming majority — the value is
+  # unchanged. Where several do, the reported length is now the contig that actually
+  # won the selection (highest bitscore) rather than the longest of the group, and
+  # the old form could also yield a zero-length pull when the winner happened to be
+  # major_contig.
+  minor_contig = minor_contig,
+  minor_contig_length = minor_len
 )
 write_csv(summary_tbl, paste0(prefix, ".blastparse.csv"))
 

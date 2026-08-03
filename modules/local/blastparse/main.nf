@@ -57,7 +57,7 @@ process BLASTPARSE {
 
     # Deterministic stub outputs matching declared outputs
     printf "qseqid,sseqid,pident,length,mismatch,gapopen,qstart,qend,sstart,send,evalue,bitscore\n" > ${prefix}.blast_out.csv
-    printf "id,header\n" > ${prefix}.blastparse.csv
+    printf "sample,major_ref,major_contig_length,minor_ref,minor_contig,minor_contig_length\n" > ${prefix}.blastparse.csv
     printf "sample,subtype,best_ref,best_contig_length,best_contig_pident,best_contig_aln_length,best_contig_kmer_cov\n" > ${prefix}.assembly_support.csv
     : > ${prefix}.png
 

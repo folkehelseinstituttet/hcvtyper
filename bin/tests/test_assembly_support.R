@@ -99,10 +99,15 @@ run_blast_parse <- function(case, prefix, hits) {
   } else {
     NULL
   }
+  # 260803-ogc: blastparse.csv is read back too, so the minor-slot coherence
+  # contract (ref / contig / length from ONE row) can be asserted directly.
+  bp_path <- file.path(wd, paste0(prefix, ".blastparse.csv"))
+  blastparse <- if (file.exists(bp_path)) read_csv(bp_path, show_col_types = FALSE) else NULL
   # Also read the raw header line so the empty case can assert the contract even
   # when read_csv yields a zero-row frame.
   header <- if (file.exists(support_path)) readLines(support_path, n = 1) else NA_character_
-  list(exit = exit, support = support, header = header, path = support_path)
+  list(exit = exit, support = support, header = header, path = support_path,
+       blastparse = blastparse)
 }
 
 # Helper to build an outfmt6 hit. qseqid carries NODE_<n>_length_<len>_cov_<cov>
@@ -189,5 +194,65 @@ if (!is.null(r_c$support) && nrow(r_c$support) != 0)
   fail(paste("empty: header-only CSV must have zero data rows, got",
              nrow(r_c$support)))
 ok("empty -> header-only CSV, exit 0, seven-column contract (T-07-01 DoS guard)")
+
+# --- Case D: minor_ref / minor_contig / minor_contig_length name ONE contig ----
+# Regression for the 2633901 defect (260803-ogc). Shape reproduced exactly:
+#   NODE_1  5159 bp, top hit 1a, aln 5160  -> the major (best overall hit)
+#   NODE_2  3232 bp, top hit 1a, aln 3088  -> a 1a contig that ALSO hits the 6i
+#                                             reference at aln 879 (5'UTR/core)
+#   NODE_3  1620 bp, only hit  6i, aln 69  -> the actual off-genotype contig
+# bitscore == aln length in this harness, so NODE_2's 879 bp hit to 6i outscores
+# NODE_3's 69 bp hit to the same reference by an order of magnitude. That is what
+# used to make summarize.R name NODE_2 while the reference and the length described
+# NODE_3.
+r_d <- run_blast_parse("minorcoherence", "MINCOH", hits = list(
+  node(1, 5159, 9828.93, "1a_HQ850279", 93.9, 5160),
+  node(2, 3232, 6285.47, "1a_HQ850279", 93.0, 3088),
+  node(2, 3232, 6285.47, "6i_DQ835770", 88.7,  879),
+  node(3, 1620,    1.02, "6i_DQ835770", 91.3,   69)
+))
+if (r_d$exit != 0) fail(paste("minor-coherence: exit", r_d$exit))
+bp <- r_d$blastparse
+if (is.null(bp)) fail("minor-coherence: blastparse.csv must be written")
+if (!"minor_contig" %in% names(bp))
+  fail(paste("minor-coherence: blastparse.csv must carry minor_contig; got:",
+             paste(names(bp), collapse = ",")))
+if (!identical(bp$minor_ref[1], "6i_DQ835770"))
+  fail(paste("minor-coherence: minor_ref must be the 6i reference, got", bp$minor_ref[1]))
+# The whole point: the NAMED contig must be NODE_3, never NODE_2.
+if (!grepl("^NODE_3_", bp$minor_contig[1]))
+  fail(paste("minor-coherence: minor_contig must be NODE_3 (the off-genotype contig),",
+             "not the 1a contig that outscores it on the same reference; got",
+             bp$minor_contig[1]))
+if (bp$minor_contig_length[1] != 1620)
+  fail(paste("minor-coherence: minor_contig_length must be NODE_3's 1620, got",
+             bp$minor_contig_length[1]))
+# And the three fields must be mutually consistent: the length embedded in the
+# contig name must equal the reported length.
+name_len <- as.numeric(sub(".*_length_([0-9]+)_.*", "\\1", bp$minor_contig[1]))
+if (!identical(name_len, as.numeric(bp$minor_contig_length[1])))
+  fail(sprintf("minor-coherence: contig name says %s bp but minor_contig_length says %s",
+               name_len, bp$minor_contig_length[1]))
+ok("minor-coherence: minor_ref / minor_contig / minor_contig_length all describe ONE contig (2633901 regression)")
+
+# --- Case E: several contigs share the minor reference as their top hit --------
+# The changed length semantics, pinned. Two genotype-2 contigs both top-hit the same
+# 2b reference: NODE_5 is LONGER (3000 bp) but aligns over only 100 bp; NODE_6 is
+# shorter (1000 bp) but aligns over 900 and therefore wins the selection. The
+# reported contig and length must be the SELECTED one, not the longest of the group —
+# otherwise the pair goes back out of sync.
+r_e <- run_blast_parse("minorgroup", "MINGRP", hits = list(
+  node(4, 9000, 500.0, "1a_HQ850279", 99.0, 8900),
+  node(5, 3000,   2.0, "2b_ACC",      90.0,  100),
+  node(6, 1000,  30.0, "2b_ACC",      96.0,  900)
+))
+if (r_e$exit != 0) fail(paste("minor-group: exit", r_e$exit))
+bpe <- r_e$blastparse
+if (!grepl("^NODE_6_", bpe$minor_contig[1]))
+  fail(paste("minor-group: minor_contig must be the selected NODE_6, got", bpe$minor_contig[1]))
+if (bpe$minor_contig_length[1] != 1000)
+  fail(paste("minor-group: minor_contig_length must be NODE_6's 1000 (the selected",
+             "contig), not NODE_5's 3000 (the longest); got", bpe$minor_contig_length[1]))
+ok("minor-group: with several contigs on the minor reference, the SELECTED contig is reported, not the longest")
 
 cat("\nALL PASS\n")
