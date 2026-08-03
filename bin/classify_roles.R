@@ -973,8 +973,15 @@ offgenotype_contig_reviewable <- function(contig_subtype, major_subtype,
   different_genotype & !pair_2k1b & long_enough
 }
 
-# offgenotype_contig_note(): the measured-evidence clause for the different-genotype
-# contig review sentence (quick task 260803-ogc, option C).
+# contig_evidence_note(): the measured-evidence clause for a review sentence that
+# makes a claim about a de novo contig (quick task 260803-ogc, option C).
+#
+# Used by BOTH monoinfection contig triggers, via `context`:
+#   "offgenotype"    — "de novo found a different-genotype contig (X)"
+#   "major_conflict" — "Major subtype conflict — mapping (X) vs contig (Y)"
+# The metrics render identically; only the interpretation clause differs, because a
+# poorly-aligned contig means something different in each case (a phantom second
+# strain vs a phantom disagreement).
 #
 # The sentence used to name a subtype and nothing else — "de novo assembly found a
 # different-genotype contig (6i)" — and then ask a human to review it. None of the
@@ -1004,8 +1011,8 @@ offgenotype_contig_reviewable <- function(contig_subtype, major_subtype,
 # Returns NA_character_ when no metric is known, so the caller falls back to the
 # original wording. Scalar (called via pmap_chr), mirroring build_evidence() and
 # candidate_review_fragment().
-offgenotype_contig_note <- function(contig_length, aln_length, pident, kmer_cov,
-                                    min_aln_frac = 0.5) {
+contig_evidence_note <- function(contig_length, aln_length, pident, kmer_cov,
+                                 context = "offgenotype", min_aln_frac = 0.5) {
   one <- function(x) if (length(x) == 0) NA else x[[1]]
   len <- suppressWarnings(as.numeric(one(contig_length)))
   aln <- suppressWarnings(as.numeric(one(aln_length)))
@@ -1022,10 +1029,20 @@ offgenotype_contig_note <- function(contig_length, aln_length, pident, kmer_cov,
   if (!is.na(km))  toks <- c(toks, paste0("k-mer cov ", formatC(km, format = "f", digits = 1)))
   if (length(toks) == 0) return(NA_character_)
 
-  interp <- if (!is.na(frac) && frac < min_aln_frac) {
+  weak    <- !is.na(frac) && frac < min_aln_frac
+  is_conf <- identical(context, "major_conflict")
+  interp <- if (weak && is_conf) {
+    # A short anchor cannot support a subtype call, so it cannot support a
+    # DISAGREEMENT with one either. Say that, rather than implying a real conflict.
+    paste0("only ", round(100 * frac), "% of the contig aligns to any reference in the panel, so the ",
+           "contig subtype is weakly supported and the conflict may be an artefact of a short anchor ",
+           "rather than a real discrepancy")
+  } else if (weak) {
     paste0("only ", round(100 * frac), "% of the contig aligns to any reference in the panel, so the ",
            "subtype assignment is weakly supported — the contig may be largely non-HCV, chimeric, ",
            "or too divergent to type")
+  } else if (is_conf) {
+    "possible reference mismatch or highly divergent strain"
   } else {
     "possible missed co-infection or contamination"
   }
@@ -1058,7 +1075,13 @@ sample_review_message <- function(overall_sample_call,
                                   # Trailing arg WITH a default so every existing positional and
                                   # named caller keeps working unchanged; NA falls back to the
                                   # original wording.
-                                  offgeno_note = NA_character_) {
+                                  offgeno_note = NA_character_,
+                                  # 260803-ogc follow-up 1: the same clause for the
+                                  # MAJOR subtype-conflict sentence, describing the
+                                  # contig behind denovo_major_subtype. Trailing arg
+                                  # with a default for the same back-compatibility
+                                  # reason as offgeno_note.
+                                  majconf_note = NA_character_) {
   one <- function(x) if (length(x) == 0) NA else x[[1]]
   sc        <- one(overall_sample_call)
   maj_match <- one(denovo_major_subtype_match)
@@ -1071,6 +1094,7 @@ sample_review_message <- function(overall_sample_call,
   dom_unconf <- one(dominant_unconfirmed)
   cf        <- one(candidate_fragment)
   ogn       <- one(offgeno_note)
+  mcn       <- one(majconf_note)
   tok <- function(x) if (length(x) == 0 || is.na(x)) "unknown" else as.character(x)
 
   msgs <- character(0)
@@ -1088,8 +1112,17 @@ sample_review_message <- function(overall_sample_call,
   if (is_coinf && subtype_dis)
     msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
   # Monoinfection major subtype conflict: name the candidate + the actual subtype values (D-02 pattern 2).
+  # 260803-ogc follow-up 1: carry the conflicting contig's measured evidence. This
+  # trigger sets call_confidence = "review" on its own, so it is the HARDEST signal
+  # the sample-level builder emits — and until now it named two subtypes and no
+  # numbers. The metrics it needs are not in Major_best_contig_*, which describes the
+  # CANDIDATE's genotype group; the contig that caused the disagreement belongs to
+  # denovo_major_subtype, a different group entirely.
   if (is_mono && !is.na(maj_match) && maj_match == "NO")
-    msgs <- c(msgs, paste0(
+    msgs <- c(msgs, if (!is.na(mcn) && nzchar(mcn)) paste0(
+      "Major subtype conflict for ", dom_label, " — mapping (", tok(maj_sub),
+      ") vs contig (", tok(dv_major), ") ", mcn, " Please review."
+    ) else paste0(
       "Major subtype conflict for ", dom_label, " — mapping (", tok(maj_sub),
       ") vs contig (", tok(dv_major), "). Possible reference mismatch or highly divergent strain. Please review."))
   # Monoinfection different-genotype contig: names the contig subtype value.

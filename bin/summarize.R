@@ -1894,26 +1894,45 @@ final <- final %>%
 # a coherent same-row pair. The two length definitions were identical on 68 of 72
 # flagged samples (max difference 176 bp), which is immaterial in a human-readable
 # sentence but would matter if the gate were switched to this column.
-offgeno_support <- support_df %>%
+# Built ONCE and joined twice — once at the off-genotype (minor) subtype's grain for
+# the different-genotype-contig sentence, once at denovo_major_subtype's grain for the
+# major subtype-conflict sentence (follow-up 1). The major trigger sets
+# call_confidence = "review" by itself, so it is the hardest signal here, and it was
+# equally numberless: Major_best_contig_* describes the CANDIDATE's genotype group,
+# whereas the contig that caused the disagreement sits in denovo_major_subtype's group.
+subtype_support <- support_df %>%
   group_by(sampleName, subtype) %>%
   slice_max(best_contig_length, n = 1, with_ties = FALSE) %>%
   ungroup() %>%
-  transmute(
-    sampleName,
-    denovo_minor_subtype  = subtype,
-    offgeno_contig_length = best_contig_length,
-    offgeno_contig_aln    = best_contig_aln_length,
-    offgeno_contig_pident = best_contig_pident,
-    offgeno_contig_kmer   = best_contig_kmer_cov
-  )
+  select(sampleName, subtype,
+         .len = best_contig_length, .aln = best_contig_aln_length,
+         .pid = best_contig_pident,  .kmer = best_contig_kmer_cov)
 
 final <- final %>%
-  left_join(offgeno_support, by = c("sampleName", "denovo_minor_subtype"),
-            na_matches = "never") %>%
-  mutate(offgeno_note = pmap_chr(
-    list(offgeno_contig_length, offgeno_contig_aln, offgeno_contig_pident, offgeno_contig_kmer),
-    offgenotype_contig_note
-  ))
+  left_join(
+    subtype_support %>%
+      rename(denovo_minor_subtype = subtype, offgeno_contig_length = .len,
+             offgeno_contig_aln = .aln, offgeno_contig_pident = .pid,
+             offgeno_contig_kmer = .kmer),
+    by = c("sampleName", "denovo_minor_subtype"), na_matches = "never"
+  ) %>%
+  left_join(
+    subtype_support %>%
+      rename(denovo_major_subtype = subtype, majconf_contig_length = .len,
+             majconf_contig_aln = .aln, majconf_contig_pident = .pid,
+             majconf_contig_kmer = .kmer),
+    by = c("sampleName", "denovo_major_subtype"), na_matches = "never"
+  ) %>%
+  mutate(
+    offgeno_note = pmap_chr(
+      list(offgeno_contig_length, offgeno_contig_aln, offgeno_contig_pident, offgeno_contig_kmer),
+      contig_evidence_note, context = "offgenotype"
+    ),
+    majconf_note = pmap_chr(
+      list(majconf_contig_length, majconf_contig_aln, majconf_contig_pident, majconf_contig_kmer),
+      contig_evidence_note, context = "major_conflict"
+    )
+  )
 
 final <- final %>%
   mutate(review_flag = pmap_chr(
@@ -1930,7 +1949,8 @@ final <- final %>%
       dominant_cand_rank,
       dominant_cand_ref,
       candidate_flag_fragment,
-      offgeno_note
+      offgeno_note,
+      majconf_note
     ),
     sample_review_message
   )) %>%
@@ -1994,9 +2014,11 @@ final <- final %>%
          # two transients beside them — not part of the emitted schema. The metrics
          # themselves remain available per sample in blastparse/*.assembly_support.csv,
          # and are now surfaced in prose inside review_flag.
-         -denovo_minor_subtype_reviewable, -offgeno_note,
-         -offgeno_contig_length, -offgeno_contig_aln,
-         -offgeno_contig_pident, -offgeno_contig_kmer)
+         -denovo_minor_subtype_reviewable,
+         -offgeno_note, -offgeno_contig_length, -offgeno_contig_aln,
+         -offgeno_contig_pident, -offgeno_contig_kmer,
+         -majconf_note, -majconf_contig_length, -majconf_contig_aln,
+         -majconf_contig_pident, -majconf_contig_kmer)
 
 # Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
 # Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no

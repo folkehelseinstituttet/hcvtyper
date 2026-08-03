@@ -289,10 +289,10 @@ if (is.na(srm_mono("2k1b", maj = "3a")))
   fail("OGC-7: a 2k1b contig against a 3a major must still emit the sentence")
 ok("OGC-7: sample_review_message() honours the masked slot, the pair rule, and still fires on a real conflict")
 
-# --- 260803-ogc option C: offgenotype_contig_note() ----------------------------
+# --- 260803-ogc option C: contig_evidence_note() -------------------------------
 # The measured-evidence clause. Real numbers from run 20251212-01 / 20260521-01.
 
-ocn <- offgenotype_contig_note
+ocn <- contig_evidence_note
 
 # 2633901: 1620 bp contig, 69 bp aligned (4%). Independently confirmed against nt —
 # the contig's only HCV-like region is a ~212 bp tail closest to 1a, the same
@@ -365,5 +365,78 @@ msg_legacy <- sample_review_message(
 if (!identical(msg_legacy, msg_bare))
   fail("OGC-11: omitting offgeno_note must be identical to passing NA (backward compatibility)")
 ok("OGC-11: the clause reaches review_flag, the bare wording is preserved, and the arg is back-compatible")
+
+# --- 260803-ogc follow-up 1: the MAJOR subtype-conflict sentence ---------------
+# Same helper, context = "major_conflict". This trigger sets call_confidence =
+# "review" on its own, so it is the hardest sample-level signal, and it named two
+# subtypes and no numbers. Note the metrics cannot come from Major_best_contig_*:
+# those describe the CANDIDATE's genotype group, whereas the contig that caused the
+# disagreement belongs to denovo_major_subtype's group.
+
+# A short-anchor conflict must be described as possibly artefactual, NOT as a
+# reference mismatch — a 69 bp anchor cannot support a subtype call, so it cannot
+# support a disagreement with one either.
+mc_weak <- contig_evidence_note(1816, 120, 89.0, 1.3, context = "major_conflict")
+if (!grepl("120 bp aligned (7%)", mc_weak, fixed = TRUE))
+  fail(sprintf("OGC-12: major-conflict note must carry the aligned fraction, got: %s", mc_weak))
+if (!grepl("artefact of a short anchor", mc_weak, fixed = TRUE))
+  fail(sprintf("OGC-12: a short-anchor conflict must be flagged as possibly artefactual, got: %s", mc_weak))
+if (grepl("largely non-HCV", mc_weak, fixed = TRUE))
+  fail(sprintf("OGC-12: major-conflict context must not reuse the off-genotype wording, got: %s", mc_weak))
+
+# A full-length conflict keeps the original interpretation.
+mc_real <- contig_evidence_note(4000, 3950, 92.0, 8.0, context = "major_conflict")
+if (!grepl("possible reference mismatch or highly divergent strain", mc_real, fixed = TRUE))
+  fail(sprintf("OGC-12: a full-length conflict must keep the reference-mismatch wording, got: %s", mc_real))
+if (grepl("artefact", mc_real, fixed = TRUE))
+  fail(sprintf("OGC-12: a full-length conflict must not be called artefactual, got: %s", mc_real))
+
+# The two contexts must not bleed into each other.
+og_weak <- contig_evidence_note(1816, 120, 89.0, 1.3, context = "offgenotype")
+if (grepl("artefact of a short anchor", og_weak, fixed = TRUE))
+  fail(sprintf("OGC-12: off-genotype context must not use the major-conflict wording, got: %s", og_weak))
+if (!grepl("largely non-HCV", og_weak, fixed = TRUE))
+  fail(sprintf("OGC-12: off-genotype context must keep its own wording, got: %s", og_weak))
+ok("OGC-12: contig_evidence_note honours both contexts and does not cross-contaminate their wording")
+
+# End-to-end through sample_review_message(): the conflict sentence carries the
+# clause, falls back verbatim without it, and stays back-compatible when omitted.
+srm_conf <- function(note, omit = FALSE) {
+  a <- list(overall_sample_call = "monoinfection",
+            denovo_major_subtype_match = "NO", denovo_minor_subtype_match = NA,
+            gate_flag = "ok", denovo_minor_subtype = NA, denovo_major_subtype = "1a",
+            major_subtype = "3a", rescue_effect = "none", dominant_unconfirmed = FALSE,
+            dominant_rank = 1L, dominant_ref = "3a_D17763",
+            candidate_fragment = NA_character_)
+  if (!omit) a$majconf_note <- note
+  do.call(sample_review_message, a)
+}
+mc_msg <- srm_conf(mc_weak)
+if (!grepl("Major subtype conflict for candidate 1 (3a_D17763)", mc_msg, fixed = TRUE) ||
+    !grepl("mapping (3a) vs contig (1a)", mc_msg, fixed = TRUE) ||
+    !grepl("120 bp aligned (7%)", mc_msg, fixed = TRUE) ||
+    !grepl("Please review.", mc_msg, fixed = TRUE))
+  fail(sprintf("OGC-13: the annotated conflict sentence must keep its identity tokens and carry the metrics, got: %s", mc_msg))
+mc_bare <- srm_conf(NA_character_)
+if (!grepl("vs contig (1a). Possible reference mismatch or highly divergent strain. Please review.",
+           mc_bare, fixed = TRUE))
+  fail(sprintf("OGC-13: without metrics the original wording must be preserved verbatim, got: %s", mc_bare))
+if (!identical(srm_conf(NULL, omit = TRUE), mc_bare))
+  fail("OGC-13: omitting majconf_note must equal passing NA (backward compatibility)")
+# Both contig sentences can fire on one sample and must each get their own clause.
+both <- sample_review_message(
+  overall_sample_call = "monoinfection",
+  denovo_major_subtype_match = "NO", denovo_minor_subtype_match = NA,
+  gate_flag = "ok", denovo_minor_subtype = "6i", denovo_major_subtype = "1a",
+  major_subtype = "3a", rescue_effect = "none", dominant_unconfirmed = FALSE,
+  dominant_rank = 1L, dominant_ref = "3a_D17763", candidate_fragment = NA_character_,
+  offgeno_note = note_junk, majconf_note = mc_weak)
+if (!grepl("Major subtype conflict", both, fixed = TRUE) ||
+    !grepl("different-genotype contig (6i)", both, fixed = TRUE))
+  fail(sprintf("OGC-13: both contig sentences must survive the merge, got: %s", both))
+if (!grepl("69 bp aligned (4%)", both, fixed = TRUE) ||
+    !grepl("120 bp aligned (7%)", both, fixed = TRUE))
+  fail(sprintf("OGC-13: each sentence must carry ITS OWN contig's metrics, not the other's, got: %s", both))
+ok("OGC-13: the conflict sentence is annotated, falls back verbatim, and both contig sentences keep their own metrics")
 
 cat("ALL PASS\n")
