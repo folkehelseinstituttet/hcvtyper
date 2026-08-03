@@ -70,6 +70,40 @@ in a prompt to review. The triggers:
 9. **Major strain failed mapping quality thresholds.**
 10. **De-novo rescue overrode the Major reference** — the primary call was reassigned automatically; confirm against `rescue_audit.csv` before reporting.
 
+### Every sentence names its candidate and its numbers
+
+A review sentence is only useful if it can be adjudicated without re-running anything. Each one
+therefore names **which** candidate it refers to (rank/slot, reference, or subtype) and carries the
+**measured value** next to the floor or expectation it missed — for example *"candidate 2 contig matched
+2c but mapping says 3a"*, or *"identity 89.0 below 90 floor"*.
+
+The two contig-based triggers (2 and 3) go further and render all four measured metrics of the
+conflicting contig, with an interpretation clause that switches on the **aligned fraction**:
+
+> …different-genotype contig (6i) — 1620 bp contig, 69 bp aligned (4%), 91.3% identity, k-mer cov 1.0;
+> only 4% of the contig aligns to any reference in the panel, so the subtype assignment is weakly
+> supported — the contig may be largely non-HCV, chimeric, or too divergent to type.
+
+A contig that aligns over its full length keeps the straightforward co-infection wording; genuine minors
+align over 99–100% of their contigs. Nothing is suppressed by this — the analyst decides, with the
+numbers present. For the major-conflict context the interpretation is deliberately different: a 69 bp
+anchor cannot support a subtype call, so it cannot support a *disagreement* with one either. The honest
+reading is that the conflict may be phantom, not that the contig is junk.
+
+### Trigger 3 has a substantiality floor
+
+The "different-genotype contig under a monoinfection" sentence is gated on two conditions:
+
+- the contig must reach `--review_min_offgenotype_contig_length` (default **1000 bp**), and
+- the pair must not be a 2k/1b recombinant against a genotype 1 or 2 major.
+
+Without the length floor this trigger fired on 51% of a 140-sample cohort — median triggering contig
+606 bp, shortest 142 bp — and accounted for 92% of all `provisional` calls. A flag that fires on half a
+cohort is a flag reviewers learn to ignore. The floor is deliberately **separate from and higher than**
+`--denovo_min_contig_length`: that floor confirms a minor that mapping already supports, whereas here
+the contig is the *only* evidence. Length is the only leg used — genuine low-yield minors sit *below*
+`--denovo_min_kmer_cov`, so a k-mer leg would suppress exactly the samples most worth reviewing.
+
 ---
 
 ## Per-candidate roles and `role_reason` (analyst glossary)
@@ -140,3 +174,30 @@ published:
 
 A `high`-confidence call needs none of this; the point of the confidence axis is to tell
 you which samples do.
+
+> **`denovo_minor_ref`, `denovo_minor_contig` and `denovo_minor_contig_length` describe one
+> contig.** They previously did not: the reference was selected from the per-contig table
+> (restricted to contigs whose *own* top hit is off-genotype) while the contig name was
+> re-derived from the full hit table, so a conserved 5′UTR/core region on an unrelated contig
+> could win on bitscore and send an analyst to the wrong sequence. If you are working from
+> results produced before this fix, verify the contig name against the length before trusting it.
+
+---
+
+## Tuning the thresholds
+
+Every floor referenced above is a pipeline parameter, documented with its default and rationale
+in the [README](../README.md#optional-parameters):
+
+| What you want to change | Parameters |
+|---|---|
+| How many candidate references are selected and mapped | `--n_candidates` |
+| The abundance floor a candidate must clear | `--minRead`, `--minCov` |
+| When a contig counts as corroborating evidence | `--denovo_min_contig_length`, `--denovo_min_kmer_cov`, `--denovo_min_blast_identity`, `--denovo_match_level` |
+| When a contig may reassign a candidate's reference | the `--rescue_*` family |
+| What dominance means (reads vs. evenness) | the `--score_weight_*` family |
+| How noisy the off-genotype-contig review flag is | `--review_min_offgenotype_contig_length` |
+
+Raising a floor makes the pipeline quieter and riskier; lowering it makes it noisier and safer.
+The defaults are calibrated on a 140-sample routine cohort and are the recommended starting
+point — with an expert reviewing the output, losing a real co-infection is the worse error.
