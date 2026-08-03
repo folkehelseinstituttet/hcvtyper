@@ -905,6 +905,74 @@ candidate_review_fragment <- function(role, role_reason, evidence_state, concord
   paste0(label, ": ", reason, suffix)
 }
 
+# offgenotype_contig_reviewable(): gate for the monoinfection "de novo assembly
+# found a different-genotype contig" review trigger (quick task 260803-ogc).
+#
+# The trigger used to fire on ANY off-genotype contig with no substantiality floor
+# whatsoever: 72 of 140 samples (51%) across the five v1.3.0-g28a568d routine runs,
+# median triggering contig 606 bp, shortest 142 bp — below even
+# denovo_min_contig_length (500). It was the ONLY sentence on all 72, so it alone
+# accounted for 92% of the cohort's `provisional` calls: the one signal meant to mark
+# a possibly missed co-infection was firing mostly on assembly noise.
+#
+# Two independent gates, both settled empirically in
+# hcvtyper_offgenotype_flag_sweep_results_2026-08-03.md:
+#
+#   (1) CONTIG LENGTH >= min_length. Length is the ONLY usable leg. The three
+#       legacy-typable minors this build demotes to monoinfection — the cases that
+#       most deserve the flag — measure 4467/2787/2706 bp but sit at k-mer coverage
+#       1.42/1.97/1.62, i.e. BELOW denovo_min_kmer_cov (2.0). A k-mer leg would
+#       suppress exactly the samples worth reviewing, and the artefacts run the other
+#       way (2k1b fragments co-assembled off an abundant major reach k-mer 2797-3257).
+#       Applied by the CALLER (summarize.R), which owns the param and the length
+#       column; passing min_length here keeps the helper self-contained for tests.
+#
+#   (2) NOT a 2k/1b recombinant pair. 2k1b is a 2k/1b recombinant reference: its 1b
+#       portion is not a different genotype from a 1b major, so a 2k1b contig against
+#       a genotype-1 or -2 major is a taxonomy artefact rather than a co-infection.
+#       This is the SAME policy is_valid_minor() rule 2 (above) already applies to
+#       candidate promotion — the review trigger simply never consulted it. 14 of the
+#       72 flags are this class.
+#
+# WHY NOT genotype_from_subtype() ALONE: it maps "2k1b" -> "2k1b" (the 2k1b-aware
+# rule), so "2k1b" != "1" and a 2k1b-vs-1b pair STILL differs. Swapping the old
+# substr(x, 1, 1) comparison for genotype_from_subtype() removes zero flags, and for
+# a 2k1b contig against a 2c major it ADDS one that substr never fired ("2" == "2").
+# The explicit pair test below is what does the work. Using genotype_from_subtype()
+# for the difference test is still correct — combined with the pair test it is
+# behaviourally identical to substr for every 2k1b case — and it retires the
+# hand-rolled idiom the codebase replaced everywhere else.
+#
+# WHY NOT is_valid_minor() WHOLESALE: rule 1 returns TRUE for 1a/1b pairs, so
+# delegating the whole test to it would newly fire this trigger on the
+# within-genotype-1 cross-mapping artefacts (29 samples) that the role model already
+# discards correctly.
+#
+# NA contig_length fails OPEN (keeps the flag): an unmeasurable contig is not
+# evidence of insubstantiality, and silently dropping a possible co-infection is the
+# worse error. A batch with no de novo leg never reaches here — contig_subtype is NA
+# and the difference test below is FALSE.
+#
+# Vectorised (called from a mutate over the whole sample frame). Returns a bare
+# logical with no NAs.
+offgenotype_contig_reviewable <- function(contig_subtype, major_subtype,
+                                          contig_length = NA_real_,
+                                          min_length = 0) {
+  cg <- genotype_from_subtype(contig_subtype)
+  mg <- genotype_from_subtype(major_subtype)
+
+  different_genotype <- !is.na(cg) & !is.na(mg) & cg != mg
+
+  # is_valid_minor() rule 2, restated over genotypes only.
+  pair_2k1b <- (cg == "2k1b" & mg %in% c("1", "2", "2k1b")) |
+               (mg == "2k1b" & cg %in% c("1", "2", "2k1b"))
+  pair_2k1b <- !is.na(pair_2k1b) & pair_2k1b
+
+  long_enough <- is.na(contig_length) | contig_length >= min_length
+
+  different_genotype & !pair_2k1b & long_enough
+}
+
 # sample_review_message(): the rewritten sample-level review_flag builder (EVID-06).
 # Keeps the D-10 triggers (is_indet, gate_flag != "ok", is_indet_dom) GENERIC with no
 # candidate name; enriches the subtype-conflict / different-genotype-contig triggers
@@ -959,8 +1027,13 @@ sample_review_message <- function(overall_sample_call,
       "Major subtype conflict for ", dom_label, " — mapping (", tok(maj_sub),
       ") vs contig (", tok(dv_major), "). Possible reference mismatch or highly divergent strain. Please review."))
   # Monoinfection different-genotype contig: names the contig subtype value.
+  # 260803-ogc: the genotype-difference + 2k1b policy now lives in the pure
+  # offgenotype_contig_reviewable() helper above (replacing a hand-rolled
+  # substr(x, 1, 1)). The CONTIG-LENGTH leg is applied by the caller, which masks
+  # dv_minor to NA when the contig is below review_min_offgenotype_contig_length —
+  # so a sub-floor contig short-circuits on the is.na() guard here.
   if (is_mono && !is.na(dv_minor) && !is.na(maj_sub) &&
-      substr(dv_minor, 1, 1) != substr(maj_sub, 1, 1))
+      offgenotype_contig_reviewable(dv_minor, maj_sub))
     msgs <- c(msgs, paste0(
       "Monoinfection called for ", dom_label, ", but de novo assembly found a different-genotype contig (",
       dv_minor, ") — possible missed co-infection or contamination. Please review."))

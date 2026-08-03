@@ -67,6 +67,12 @@ score_weight_kmercov  <- if (length(args) >= 14 && nchar(args[14]) > 0) as.numer
 # Evenness-transform constant (factor = 1/(1 + k*CV)); plumbed end-to-end so a
 # caller supplying a raw CV instead of a precomputed factor stays configurable.
 score_evenness_k      <- if (length(args) >= 15 && nchar(args[15]) > 0) as.numeric(args[15]) else 1.0
+# Contig-length floor for the monoinfection different-genotype-contig REVIEW sentence
+# (260803-ogc). APPENDED at args[16] — strictly after score_evenness_k — for the same
+# positional reason as the block above (T-08-04): inserting mid-string silently
+# re-maps every later index. Default mirrors nextflow.config.
+review_min_offgenotype_contig_length <-
+  if (length(args) >= 16 && nchar(args[16]) > 0) as.numeric(args[16]) else 1000
 
 script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
@@ -1798,6 +1804,25 @@ final <- final %>%
 # candidate_review_fragment) with " | ". It returns NA_character_ when nothing fires so a clean
 # sample stays NA (the MultiQC cond_formatting_rules colours any non-NA review_flag orange).
 # Args are threaded POSITIONALLY to match sample_review_message()'s signature.
+
+# 260803-ogc: the CONTIG-LENGTH leg of the different-genotype-contig review trigger.
+# Masked into a TRANSIENT column rather than applied to denovo_minor_subtype itself:
+# that column is emitted in Summary.csv, feeds Minor_evidence via build_evidence()
+# below, and already produced denovo_minor_subtype_match upstream — overwriting it
+# would corrupt three reported values to change one sentence. The genotype-difference
+# and 2k1b legs live in offgenotype_contig_reviewable() (classify_roles.R) and run
+# inside sample_review_message(); only the length leg needs the param and the length
+# column, both of which are in scope here. denovo_minor_contig_length is joined into
+# `final` at the df_denovo left_join above, so no new read or join is introduced.
+final <- final %>%
+  mutate(
+    denovo_minor_subtype_reviewable = if_else(
+      coalesce(denovo_minor_contig_length, Inf) >= review_min_offgenotype_contig_length,
+      denovo_minor_subtype,
+      NA_character_
+    )
+  )
+
 final <- final %>%
   mutate(review_flag = pmap_chr(
     list(
@@ -1805,7 +1830,7 @@ final <- final %>%
       denovo_major_subtype_match,
       denovo_minor_subtype_match,
       gate_flag,
-      denovo_minor_subtype,
+      denovo_minor_subtype_reviewable,
       denovo_major_subtype,
       Major_subtype,
       rescue_effect,
@@ -1869,7 +1894,11 @@ final <- final %>%
   # per-candidate fragment) and dominant_cand_ref (dominant reference name) — both merged
   # into review_flag by sample_review_message() above and not part of the emitted schema.
   select(-any_refuted_denovo, -any_discordant_identity, -any_probable_only, -dominant_unconfirmed,
-         -candidate_flag_fragment, -dominant_cand_ref)
+         -candidate_flag_fragment, -dominant_cand_ref,
+         # 260803-ogc transient: the length-masked copy of denovo_minor_subtype consumed
+         # by sample_review_message() above. Dropped here for the same CR-02 reason as
+         # the two transients beside it — not part of the emitted schema.
+         -denovo_minor_subtype_reviewable)
 
 # Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
 # Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no
