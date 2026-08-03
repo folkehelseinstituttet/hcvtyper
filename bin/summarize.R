@@ -1454,6 +1454,38 @@ final <- final %>%
     Minor_subtype = coalesce(Minor_role_subtype, Minor_subtype)
   )
 
+# Major_genotype / Minor_genotype — re-derived from the role-corrected subtypes
+# immediately above (260803-ogc; comparison report §6). Two defects are fixed here:
+#
+#   (1) MISSING COLUMNS. They were only ever created by the gt_check block, which is
+#       itself guarded on `nrow(glue_report) > 0`. A batch where HCV-GLUE could not be
+#       run never got the columns at all — observed as 134 vs 136 columns across five
+#       runs of the SAME pipeline version, so a downstream consumer reading
+#       Major_genotype breaks on some runs and silently reports nothing on others.
+#       mutate() creates them unconditionally, so the emitted schema is now stable.
+#
+#   (2) STALE ORDERING. They came from glue_report / glue_report_minor, which map to
+#       cand1 / cand2 by file-system SLOT. Major_subtype / Minor_subtype get corrected
+#       to the role-based assignment just above; the genotype columns never did. On the
+#       one cohort sample whose roles are reversed relative to first-mapping (Sample51K)
+#       they disagreed with the subtype columns: Major_genotype=2 alongside
+#       Major_subtype=3a. Deriving them from the corrected subtypes keeps the two in
+#       lockstep by construction.
+#
+# genotype_from_subtype() (not substr) so the 2k1b recombinant keeps its full name as
+# its genotype, matching every other genotype derivation in the pipeline.
+#
+# ORDERING IS LOAD-BEARING: this must stay AFTER the coalesce above and AFTER the
+# gt_check join that feeds minor_typable. gt_check's identical_geno / identical_subgeno
+# are computed from the RAW GLUE slot values inside gt_check itself and are consumed by
+# the minor_typable case_when earlier — re-deriving there would change typability,
+# which IS a call. Here it changes only two reported columns.
+final <- final %>%
+  mutate(
+    Major_genotype = genotype_from_subtype(Major_subtype),
+    Minor_genotype = genotype_from_subtype(Minor_subtype)
+  )
+
 # De novo confirmation of the reported minor — RETIRED (D-15). The legacy
 # apply_denovo_layer() / minor_denovo_status / coinfection_flag chokepoint has been
 # REPLACED by the Phase-8 N-candidate role classifier (score_candidates() +
