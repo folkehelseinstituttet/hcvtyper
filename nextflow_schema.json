@@ -118,9 +118,6 @@
         "spades_hmm": {
             "type": "string"
         },
-        "skip_assembly": {
-            "type": "boolean"
-        },
         "skip_hcvglue": {
             "type": "boolean"
         },
@@ -243,6 +240,21 @@
             "type": "integer",
             "default": 5000,
             "description": "Stricter contig-length floor (bp) applied when both the mapped candidate and the de novo top-hit subtypes are in {1a, 1b}, where the 1a/1b boundary is hard to call from short contigs (Phase 10, D-04)."
+        },
+        "rescue_kmer_cov_ratio": {
+            "type": "number",
+            "default": 10,
+            "description": "Block a de novo rescue when the candidate's own-subtype contig k-mer coverage exceeds the rescue target's by at least this factor. Guards against a low-coverage cross-mapping-noise contig replacing a well-assembled candidate. Set to 0 to disable."
+        },
+        "rescue_dominant_protect_cov": {
+            "type": "number",
+            "default": 90,
+            "description": "A first-mapping candidate at or above this genome coverage whose own subtype IS assembled (BLAST identity and k-mer floors met) is treated as self-confirming and is never replaced by a de novo rescue. Leave blank to disable."
+        },
+        "review_min_offgenotype_contig_length": {
+            "type": "integer",
+            "default": 1000,
+            "description": "Minimum de novo contig length (bp) for the monoinfection 'de novo assembly found a different-genotype contig' review sentence to fire. Deliberately separate from, and higher than, denovo_min_contig_length: that floor confirms a minor that mapping already supports, whereas here the contig is the ONLY evidence. Validated on 140 samples — with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case."
         },
         "n_candidates": {
             "type": "integer",
