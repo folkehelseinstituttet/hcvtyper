@@ -13,9 +13,19 @@
 #
 #   allowed_cols  Comma-separated columns permitted to differ. Defaults to the
 #                 260803-ogc expectation:
-#                   review_flag,call_confidence,Major_genotype,Minor_genotype
+#                   review_flag,call_confidence,Major_genotype,Minor_genotype,
+#                   denovo_minor_contig,denovo_minor_contig_length
 #                 Pass "review_flag,call_confidence" to check the flag change
 #                 alone (i.e. with the Major_genotype fix reverted or excluded).
+#
+#                 The last two are in the default set because the minor-contig
+#                 coherence fix intentionally moves them: denovo_minor_contig now
+#                 names the contig the selection chose, and denovo_minor_contig_length
+#                 reports THAT contig rather than the longest one sharing the
+#                 reference. They differ only where several contigs top-hit the same
+#                 reference, so a large diff on either is worth investigating rather
+#                 than accepting — and since the length column gates the review flag,
+#                 re-check the flagged sample count when it moves.
 #
 # Exit status: 0 when every difference is confined to the allowed columns and
 # the sample set is unchanged; 1 otherwise. Column ADDITIONS are reported and
@@ -39,7 +49,8 @@ new_path <- args[2]
 allowed <- if (length(args) >= 3 && nzchar(args[3])) {
   trimws(str_split(args[3], ",")[[1]])
 } else {
-  c("review_flag", "call_confidence", "Major_genotype", "Minor_genotype")
+  c("review_flag", "call_confidence", "Major_genotype", "Minor_genotype",
+    "denovo_minor_contig", "denovo_minor_contig_length")
 }
 
 for (p in c(old_path, new_path)) if (!file.exists(p)) {
