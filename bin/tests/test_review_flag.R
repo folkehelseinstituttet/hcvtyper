@@ -289,4 +289,81 @@ if (is.na(srm_mono("2k1b", maj = "3a")))
   fail("OGC-7: a 2k1b contig against a 3a major must still emit the sentence")
 ok("OGC-7: sample_review_message() honours the masked slot, the pair rule, and still fires on a real conflict")
 
+# --- 260803-ogc option C: offgenotype_contig_note() ----------------------------
+# The measured-evidence clause. Real numbers from run 20251212-01 / 20260521-01.
+
+ocn <- offgenotype_contig_note
+
+# 2633901: 1620 bp contig, 69 bp aligned (4%). Independently confirmed against nt —
+# the contig's only HCV-like region is a ~212 bp tail closest to 1a, the same
+# genotype as the major, so there is no second strain and the 6i label is an
+# artefact of a short anchor.
+note_junk <- ocn(contig_length = 1620, aln_length = 69, pident = 91.30, kmer_cov = 1.02)
+for (tok in c("1620 bp contig", "69 bp aligned", "(4%)", "91.3% identity", "k-mer cov 1.0")) {
+  if (!grepl(tok, note_junk, fixed = TRUE))
+    fail(sprintf("OGC-8: note must carry '%s', got: %s", tok, note_junk))
+}
+if (!grepl("weakly supported", note_junk, fixed = TRUE))
+  fail(sprintf("OGC-8: a 4%%-aligned contig must be described as weakly supported, got: %s", note_junk))
+if (grepl("possible missed co-infection", note_junk, fixed = TRUE))
+  fail(sprintf("OGC-8: a 4%%-aligned contig must NOT assert a possible co-infection, got: %s", note_junk))
+ok("OGC-8: a poorly-aligned contig carries all four metrics and is described as weakly supported")
+
+# 2743986: 4467 bp contig, 4448 bp aligned (100%) — a genuine co-infection signal.
+note_real <- ocn(contig_length = 4467, aln_length = 4448, pident = 91.93, kmer_cov = 1.42)
+if (!grepl("(100%)", note_real, fixed = TRUE))
+  fail(sprintf("OGC-9: a fully-aligned contig must report 100%%, got: %s", note_real))
+if (!grepl("possible missed co-infection or contamination", note_real, fixed = TRUE))
+  fail(sprintf("OGC-9: a fully-aligned contig must keep the co-infection wording, got: %s", note_real))
+if (grepl("weakly supported", note_real, fixed = TRUE))
+  fail(sprintf("OGC-9: a fully-aligned contig must NOT be called weakly supported, got: %s", note_real))
+# All three must-keeps align >=99% and must all read as genuine.
+for (m in list(c(4467, 4448), c(2787, 2762), c(2706, 2705))) {
+  n <- ocn(contig_length = m[1], aln_length = m[2], pident = 92, kmer_cov = 1.5)
+  if (grepl("weakly supported", n, fixed = TRUE))
+    fail(sprintf("OGC-9: must-keep contig %d/%d must not be called weakly supported", m[2], m[1]))
+}
+ok("OGC-9: fully-aligned contigs keep the co-infection wording; all three must-keeps read as genuine")
+
+# Partial metrics degrade gracefully; nothing known yields NA so the caller falls back.
+if (!is.na(ocn(1620, NA, NA, NA)) && !grepl("1620 bp contig", ocn(1620, NA, NA, NA), fixed = TRUE))
+  fail("OGC-10: a note with only a contig length must still render that length")
+if (grepl("aligned", ocn(1620, NA, NA, NA), fixed = TRUE))
+  fail("OGC-10: an unknown alignment length must not be rendered")
+if (!is.na(ocn(NA, NA, NA, NA)))
+  fail("OGC-10: with no metrics at all the note must be NA so the caller falls back")
+# A zero-length contig must not divide by zero.
+if (grepl("%)", ocn(0, 0, 90, 1), fixed = TRUE))
+  fail("OGC-10: a zero-length contig must not render a fraction")
+ok("OGC-10: partial metrics degrade gracefully, no metrics yields NA, no divide-by-zero")
+
+# End-to-end: the clause reaches review_flag, and the fallback wording is preserved
+# when the metrics are unavailable.
+srm_note <- function(note) sample_review_message(
+  overall_sample_call = "monoinfection",
+  denovo_major_subtype_match = "YES", denovo_minor_subtype_match = NA,
+  gate_flag = "ok", denovo_minor_subtype = "6i", denovo_major_subtype = "1a",
+  major_subtype = "1a", rescue_effect = "none", dominant_unconfirmed = FALSE,
+  dominant_rank = 1L, dominant_ref = "1a_AF009606", candidate_fragment = NA_character_,
+  offgeno_note = note)
+
+msg_annotated <- srm_note(note_junk)
+if (!grepl("different-genotype contig (6i)", msg_annotated, fixed = TRUE) ||
+    !grepl("69 bp aligned (4%)", msg_annotated, fixed = TRUE) ||
+    !grepl("Please review.", msg_annotated, fixed = TRUE))
+  fail(sprintf("OGC-11: the annotated sentence must name the subtype, carry the metrics and end with the call to action, got: %s", msg_annotated))
+msg_bare <- srm_note(NA_character_)
+if (!grepl("— possible missed co-infection or contamination. Please review.", msg_bare, fixed = TRUE))
+  fail(sprintf("OGC-11: with no metrics the original wording must be preserved verbatim, got: %s", msg_bare))
+# Default argument: an OLD-STYLE call omitting offgeno_note entirely must still work.
+msg_legacy <- sample_review_message(
+  overall_sample_call = "monoinfection",
+  denovo_major_subtype_match = "YES", denovo_minor_subtype_match = NA,
+  gate_flag = "ok", denovo_minor_subtype = "6i", denovo_major_subtype = "1a",
+  major_subtype = "1a", rescue_effect = "none", dominant_unconfirmed = FALSE,
+  dominant_rank = 1L, dominant_ref = "1a_AF009606", candidate_fragment = NA_character_)
+if (!identical(msg_legacy, msg_bare))
+  fail("OGC-11: omitting offgeno_note must be identical to passing NA (backward compatibility)")
+ok("OGC-11: the clause reaches review_flag, the bare wording is preserved, and the arg is back-compatible")
+
 cat("ALL PASS\n")

@@ -973,6 +973,65 @@ offgenotype_contig_reviewable <- function(contig_subtype, major_subtype,
   different_genotype & !pair_2k1b & long_enough
 }
 
+# offgenotype_contig_note(): the measured-evidence clause for the different-genotype
+# contig review sentence (quick task 260803-ogc, option C).
+#
+# The sentence used to name a subtype and nothing else — "de novo assembly found a
+# different-genotype contig (6i)" — and then ask a human to review it. None of the
+# four numbers needed to judge that claim were anywhere the analyst would look: the
+# aligned length lives ONLY in blastparse/<sample>.assembly_support.csv, because the
+# candidate-grain join never reaches a subtype that is not itself a candidate.
+#
+# Worked example (2633901, run 20251212-01, major 1a). A 1,620 bp contig was reported
+# as a genotype-6i off-genotype contig. Its BLAST alignment is 69 bp — 4% of the
+# contig. Confirmed independently against nt: the contig's only HCV-like region is a
+# ~212 bp tail (13% of it), closest to 1a — the SAME genotype as the major. So the
+# contig is ~87% non-HCV, the "6i" label is an artefact of a short anchor, and there
+# is no second strain. A reader given "6i" alone cannot possibly reach that
+# conclusion; a reader given "69 bp aligned (4%)" reaches it immediately.
+#
+# Why the aligned FRACTION is the discriminator, not the contig length: this contig
+# is 1,620 bp, comfortably over any length floor. Length says the contig is real;
+# the aligned fraction says how much of it is actually HCV. The three genuine minors
+# this build demotes align over 99-100% of their contigs (2705/2706, 2762/2787,
+# 4448/4467) against 4% here — a ~25x separation, so the min_aln_frac cut point is
+# not sensitive.
+#
+# min_aln_frac only changes the WORDING, never whether the sentence fires. Kept as a
+# plain default rather than a plumbed param: it is presentational, and the sweep
+# output (aln_frac_pct) should inform any tuning before it earns an arg position.
+#
+# Returns NA_character_ when no metric is known, so the caller falls back to the
+# original wording. Scalar (called via pmap_chr), mirroring build_evidence() and
+# candidate_review_fragment().
+offgenotype_contig_note <- function(contig_length, aln_length, pident, kmer_cov,
+                                    min_aln_frac = 0.5) {
+  one <- function(x) if (length(x) == 0) NA else x[[1]]
+  len <- suppressWarnings(as.numeric(one(contig_length)))
+  aln <- suppressWarnings(as.numeric(one(aln_length)))
+  pid <- suppressWarnings(as.numeric(one(pident)))
+  km  <- suppressWarnings(as.numeric(one(kmer_cov)))
+
+  frac <- if (!is.na(len) && !is.na(aln) && len > 0) aln / len else NA_real_
+
+  toks <- character(0)
+  if (!is.na(len)) toks <- c(toks, paste0(round(len), " bp contig"))
+  if (!is.na(aln)) toks <- c(toks, paste0(round(aln), " bp aligned",
+                                          if (!is.na(frac)) paste0(" (", round(100 * frac), "%)") else ""))
+  if (!is.na(pid)) toks <- c(toks, paste0(formatC(pid, format = "f", digits = 1), "% identity"))
+  if (!is.na(km))  toks <- c(toks, paste0("k-mer cov ", formatC(km, format = "f", digits = 1)))
+  if (length(toks) == 0) return(NA_character_)
+
+  interp <- if (!is.na(frac) && frac < min_aln_frac) {
+    paste0("only ", round(100 * frac), "% of the contig aligns to any reference in the panel, so the ",
+           "subtype assignment is weakly supported — the contig may be largely non-HCV, chimeric, ",
+           "or too divergent to type")
+  } else {
+    "possible missed co-infection or contamination"
+  }
+  paste0("— ", paste(toks, collapse = ", "), "; ", interp, ".")
+}
+
 # sample_review_message(): the rewritten sample-level review_flag builder (EVID-06).
 # Keeps the D-10 triggers (is_indet, gate_flag != "ok", is_indet_dom) GENERIC with no
 # candidate name; enriches the subtype-conflict / different-genotype-contig triggers
@@ -993,7 +1052,13 @@ sample_review_message <- function(overall_sample_call,
                                   dominant_unconfirmed,
                                   dominant_rank = NA_integer_,
                                   dominant_ref = NA_character_,
-                                  candidate_fragment = NA_character_) {
+                                  candidate_fragment = NA_character_,
+                                  # 260803-ogc option C: pre-built measured-evidence clause for the
+                                  # different-genotype-contig sentence (offgenotype_contig_note()).
+                                  # Trailing arg WITH a default so every existing positional and
+                                  # named caller keeps working unchanged; NA falls back to the
+                                  # original wording.
+                                  offgeno_note = NA_character_) {
   one <- function(x) if (length(x) == 0) NA else x[[1]]
   sc        <- one(overall_sample_call)
   maj_match <- one(denovo_major_subtype_match)
@@ -1005,6 +1070,7 @@ sample_review_message <- function(overall_sample_call,
   maj_sub   <- one(major_subtype)
   dom_unconf <- one(dominant_unconfirmed)
   cf        <- one(candidate_fragment)
+  ogn       <- one(offgeno_note)
   tok <- function(x) if (length(x) == 0 || is.na(x)) "unknown" else as.character(x)
 
   msgs <- character(0)
@@ -1036,7 +1102,10 @@ sample_review_message <- function(overall_sample_call,
       offgenotype_contig_reviewable(dv_minor, maj_sub))
     msgs <- c(msgs, paste0(
       "Monoinfection called for ", dom_label, ", but de novo assembly found a different-genotype contig (",
-      dv_minor, ") — possible missed co-infection or contamination. Please review."))
+      dv_minor, ") ",
+      # Measured evidence when the metrics resolved; the original bare wording otherwise.
+      if (!is.na(ogn) && nzchar(ogn)) ogn else "— possible missed co-infection or contamination.",
+      " Please review."))
   # D-11: name the dominant candidate for a provisional (uncorroborated) call.
   if (isTRUE(dom_unconf) && is_mono)
     msgs <- c(msgs, paste0("Genotype call for ", dom_label,

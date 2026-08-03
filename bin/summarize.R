@@ -1855,6 +1855,51 @@ final <- final %>%
     )
   )
 
+# 260803-ogc option C: the MEASURED EVIDENCE behind that sentence. Until now it named
+# a subtype and nothing else, then asked a human to review it — while the aligned
+# length, identity and k-mer coverage of the very contig it was talking about existed
+# ONLY in blastparse/<sample>.assembly_support.csv. They never reached Summary.csv,
+# because join_assembly_support() attaches support at CANDIDATE grain and the
+# off-genotype contig is by definition not a candidate. So the flag that asks for a
+# judgement withheld every number needed to make it.
+#
+# The fix is one join of the SAME support frame at the off-genotype subtype's grain.
+# support_df is already read and typed above (line ~772) and is untouched since, so
+# no new file read is introduced.
+#
+# na_matches = "never": denovo_minor_subtype is NA on most samples, and dplyr's
+# default would happily match those against any NA subtype on the support side.
+# slice_max(with_ties = FALSE) is a defensive many-to-many guard in the JMAP-03 /
+# T-dpj-02 idiom — blast_parse.R emits one row per (sample, subtype) today, and this
+# keeps a future duplicate from multiplying rows in `final`.
+#
+# NOTE the deliberate asymmetry: the length GATE above uses denovo_minor_contig_length
+# (from blastparse.csv, per-reference, the validated sweep column), while the DISPLAYED
+# metrics come from this per-subtype assembly_support row so that all four numbers are
+# a coherent same-row pair. The two length definitions were identical on 68 of 72
+# flagged samples (max difference 176 bp), which is immaterial in a human-readable
+# sentence but would matter if the gate were switched to this column.
+offgeno_support <- support_df %>%
+  group_by(sampleName, subtype) %>%
+  slice_max(best_contig_length, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(
+    sampleName,
+    denovo_minor_subtype  = subtype,
+    offgeno_contig_length = best_contig_length,
+    offgeno_contig_aln    = best_contig_aln_length,
+    offgeno_contig_pident = best_contig_pident,
+    offgeno_contig_kmer   = best_contig_kmer_cov
+  )
+
+final <- final %>%
+  left_join(offgeno_support, by = c("sampleName", "denovo_minor_subtype"),
+            na_matches = "never") %>%
+  mutate(offgeno_note = pmap_chr(
+    list(offgeno_contig_length, offgeno_contig_aln, offgeno_contig_pident, offgeno_contig_kmer),
+    offgenotype_contig_note
+  ))
+
 final <- final %>%
   mutate(review_flag = pmap_chr(
     list(
@@ -1869,7 +1914,8 @@ final <- final %>%
       dominant_unconfirmed,
       dominant_cand_rank,
       dominant_cand_ref,
-      candidate_flag_fragment
+      candidate_flag_fragment,
+      offgeno_note
     ),
     sample_review_message
   )) %>%
@@ -1927,10 +1973,15 @@ final <- final %>%
   # into review_flag by sample_review_message() above and not part of the emitted schema.
   select(-any_refuted_denovo, -any_discordant_identity, -any_probable_only, -dominant_unconfirmed,
          -candidate_flag_fragment, -dominant_cand_ref,
-         # 260803-ogc transient: the length-masked copy of denovo_minor_subtype consumed
-         # by sample_review_message() above. Dropped here for the same CR-02 reason as
-         # the two transients beside it — not part of the emitted schema.
-         -denovo_minor_subtype_reviewable)
+         # 260803-ogc transients: the length-masked copy of denovo_minor_subtype and the
+         # off-genotype contig metrics + their rendered clause, all consumed by
+         # sample_review_message() above. Dropped here for the same CR-02 reason as the
+         # two transients beside them — not part of the emitted schema. The metrics
+         # themselves remain available per sample in blastparse/*.assembly_support.csv,
+         # and are now surfaced in prose inside review_flag.
+         -denovo_minor_subtype_reviewable, -offgeno_note,
+         -offgeno_contig_length, -offgeno_contig_aln,
+         -offgeno_contig_pident, -offgeno_contig_kmer)
 
 # Shorthand aliases surfaced near the front of Summary.csv for at-a-glance reading.
 # Pure verbatim copies of the existing, buried Major_subtype / Minor_subtype — no
