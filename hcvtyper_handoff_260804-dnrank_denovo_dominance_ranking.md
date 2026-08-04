@@ -7,15 +7,17 @@ default cited here (`denovo_min_contig_length = 500`, `denovo_min_kmer_cov = 2.0
 `denovo_min_blast_identity = 90`, `review_min_offgenotype_contig_length = 1000`) unchanged.
 **Cohort:** the 93 samples in `HCV/2026/HCV_paper_revisjon/HCVTyper_SRA_data`, of two kinds:
 
-- **86 `ERR…` samples — public SRA run accessions from Thomson *et al.* (2016)**, the real-world
-  benchmark used in the manuscript. These are patient plasma samples (single-genotype and co-infected),
-  plus the in vitro RNA transcript (IVT) mixtures of H77 (1a, AF009606) and JFH-1 (2a, AB047639) at known
-  ratios from 5000:1 to 1:5000. Every `ERR…` accession named in this document is public and can be
-  re-downloaded from SRA/ENA.
+- **86 `ERR…` samples — public SRA run accessions from Thomson *et al.* (2016)**, our real-world
+  benchmark. These are patient plasma samples (single-genotype and co-infected), plus the in vitro RNA
+  transcript (IVT) mixtures of H77 (1a, AF009606) and JFH-1 (2a, AB047639) at known ratios from 5000:1 to
+  1:5000. Every `ERR…` accession named in this document is public and can be re-downloaded from SRA/ENA.
 - **7 simulated datasets** — `sim1`, `sim2`, `sim3`, `sim11asingle`, `sim11bsingle`, `sim22asingle`,
   `sim23asingle` — generated in-house with known genotype composition and mixing ratios. Note the
-  filesystem names are the manuscript names with underscores stripped: `sim11asingle` = `sim1_1a_single`,
-  `sim22asingle` = `sim2_2a_single`, and so on.
+  filesystem names carry no underscores: `sim11asingle` is the `sim1` 1a single-infection control,
+  `sim22asingle` the `sim2` 2a single-infection control, and so on.
+
+Both sets are available to the development team, and every claim below is reproducible from them
+(see §7).
 
 **Analysis was read-only.** Nothing was written to `/mnt/N`.
 
@@ -78,7 +80,7 @@ Ranking the minor by k-mer makes short, high-coverage fragments win, and they th
 
 | sample | minor contig before | minor contig after | consequence |
 |---|---|---|---|
-| `ERR1810503` | 1,475 bp @ 11.0× | **637 bp @ 16.0×** | flag lost — cited in the manuscript |
+| `ERR1810503` | 1,475 bp @ 11.0× | **637 bp @ 16.0×** | flag lost — a genuine genotype-3 detection at 11× |
 | `ERR1810521` | 1,395 bp @ 16.7× | **845 bp @ 18.4×** | flag lost — the 1:500 IVT true minority |
 | `ERR1810491` | 2,132 bp @ 1.17× | 653 bp @ 1.34× | flag lost |
 | `ERR1810467` | 1,849 bp @ 1.53× | 540 bp @ 2.56× | flag lost |
@@ -172,8 +174,7 @@ counts (507,708:231,132), coverage (99.99:99.98) and dominance ordering were all
 only the spurious escalation is gone.
 
 `sim22asingle` / `sim23asingle` are **deliberately unaffected**. Their `provisional` comes from a separate
-issue (a spurious `background`/`weak` second candidate lowering the tier), written up as item 8b of
-`hcvtyper_backlog_from_paper_replay_2026-08-04.md`.
+issue — a spurious `background`/`weak` second candidate lowering the tier — described in §9.2.
 
 ---
 
@@ -282,26 +283,99 @@ statement that nothing else moved.
    `ERR1810469` and `ERR1810510` are both `co-infection (indeterminate dominance)` via D2 and must keep
    `review`. Both are unchanged by this patch — worth locking in.
 3. **Off-genotype flag count.** Assert all 7 survive; this is what the rejected approach in §2 broke.
-4. **The IVT dilution series as a sensitivity fixture** (backlog item 1) would have caught the §2 approach
+4. **The IVT dilution series as a sensitivity fixture.** This would have caught the §2 approach
    immediately, since `ERR1810521` is the 1:500 minority. These are Thomson *et al.* SRA accessions, so
    the fixture inputs are public and re-downloadable rather than dependent on `/mnt/N` — the nine mixtures
    are `ERR1810511`/`513`/`515`/`517`/`519`/`521`/`523`/`525`/`527`.
 
+   The series is worth building out properly: nine 1a/2a mixtures spanning 1:1 to 1:5000 in both
+   directions, where the minority strain is known by construction. De novo recovers it at **every**
+   dilution — 2a at 2,578 bp/326× (5:1), 3,075 bp/232× (50:1), 349 bp/1.4× (500:1), 920 bp/1.7× (5000:1);
+   1a at 4,585 bp/373× (1:5), 1,563 bp/111× (1:50), 1,395 bp/16.7× (1:500), 505 bp/0.94× (1:5000). Nothing
+   in `bin/tests/` currently asserts *sensitivity* — that the pipeline still detects what it should — only
+   that output has not changed. This is the one dataset that can support such a test.
+
 ---
 
-## 9. Related, not fixed here
+## 9. Related defects found in the same replay, not fixed here
 
-From `hcvtyper_backlog_from_paper_replay_2026-08-04.md`:
+These surfaced while diagnosing the above and are recorded here so they are not re-derived from scratch.
+§9.1 is the most serious — a genuine regression in shipped code.
 
-- **item 6** — coverage/depth silently `NA` on 15 of 93 samples whenever a sample has two candidates but
-  one depth file. A genuine regression; the values are fully recoverable from the published depth files.
-- **item 8b** — spurious `background`/`weak` candidates dragging `call_confidence` to `provisional` even
-  though the pipeline correctly rejected them. This is what makes `sim22asingle` / `sim23asingle`
-  `provisional`.
-- **item 5** — `ERR1810505`'s `denovo_*` columns were `NA` under `28a568d` and populate at HEAD, which is
-  what exposed this defect there in the first place.
+### 9.1 REGRESSION — coverage and depth silently blank when a sample has two candidates but one depth file
 
-One further observation, not raised as a defect. `blast_parse.R`'s `major_contig_length` is derived as
+On **15 of the 93 samples**, `Major_cov_breadth_min_1/5/10` and `Major_avg_depth` come out `NA` even
+though the `cand1` depth file exists and its reference matches `Major_reference` exactly.
+
+The trigger condition is exact:
+
+| candidates | depth files | outcome |
+|---|---|---|
+| 1 | 1 | works (`sim11asingle`, `sim3`, …) |
+| 2 | 2 | works (`sim1`, `sim2`, `ERR1810447`, …) |
+| 2 | 1 | **all Major coverage/depth columns NA** |
+
+Affected: `ERR1810454`, `ERR1810473`, `ERR1810477`, `ERR1810480`, `ERR1810481`, `ERR1810500`,
+`ERR1810501`, `ERR1810506`, `ERR1810512`, `ERR1810514`, `ERR1810516`, `ERR1810518`, `ERR1810524`,
+`sim22asingle`, `sim23asingle`.
+
+**The `candidate_rank` join is NOT the cause — that dead end is already ruled out.** It is the obvious
+suspect and it is innocent: replaying the join (`depth/` filenames → `candidate_rank_lookup`,
+`summarize.R:577-580`) recovers `candidate_rank = 1` correctly for every affected sample, with **0 NA
+ranks across all 91 depth rows**. The fault is downstream, in `df_coverage` (`summarize.R:603-625`) or a
+later join — note `df_coverage` collapses with `fill(.direction = "downup") %>% slice(1)`, which has
+nothing to fill from when a sample contributes only one row.
+
+**The pileups are intact; only the summary fails to carry them through.** Recomputing breadth and mean
+depth directly from `samtools/<sample>.<ref>.cand1.nodup.tsv` reproduces the expected values exactly:
+
+| sample | expected cov@10× | recomputed | expected depth | recomputed |
+|---|---|---|---|---|
+| `ERR1810454` | 89.00 | 89.00 | 16 | 16.1 |
+| `ERR1810473` | 0.78 | 0.78 | 3 | 2.8 |
+| `ERR1810477` | 98.42 | 98.42 | 55 | 55.3 |
+| `ERR1810480` | 57.32 | 57.32 | 11 | 10.6 |
+| `ERR1810481` | 85.58 | 85.58 | 19 | 18.7 |
+| `ERR1810501` | 98.9 | 98.91 | — | 188.2 |
+| `sim22asingle` | 100.0 | 99.99 | — | 20,762 |
+| `sim23asingle` | 100.0 | 99.99 | — | 21,045 |
+
+Worth a regression test asserting that a sample with a `cand1` depth file always gets a non-NA
+`Major_cov_breadth_min_10`.
+
+### 9.2 Spurious second candidates, and a correctly-rejected candidate lowering confidence
+
+All three simulated single-infection datasets carry a cross-mapping second candidate that first mapping
+correctly gated out (`minor_call = no`):
+
+| sample | spurious candidate | first-map reads | first-map cov | retained as rank 2? | confidence |
+|---|---|---|---|---|---|
+| `sim11asingle` | `1i_KJ439772` | 11,664 | **17%** | **no** | `high` |
+| `sim22asingle` | `1m_KJ439778` | 8,260 | 6% | **yes** | `provisional` |
+| `sim23asingle` | `1n_KJ439775` | 9,688 | 6% | **yes** | `provisional` |
+
+The candidate with the *highest* coverage is the one dropped, and the two at 6% are kept — whatever
+governs retention is not monotone in the evidence. This retention is also what creates the
+two-candidates-one-depth-file condition in §9.1, so the NA coverage on those two samples is downstream of
+the same inconsistency.
+
+Once retained, the candidates are handled **correctly** — `background` / `no_own_assembly` / `weak`, no
+co-infection called. The issue is that a correctly-demoted background candidate drags `call_confidence`
+to `provisional`, which asserts the *call* is less certain when the pipeline has in fact just done its
+job. On a simulated single-genotype dataset with 692k reads at 100% coverage and an exact reference
+match, `provisional` is the wrong tier. Suggest keeping the traceability note but not letting a demoted
+`weak`/`background` candidate lower the tier.
+
+### 9.3 `ERR1810505`'s `denovo_*` columns populate at HEAD where they were `NA` before
+
+Under `28a568d` every `denovo_*` column on `ERR1810505` was `NA`; at HEAD they populate. That is a gain —
+but it is what exposed the §1 defect on that sample, and it means the previous build was silently
+suppressing a review flag rather than not raising one. Worth confirming the change was deliberate and
+adding a fixture.
+
+### 9.4 `major_contig_length` can describe a different contig than `major_ref`
+
+`blast_parse.R`'s `major_contig_length` is derived as
 `scaf %>% filter(sseqid == major_name) %>% slice_max(sc_length)`, which searches the **full** BLAST table
 rather than the top-hit-per-contig frame. On `sim1` that returns 9,339 bp — the length of the **1b**
 contig, which carries a secondary 78.7%-identity hit against `1a_HQ850279` — while `denovo_major_ref` is
