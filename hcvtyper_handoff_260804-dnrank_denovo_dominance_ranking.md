@@ -25,6 +25,10 @@ Both sets are available to the development team, and every claim below is reprod
 > FASTQ, on all 7 simulated datasets plus 3 Thomson accessions. Every claim testable there reproduced —
 > most to the exact digit. §9.1's root cause was additionally pinned down and is **not** where this
 > document guessed; §9.1 has been corrected accordingly. Full record in §10.
+>
+> **The §3 patch has since been applied, measured and shipped as `2f254a3`** — two columns move on one
+> sample, all 25 call-bearing columns byte-identical, and the D2 control still fires (§10.5). §9.1 is
+> diagnosed but **not** yet fixed.
 
 ---
 
@@ -497,6 +501,42 @@ contradicted; it simply could not be reached.**
 - **§9.3**, which needs a `28a568d` build of `ERR1810505`.
 - **Every §9.1-affected `ERR…`** — though the mechanism now established in §9.1 predicts them all.
 
-**The patch's "after" state is untested.** This run establishes the *before* state only; `bin/` was not
-modified. The §3 hunks and the §4/§5 "after" columns remain predictions. Re-running `summarize.R`
-standalone against the run's SUMMARIZE work directory is the cheap way to close this.
+### 10.5 The patch's "after" state — measured, and it holds
+
+The §3 hunks were applied and `summarize.R` re-run standalone against the run's SUMMARIZE work directory.
+**Fidelity was established first**, as §7 insists: the *unpatched* replay reproduced the pipeline's
+`Summary.csv` and `candidates.csv` byte-for-byte, so the delta below is the patch and not the harness.
+
+(That check earned its keep. The first replay attempt mis-staged — `trimmed/` and `variation/` were
+missing — and silently `NA`-ed four read-count columns. Without the fidelity gate that would have read as
+a patch effect.)
+
+**Exactly two columns move, on exactly one sample:**
+
+| sample | column | before | after |
+|---|---|---|---|
+| `sim2` | `call_confidence` | `review` | **`high`** |
+| `sim2` | `review_flag` | the dominance sentence | **empty** |
+
+- **All 25 call-bearing columns byte-identical** across all 10 samples — 0 differences, confirming §5's
+  "nothing call-bearing moves" on the sample subset available here.
+- **`ERR1810469` holds `review`**, flag unchanged, still raised by D2 — §8 test 2's control, and the
+  evidence that the removal is not over-applied: the abundance-based dominance check still fires once the
+  bitscore-based one is gone.
+- `ERR1810451` keeps its off-genotype flag; `ERR1810447` holds `provisional`.
+- `sim22asingle` / `sim23asingle` stay `provisional` on the background-candidate note, per §4.
+
+Confidence distribution `high 4 / provisional 3 / review 3` → `high 5 / provisional 3 / review 2` — the
+same shape as §5's cohort prediction: `review` down, `high` up, `provisional` untouched, nothing gained.
+
+**Variant B's rationale holds.** `sim2` lands at `high` with an empty flag, consistent with the documented
+invariant. Variant A would have left it `provisional` with nothing for the analyst to act on.
+
+Shipped as `2f254a3`, which also drops the locals the removal left dead in `classify_roles.R` (`is_coinf`,
+`subtype_dis`, `min_match` — the `denovo_minor_subtype_match` *parameter* is kept, since it is the 3rd
+positional arg and dropping it would silently shift every positional caller). That cleanup was re-run and
+is byte-neutral.
+
+**Still open:** §5's full 93-sample tables, §2's five lost flags, `ERR1810505`, the IVT series and §9.3
+remain unverified for want of the other 76 accessions (§10.4), and the §9.1 join fix is diagnosed but
+not implemented.
