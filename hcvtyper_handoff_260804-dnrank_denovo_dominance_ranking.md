@@ -21,6 +21,11 @@ Both sets are available to the development team, and every claim below is reprod
 
 **Analysis was read-only.** Nothing was written to `/mnt/N`.
 
+> **Independently verified 2026-08-05** by a fresh end-to-end Nextflow run on a second machine, from raw
+> FASTQ, on all 7 simulated datasets plus 3 Thomson accessions. Every claim testable there reproduced —
+> most to the exact digit. §9.1's root cause was additionally pinned down and is **not** where this
+> document guessed; §9.1 has been corrected accordingly. Full record in §10.
+
 ---
 
 ## 1. The defect in one sentence
@@ -322,9 +327,34 @@ Affected: `ERR1810454`, `ERR1810473`, `ERR1810477`, `ERR1810480`, `ERR1810481`, 
 **The `candidate_rank` join is NOT the cause — that dead end is already ruled out.** It is the obvious
 suspect and it is innocent: replaying the join (`depth/` filenames → `candidate_rank_lookup`,
 `summarize.R:577-580`) recovers `candidate_rank = 1` correctly for every affected sample, with **0 NA
-ranks across all 91 depth rows**. The fault is downstream, in `df_coverage` (`summarize.R:603-625`) or a
-later join — note `df_coverage` collapses with `fill(.direction = "downup") %>% slice(1)`, which has
-nothing to fill from when a sample contributes only one row.
+ranks across all 91 depth rows**.
+
+**ROOT CAUSE (identified 2026-08-05, §10).** It is the *later* join, not `df_coverage` itself.
+`df_coverage` is innocent too — its `fill(.direction = "downup") %>% slice(1)` collapse was the suspect
+named in the original draft of this section, and it is wrong: on an affected sample `df_coverage`
+produces a perfectly correct row carrying `Major_cov_breadth_min_10` and a `Minor_reference` of `NA`.
+
+The fault is `summarize.R:1306`:
+
+```r
+left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference))
+```
+
+`df_coverage` derives **both** reference columns from the staged `depth/` filenames, so a sample whose
+rank-2 candidate never got a depth file has `Minor_reference = NA` on that side, while the main frame
+carries the real candidate name from `candidates.csv`. dplyr matches `NA` to `NA` by default
+(`na_matches = "na"`), which is exactly why the other two rows of the trigger table survive:
+
+| candidates | depth files | `df_coverage$Minor_reference` | main frame | join |
+|---|---|---|---|---|
+| 1 | 1 | `NA` | `NA` | matches (NA-to-NA) → **works** |
+| 2 | 2 | `2b_D10988` | `2b_D10988` | matches → **works** |
+| 2 | 1 | `NA` | `1m_KJ439778` | **no match → whole coverage block NA** |
+
+One mechanism explains all three rows. The fix belongs in the join key — `df_coverage` is already one row
+per sample, so `Minor_reference` earns nothing as a key and only introduces the failure. Dropping it has
+**not** been tested; do that before shipping, and note that joining on `sampleName` alone would collide
+the two reference columns, so `join_by(sampleName, Major_reference)` is the narrower change.
 
 **The pileups are intact; only the summary fails to carry them through.** Recomputing breadth and mean
 depth directly from `samtools/<sample>.<ref>.cand1.nodup.tsv` reproduces the expected values exactly:
@@ -382,3 +412,91 @@ contig, which carries a secondary 78.7%-identity hit against `1a_HQ850279` — w
 `1a_HQ850279`, whose own contig is 9,076 bp. Two fields, two contigs: the same grain mismatch `78ec956`
 fixed for the minor slot, still live in the major slot. Not touched here because it is orthogonal to the
 dominance defect, but worth its own patch.
+
+---
+
+## 10. Independent verification, 2026-08-05
+
+### 10.1 What was run
+
+A **fresh end-to-end Nextflow run from raw FASTQ** on a different machine from the one that produced §1-§9
+— not a replay of published outputs. This matters: §7's reproduction recipe re-runs `summarize.R` and
+`blast_parse.R` over an existing results directory, so it shares that directory's staging. A full pipeline
+run shares nothing, and it reproduced the same numbers.
+
+- **Code:** `dev` @ `d64d35a`, **plus the uncommitted working-tree changes present on that machine** —
+  principally `conf/modules.config` (`BOWTIE2_BUILD` resources + `publishDir` disabled; `FASTQC_TRIM`
+  prefix `.trimmed` → `_trimmed`), plus `assets/multiqc_config.yml`, `nf-test.config`, `tests/`, and CI.
+  **None of them touch `bin/`**, so no call-bearing logic differs from `d64d35a` — but the run is *not*
+  byte-reproducible from `origin/dev` alone until that work is committed.
+- **Samples (10):** all 7 simulated datasets, plus `ERR1810469`, `ERR1810451`, `ERR1810447`.
+- **Profile:** `-profile docker`, GLUE enabled, `kraken_all = false`.
+
+Only 10 of the 86 `ERR…` accessions were available locally, which set the ceiling on what §5 and §2 could
+be checked against (§10.4).
+
+### 10.2 Confirmed — reproduced to the exact digit
+
+**§1, the core defect.** `sim2` top hits per contig, ordered by bitscore, rebuilt from
+`sim2_blast_out.csv`:
+
+| rank | sseqid | bitscore | pident | k-mer cov |
+|---|---|---|---|---|
+| 1 | `3a_D17763` | 17,444 | 100 | 4,184.4 |
+| 2 | `2a_D00944` | 15,579 | 96.041 | 9,918.2 |
+
+`blastparse.csv` gives `denovo_major_ref = 3a_D17763`; mapping makes 2a the major at **507,708 vs
+231,132** reads. `sim1` reproduces likewise (1a: 16,761 / 100% / 10,626 — 1b: 13,452 / 93.128% / 4,168.6)
+and escapes for the stated reason, not by being more correct.
+
+`sim2`'s `candidates.csv` shows why D2 is right to stay silent: rank 1 is 2a on **both** abundance
+measures (624,520 targeted reads, k-mer 9,918) and rank 2 is 3a (273,886, k-mer 4,184). The abundance
+signals agree with each other and disagree only with bitscore.
+
+**§4, all seven rows.** Reproduced exactly, including `sim2` at `review` carrying the message verbatim,
+and `sim22asingle` / `sim23asingle` at `provisional` on the background-candidate note.
+
+**§9.1.** Trigger table reproduced with no exceptions across all 10 samples; only `sim22asingle` and
+`sim23asingle` are affected. Root cause then identified — see the correction in §9.1 above.
+
+**§9.2.** `sim11asingle` carries a single candidate (the 17% `1i_KJ439772` is dropped outright, absent
+from `candidates.csv`); `sim22asingle` retains `1m_KJ439778` at 8,260 reads / 6%; `sim23asingle` retains
+`1n_KJ439775` at 9,688 reads / 6%. Both retained ones are `below_threshold` / `weak` / `background`. The
+non-monotonicity is real.
+
+**§9.4.** `sim1` has `major_ref = 1a_HQ850279` with `major_contig_length = 9339` — the 1b contig's length,
+not the 1a contig's 9,076 bp.
+
+**§6, statically.** `BLASTPARSE.out.csv` has exactly one consumer, `ch_denovo` at
+`workflows/hcvtyper.nf:515`; rescue and reference selection take `.support` at `:386`. Confirmed by grep
+over `workflows/` and `subworkflows/` — no other reference exists.
+
+**The D2 trigger** at `classify_roles.R:709-733` does compare `targeted_reads_nodup` against
+`assembly_support_best_contig_kmer_cov`, both abundance measures, as §1 claims.
+
+### 10.3 The two Thomson controls behave as the patch requires
+
+| sample | result | why it matters |
+|---|---|---|
+| `ERR1810469` | `co-infection (indeterminate dominance)`, `review`, flagged **by D2** | §8 test 2's negative control. Confirms D2 fires independently of the message §3.1 removes, so the removal cannot be over-applied. |
+| `ERR1810451` | off-genotype-contig flag present — a 1,538 bp 2b contig at k-mer 2.3 against a 4a monoinfection | §8 test 3 / the flag class the §2 approach destroyed. |
+
+`ERR1810451` also incidentally strengthens §2: its genuine flag rests on a 1,538 bp contig at k-mer 2.3 —
+exactly the long-but-low-coverage profile that k-mer re-ranking displaces in favour of a short fragment.
+
+### 10.4 Not verified — and why
+
+Everything below needs Thomson accessions that were not on the verification machine. **None of it was
+contradicted; it simply could not be reached.**
+
+- **§5's cohort-wide tables** — the 93-sample confidence distribution and the 7 changed `review_flag`
+  texts. Only 10 `ERR…` were available.
+- **§2's five-flags-lost table** (`ERR1810503`, `ERR1810521`, `ERR1810491`, `ERR1810467`, `ERR1810487`)
+  and **§1's second false positive `ERR1810505`**.
+- **§8 test 4, the IVT dilution series** (`ERR1810511`-`527`).
+- **§9.3**, which needs a `28a568d` build of `ERR1810505`.
+- **Every §9.1-affected `ERR…`** — though the mechanism now established in §9.1 predicts them all.
+
+**The patch's "after" state is untested.** This run establishes the *before* state only; `bin/` was not
+modified. The §3 hunks and the §4/§5 "after" columns remain predictions. Re-running `summarize.R`
+standalone against the run's SUMMARIZE work directory is the cheap way to close this.
