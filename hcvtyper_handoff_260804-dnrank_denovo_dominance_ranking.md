@@ -27,8 +27,12 @@ Both sets are available to the development team, and every claim below is reprod
 > document guessed; §9.1 has been corrected accordingly. Full record in §10.
 >
 > **The §3 patch has since been applied, measured and shipped as `2f254a3`** — two columns move on one
-> sample, all 25 call-bearing columns byte-identical, and the D2 control still fires (§10.5). §9.1 is
-> diagnosed but **not** yet fixed.
+> sample, all 25 call-bearing columns byte-identical, and the D2 control still fires (§10.5).
+>
+> **§9.1 and §9.4 are now fixed too** (`f9a5591`, `b47f627`), and the §8 IVT dilution series has been
+> downloaded and run — every one of its eight predicted contig length / k-mer values reproduced to the
+> digit (§10.6). That run also exposed a **sensitivity cliff at 500:1 and beyond** that this document did
+> not previously record: see §10.7.
 
 ---
 
@@ -304,6 +308,12 @@ statement that nothing else moved.
    in `bin/tests/` currently asserts *sensitivity* — that the pipeline still detects what it should — only
    that output has not changed. This is the one dataset that can support such a test.
 
+   **Status 2026-08-05: downloaded and run; every number above reproduced to the digit (§10.6).** The
+   accession → ratio mapping is now known and tabulated there, so the fixture can be written. Note the
+   run also found a sensitivity cliff at 500:1 (§10.7) — a fixture asserting only "minority recovered"
+   would pass while the Summary reports `monoinfection` at `high` with no caveat, so assert the
+   *reported* outcome per ratio, not just the contig's existence.
+
 ---
 
 ## 9. Related defects found in the same replay, not fixed here
@@ -312,6 +322,17 @@ These surfaced while diagnosing the above and are recorded here so they are not 
 §9.1 is the most serious — a genuine regression in shipped code.
 
 ### 9.1 REGRESSION — coverage and depth silently blank when a sample has two candidates but one depth file
+
+> **FIXED in `f9a5591` (2026-08-05).** Root cause below; the fix drops `Minor_reference` from the
+> `summarize.R:1306` join key (and drops `df_coverage`'s own copy of that column, which would otherwise
+> collide into `.x`/`.y` and break the 136-column schema).
+>
+> **This section understated the impact.** It is written as coverage and depth columns going `NA`, but the
+> coverage those columns hold is what the typability gate reads — so the bug was also forcing
+> **`major_typable` to `NO`**, a call-bearing column, on the affected samples. On `sim22asingle` /
+> `sim23asingle` — simulated single-genotype data with ~692k reads at 100% breadth and an exact reference
+> match — the pipeline was reporting the major strain as untypable. Recovered values match the
+> recomputation table below exactly (cov@10× 99.99; mean depth 20,762 and 21,045).
 
 On **15 of the 93 samples**, `Major_cov_breadth_min_1/5/10` and `Major_avg_depth` come out `NA` even
 though the `cand1` depth file exists and its reference matches `Major_reference` exactly.
@@ -408,6 +429,17 @@ suppressing a review flag rather than not raising one. Worth confirming the chan
 adding a fixture.
 
 ### 9.4 `major_contig_length` can describe a different contig than `major_ref`
+
+> **FIXED in `b47f627` (2026-08-05).** The major slot now uses the same ONE ROW discipline as the minor
+> slot: `scaf_top` row 1 is the row that defines `major_ref`, so reference, contig and length are all read
+> off it. `sim1` 9,339 → **9,076**, `sim2` 9,695 → **9,446** (where 9,695 was literally the *minor* 2a
+> contig's length sitting in the major field). Verified OK on all 9 IVT samples too (§10.6).
+>
+> Two notes for the reader. First, this section's risk is lower than it looks:
+> `denovo_major_contig_length` has **no logic consumers** — only `denovo_minor_contig_length` feeds a
+> threshold (the off-genotype trigger at `summarize.R:1867`) — so the defect could only ever mislead a
+> human reading the row, never change a call. Second, `major_contig` was derived a *third* way (longest
+> contig in `scaf_top`, unfiltered) and was assigned but never read; it is now correct and still internal.
 
 `blast_parse.R`'s `major_contig_length` is derived as
 `scaf %>% filter(sseqid == major_name) %>% slice_max(sc_length)`, which searches the **full** BLAST table
@@ -537,6 +569,75 @@ Shipped as `2f254a3`, which also drops the locals the removal left dead in `clas
 positional arg and dropping it would silently shift every positional caller). That cleanup was re-run and
 is byte-neutral.
 
-**Still open:** §5's full 93-sample tables, §2's five lost flags, `ERR1810505`, the IVT series and §9.3
-remain unverified for want of the other 76 accessions (§10.4), and the §9.1 join fix is diagnosed but
-not implemented.
+**Still open at that point:** §5's full 93-sample tables, §2's five lost flags, `ERR1810505` and §9.3.
+The IVT series has since been closed — see §10.6.
+
+### 10.6 The IVT dilution series — downloaded, run, and every §8 number reproduced
+
+§10.4 listed the IVT series as unreachable. It is not: all nine accessions are public, and
+`nf-core/fetchngs@1.12.0` retrieves them in minutes (464 MB total). They were then run end-to-end through
+the pipeline at `b47f627`, i.e. with the §3 patch and both 260805 fixes in place.
+
+Two fetchngs gotchas, since the next person will hit them: `--input` rejects a `.txt` extension outright,
+and it reads a CSV **header row as an accession** (`Mixture of ids provided via --input: id`). Use a
+headerless `.csv`.
+
+**Every predicted contig length and k-mer coverage reproduced to the digit**, which also pins down the
+accession → ratio mapping that §8 did not state:
+
+| accession | ratio (1a:2a) | minority | §8 predicted | measured | call | conf |
+|---|---|---|---|---|---|---|
+| `ERR1810511` | 1:1 | — | — | both ≈1,550× | co-infection | high |
+| `ERR1810513` | 1:5 | 1a | 4,585 bp / 373× | **4,585 / 373.03** | co-infection | high |
+| `ERR1810515` | 5:1 | 2a | 2,578 bp / 326× | **2,578 / 326.40** | co-infection | high |
+| `ERR1810517` | 1:50 | 1a | 1,563 bp / 111× | **1,563 / 110.96** | co-infection | high |
+| `ERR1810519` | 50:1 | 2a | 3,075 bp / 232× | **3,075 / 232.43** | co-infection | high |
+| `ERR1810521` | 1:500 | 1a | 1,395 bp / 16.7× | **1,395 / 16.74** | monoinfection | provisional |
+| `ERR1810523` | 500:1 | 2a | 349 bp / 1.4× | **349 / 1.38** | monoinfection | high |
+| `ERR1810525` | 1:5000 | 1a | 505 bp / 0.94× | **505 / 0.94** | monoinfection | high |
+| `ERR1810527` | 5000:1 | 2a | 920 bp / 1.7× | **920 / 1.71** | monoinfection | high |
+
+§8's claim holds: **de novo recovers the minority strain at every dilution, 1:1 through 1:5000.**
+
+`ERR1810521`'s off-genotype flag fires with exactly the predicted evidence — *"1395 bp contig, 1395 bp
+aligned (100%), 98.7% identity, k-mer cov 16.7"*. This is the flag §2 says k-mer re-ranking destroys, now
+observed firing on its own data.
+
+**§9.4 verified on all nine**: `major_contig_length` equals the length of `major_ref`'s own contig in
+every case, checked by rebuilding `scaf_top` from the raw BLAST output rather than trusting the field.
+
+**§9.1 was NOT exercised here.** All nine samples have matching candidate and depth-file counts (5×2/2,
+4×1/1), so none reaches the 2-candidates/1-depth-file shape. This run shows the fix does no harm on
+unseen data; it is not independent positive evidence. `sim22asingle` / `sim23asingle` remain the only
+demonstration, and a dedicated fixture is still worth building.
+
+One incidental observation: at 1:5000 the 1a minority's best hit is to `1a_M67463`, a different 1a
+reference than the `1a_AF009606` used at every other ratio. Genotype recovery is unaffected, but a
+fixture asserting an exact reference name there would be brittle.
+
+### 10.7 NEW FINDING — a sensitivity cliff at 500:1, where a known mixture reports as clean
+
+Not in any previous section, and the reason the IVT series is worth keeping as a permanent fixture.
+
+Across the series the pipeline gives **three qualitatively different answers**, and the boundary is set
+entirely by `review_min_offgenotype_contig_length` (1,000 bp):
+
+| ratios | outcome | minority visible to the analyst? |
+|---|---|---|
+| 1:1 – 50:1 | co-infection, `high` | **yes** — reported as the Minor strain |
+| 1:500 | monoinfection, `provisional` + off-genotype flag | **yes** — as a caveat (contig 1,395 bp > 1,000) |
+| 500:1, 1:5000, 5000:1 | monoinfection, **`high`, empty `review_flag`** | **no** — contig 349/505/920 bp < 1,000 |
+
+So on a sample that is a two-strain mixture *by construction*, and whose assembly demonstrably contains
+the second strain, the pipeline can emit `monoinfection` at `high` confidence with no caveat whatsoever.
+`ERR1810527` (5000:1) misses the flag by 80 bp — its 920 bp contig would have been flagged at 1,000.
+
+This is the threshold behaving as documented rather than a defect, but it is a sharper sensitivity
+statement than "de novo recovers it at every dilution" suggests, and it belongs in any paper claim about
+co-infection detection limits. It also shows §2's mechanism in the wild: what separates a flagged
+minority from a silent one is contig length crossing 1,000 bp — precisely the quantity the rejected
+k-mer re-ranking would have shortened.
+
+Worth deciding deliberately: whether `high` is the right tier for a monoinfection call that has a
+sub-threshold off-genotype contig sitting in its own assembly. A `provisional` tier, or a note without a
+tier change, would at least leave a trace.
