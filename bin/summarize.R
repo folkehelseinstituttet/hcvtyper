@@ -1303,7 +1303,31 @@ final <- input_samplesheet %>%
   # Add mapped reads stats
   left_join(df_mapped_reads, join_by(sampleName)) %>%
   # Add coverage
-  left_join(df_coverage, join_by(sampleName, Major_reference, Minor_reference)) %>%
+  #
+  # 260805: Minor_reference REMOVED from the join key. df_coverage derives BOTH
+  # reference columns from the staged depth/ filenames, whereas the left side gets
+  # them from candidates.csv. When a sample has a rank-2 candidate that never
+  # produced a depth file (a `background`/`weak` candidate that JOINT_MAPPING did
+  # not map), df_coverage carries Minor_reference = NA while the left side carries
+  # the real name — the keys disagree, no row matches, and EVERY coverage and depth
+  # column silently goes NA even though the cand1 pileup exists and is intact.
+  #
+  # dplyr matches NA to NA by default (na_matches = "na"), which is why only that
+  # one shape broke and the bug stayed hidden:
+  #   1 candidate  / 1 depth file -> NA vs NA           -> matched
+  #   2 candidates / 2 depth files -> name vs same name -> matched
+  #   2 candidates / 1 depth file  -> NA vs name        -> NO MATCH, all cov NA
+  # Affected 15 of the 93 samples in the 260804-dnrank cohort.
+  #
+  # df_coverage is already one row per sample (it collapses with group_by(sampleName)
+  # %>% slice(1)), so Minor_reference earned nothing as a key. Major_reference is kept
+  # so a genuine reference disagreement still fails loudly rather than mis-joining.
+  #
+  # df_coverage's own Minor_reference is dropped rather than demoted to a payload
+  # column: the left side already carries the authoritative value from candidates.csv,
+  # and leaving both in would collide them into Minor_reference.x/.y and break the
+  # emitted schema.
+  left_join(df_coverage %>% select(-Minor_reference), join_by(sampleName, Major_reference)) %>%
   # Add consensus distance to reference
   left_join(df_distance_wide, join_by(sampleName)) %>%
   # Add de novo / BLAST evidence (PLUMB-01). Samplesheet anchors the left side so a
