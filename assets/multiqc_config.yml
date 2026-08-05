@@ -50,7 +50,7 @@ module_order:
   - fastqc:
       name: "FastQC (trimmed)"
       path_filters:
-        - "*.trimmed_*.zip"
+        - "*_trimmed_*.zip"
   - kraken:
       name: "Kraken2 all database"
       path_filters:
