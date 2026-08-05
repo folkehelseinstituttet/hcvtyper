@@ -1989,14 +1989,22 @@ final <- final %>%
       is.na(overall_sample_call) |
         overall_sample_call %in% c("indeterminate", "untypable")        ~ "indeterminate",
       (!is.na(gate_flag) & gate_flag != "ok") |
-        (!is.na(denovo_major_subtype_match) & denovo_major_subtype_match == "NO") |
+        # 260804-dnrank: scoped to non-co-infection calls. On a co-infection this
+        # was a bitscore-vs-abundance artefact, not a real conflict — denovo_*_ref
+        # is ordered by BLAST bitscore (panel proximity), so it cannot speak to
+        # which strain is dominant. Dominance is owned by the D2 trigger, which
+        # reaches "co-infection (indeterminate dominance)" two lines below.
+        (!is.na(denovo_major_subtype_match) & denovo_major_subtype_match == "NO" &
+           !str_detect(coalesce(overall_sample_call, ""), "^co-infection")) |
         (!is.na(rescue_effect) & rescue_effect == "major_ref_changed") |
         overall_sample_call == "co-infection (indeterminate dominance)"  ~ "review",
       coalesce(dominant_unconfirmed, FALSE) |
         coalesce(any_probable_only, FALSE) |
         coalesce(any_refuted_denovo, FALSE) |
         coalesce(any_discordant_identity, FALSE) |
-        (!is.na(denovo_minor_subtype_match) & denovo_minor_subtype_match == "NO") |
+        # 260804-dnrank: same artefact, other end of the same bitscore ordering.
+        (!is.na(denovo_minor_subtype_match) & denovo_minor_subtype_match == "NO" &
+           !str_detect(coalesce(overall_sample_call, ""), "^co-infection")) |
         (!is.na(rescue_effect) & rescue_effect == "minor_ref_changed") |
         !is.na(review_flag)                                              ~ "provisional",
       TRUE                                                               ~ "high"

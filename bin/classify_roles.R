@@ -1085,7 +1085,10 @@ sample_review_message <- function(overall_sample_call,
   one <- function(x) if (length(x) == 0) NA else x[[1]]
   sc        <- one(overall_sample_call)
   maj_match <- one(denovo_major_subtype_match)
-  min_match <- one(denovo_minor_subtype_match)
+  # 260804-dnrank: denovo_minor_subtype_match no longer has a reader here — its only
+  # consumer was the removed co-infection dominance message. The PARAMETER is kept
+  # (it is the 3rd positional arg; dropping it would silently shift every positional
+  # caller) but nothing binds it locally any more.
   gflag     <- one(gate_flag)
   resc      <- one(rescue_effect)
   dv_minor  <- one(denovo_minor_subtype)
@@ -1098,19 +1101,33 @@ sample_review_message <- function(overall_sample_call,
   tok <- function(x) if (length(x) == 0 || is.na(x)) "unknown" else as.character(x)
 
   msgs <- character(0)
-  is_coinf     <- !is.na(sc) && sc == "co-infection"
   is_mono      <- !is.na(sc) && sc == "monoinfection"
   is_indet     <- !is.na(sc) && sc == "indeterminate"
   is_indet_dom <- !is.na(sc) && sc == "co-infection (indeterminate dominance)"
-  subtype_dis  <- (!is.na(maj_match) && maj_match == "NO") || (!is.na(min_match) && min_match == "NO")
   dom_label    <- .candidate_label(dominant_rank, dominant_ref, maj_sub)
 
   # D-10 generic (no candidate name).
   if (is_indet_dom)
     msgs <- c(msgs, "Dominance ordering uncertain — read-count and k-mer-coverage rankings disagree. Both genotypes reported as present; co-infection vs contamination agnostic. Please review.")
   # Co-infection subtype conflict (sample-level de novo vs mapping).
-  if (is_coinf && subtype_dis)
-    msgs <- c(msgs, "Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review.")
+  #
+  # 260804-dnrank: REMOVED. This asserted a disagreement about DOMINANCE, but
+  # denovo_major_ref / denovo_minor_ref are ordered by BLAST bitscore
+  # (blast_parse.R:301, frame sorted at :150-153), which ranks strains by proximity
+  # to the reference PANEL, not by abundance. On the designed 7:3 sim2 mixture it
+  # handed "major" to 3a on a 100% panel match (bitscore 17,444) despite 2.4x less
+  # k-mer coverage and 2.2x fewer mapped reads than 2a, and raised
+  # call_confidence = review on a clean call.
+  #
+  # Dominance is already owned by the D2 trigger above, which compares
+  # top-by-targeted-reads against top-by-best-contig-k-mer-coverage -- both
+  # abundance measures -- and emits "Dominance ordering uncertain". D2 correctly
+  # stays silent on sim2. Keeping two dominance checks that measure different
+  # things guaranteed they would disagree.
+  #
+  # denovo_*_subtype_match is retained for what it CAN support: the monoinfection
+  # major-subtype cross-check immediately below, where a single strain means no
+  # dominance question arises.
   # Monoinfection major subtype conflict: name the candidate + the actual subtype values (D-02 pattern 2).
   # 260803-ogc follow-up 1: carry the conflicting contig's measured evidence. This
   # trigger sets call_confidence = "review" on its own, so it is the HARDEST signal
