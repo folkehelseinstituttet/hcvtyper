@@ -82,7 +82,7 @@ custom_data:
           description: "Overall sample classification: monoinfection, co-infection, indeterminate, or co-infection (indeterminate dominance). Read together with Confidence: the call states what the data indicate; Confidence states how much to trust it."
         call_confidence:
           title: "Confidence"
-          description: "Evidence tier for the Final call. high = clean evidence, call stands. provisional = a soft caveat (identity uncorroborated, minor kept without corroboration, minor refuted, or a minor-slot rescue) — usable but note it. review = a hard conflict that should block auto-reporting (major failed mapping QC, major subtype conflict, the de-novo rescue overrode the Major reference, or dominance is ambiguous) — see the Review note. indeterminate = no actionable call. A sample with a non-empty Review note is never high (it is demoted to at least provisional), so a high call always has an empty Review note."
+          description: "Evidence tier for the Final call. high = clean evidence, call stands. provisional = a soft caveat (identity uncorroborated, minor kept without corroboration, or a minor-slot rescue) — usable but note it. review = a hard conflict that should block auto-reporting (major failed mapping QC, major subtype conflict, the de-novo rescue overrode the Major reference, or dominance is ambiguous) — see the Review note. indeterminate = no actionable call. A sample with a non-empty Review note is never high (it is demoted to at least provisional), so a high call always has an empty Review note."
           cond_formatting_rules:
             - pass:
                 - s_eq: "high"
@@ -97,7 +97,6 @@ custom_data:
           cond_formatting_rules:
             - warn:
                 - s_contains: "Please review"
-                - s_contains: "refuted"
                 - s_contains: "uncertain"
         Genotype:
           title: "Genotype"

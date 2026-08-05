@@ -41,7 +41,7 @@ have to reconstruct confidence in your head.
 | Tier | What it means | Typical action |
 |---|---|---|
 | `high` | No conflicting signals fired; the call stands on clean evidence. `Review note` is empty. | Accept. |
-| `provisional` | A **soft** caveat: identity not corroborated, a co-infection kept without corroboration, a minor refuted by de novo, a minor-subtype conflict, or a minor-slot rescue. Usable, but note the caveat. | Skim the `Review note` and evidence columns. |
+| `provisional` | A **soft** caveat: identity not corroborated, a co-infection kept without corroboration, a minor-subtype conflict, or a minor-slot rescue. Usable, but note the caveat. | Skim the `Review note` and evidence columns. |
 | `review` | A **hard** conflict that should block automatic reporting: the major failed mapping QC, de-novo and mapping disagree on the major subtype, the de-novo rescue overrode the **Major** reference, or dominance is ambiguous. | Manually adjudicate before reporting — see `Review note` and the underlying files. |
 | `indeterminate` | No actionable call (indeterminate/untypable). | Inspect raw QC; the sample may need re-sequencing. |
 
@@ -63,11 +63,10 @@ in a prompt to review. The triggers:
 2. **Major subtype conflict (monoinfection)** — de-novo assembly and mapping disagree on the major subtype; possible reference mismatch or divergent strain.
 3. **Different-genotype de-novo contig under a monoinfection** — possible missed co-infection or contamination.
 4. **Genotype call provisional** — dominant identity not corroborated by GLUE or de novo (mapping evidence only).
-5. **Minor candidate refuted by de novo** — likely single infection.
-6. **Co-infection kept without de-novo corroboration** — de novo inconclusive for both strains; the minor may be a genuine low-yield co-infection.
-7. **Indeterminate dominance** — read-count and k-mer rankings disagree.
-8. **No candidate passed the major-gate** — call indeterminate.
-9. **Major strain failed mapping quality thresholds.**
+5. **Co-infection kept without de-novo corroboration** — de novo inconclusive for both strains; the minor may be a genuine low-yield co-infection.
+6. **Indeterminate dominance** — read-count and k-mer rankings disagree.
+7. **No candidate passed the major-gate** — call indeterminate.
+8. **Major strain failed mapping quality thresholds.**
 10. **De-novo rescue overrode the Major reference** — the primary call was reassigned automatically; confirm against `rescue_audit.csv` before reporting.
 
 ### Every sentence names its candidate and its numbers
@@ -116,11 +115,9 @@ Each candidate is classified into a `role` with a coded `role_reason`. These app
 |---|---|---|
 | `dominant` | `dominant` | The primary strain (highest dominance score among gate-passing candidates). |
 | `co-infection` | `corroborated` | A second strain confirmed by de-novo/assembly support. |
-| `co-infection` | `uncorroborated_kept` | A second strain kept even though de novo was inconclusive — may be a genuine low-yield co-infection or an artefact. Raises a review note. |
-| `background` | `refuted_denovo` | Looked like a minor by mapping, but de novo refutes it — treated as a cross-mapping artefact. |
 | `background` | `same_genotype_as_dominant` | Demoted: same genotype as the dominant strain (not counted as a distinct co-infection). |
 | `background` | `recombinant_2k1b` | Demoted by the 2k/1b recombinant exception rule. |
-| `background` | `discordant_identity` | The candidate's mapping identity and de-novo identity disagree. |
+| `background` | `discordant_identity` | The candidate's mapping identity and its GLUE identity disagree. |
 | `indeterminate` | `indeterminate_dominance_conflict` | Part of an indeterminate-dominance pair (reads favour one strain, k-mer coverage the other). |
 
 Background candidates are **surfaced explicitly with their reason**, never silently
