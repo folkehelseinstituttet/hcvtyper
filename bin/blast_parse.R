@@ -298,12 +298,24 @@ scaf_top_long %>%
 # --- 7. Major / minor reference summary (display-only, consumed by summarize.R) ---
 if (nrow(scaf_top) > 0) {
 # a) pick closest major and (optionally) minor reference names
-major_name <- scaf_top$sseqid[1]                 # best overall hit
-major_geno <- str_sub(major_name, 1, 1)
-major_contig <- scaf_top %>%
-  slice_max(sc_length, n = 1) %>%               # longest contig for this reference
-  select(qseqid, sc_length) %>% distinct() %>% # Remove duplicates if several hits against the same reference
-  pull(qseqid)
+# 260805 (§9.4): the major slot now uses the same ONE ROW discipline as the minor
+# slot below. scaf_top row 1 IS the row that defines major_name (the frame is sorted
+# by descending bitscore), so reading the reference, the contig and the contig length
+# off that single row guarantees all three describe the same contig.
+#
+# Previously the three were derived three different ways:
+#   major_name          = scaf_top$sseqid[1]                        -- row 1
+#   major_contig        = longest contig in scaf_top, UNFILTERED    -- any contig
+#   major_contig_length = longest contig in the FULL scaf table
+#                         filtered to sseqid == major_name          -- any contig
+# On sim1 that reported major_ref = 1a_HQ850279 (whose own contig is 9,076 bp)
+# alongside major_contig_length = 9,339 bp — the length of the 1b contig, which
+# merely carries a secondary 78.7%-identity hit against 1a_HQ850279.
+major_row    <- scaf_top %>% slice(1)
+major_name   <- major_row$sseqid[1]              # best overall hit
+major_geno   <- str_sub(major_name, 1, 1)
+major_contig <- major_row$qseqid[1]
+major_len    <- major_row$sc_length[1]
 
 # The minor selection is captured as ONE ROW, and the reference, the contig name and
 # the contig length are all read off that row (260803-ogc). Previously only sseqid was
@@ -320,8 +332,14 @@ major_contig <- scaf_top %>%
 # next to denovo_minor_contig = NODE_2_length_3232. Three fields, two contigs, and an
 # analyst sent to the wrong sequence.
 #
-# Structurally this could only ever bite the MINOR slot: major_name is the globally
-# best hit, so its row is necessarily also the top-bitscore row for that reference.
+# That particular re-derivation could only bite the MINOR slot, because it searched
+# by BITSCORE and major_name is the globally best hit — its row is necessarily also
+# the top-bitscore row for that reference.
+#
+# 260805 (§9.4): the major slot had the same disease from a different vector. Its
+# length was derived by slice_max(sc_length) — by LENGTH, not bitscore — so the
+# argument above never protected it, and a longer contig carrying a weak secondary
+# hit to major_name won. Fixed above by reading the major slot off ONE ROW too.
 minor_row  <- scaf_top %>%
   filter(!str_starts(subtype, major_geno)) %>%   # must be different genotype
   slice_head(n = 1)
@@ -331,6 +349,7 @@ minor_len    <- if (nrow(minor_row) == 0) NA_real_      else minor_row$sc_length
 } else {
   major_name <- NA_character_
   major_contig <- NA_character_
+  major_len <- NA_real_
   minor_name <- NA_character_
   minor_contig <- NA_character_
   minor_len <- NA_real_
@@ -340,10 +359,8 @@ minor_len    <- if (nrow(minor_row) == 0) NA_real_      else minor_row$sc_length
 summary_tbl <- tibble(
   sample       = prefix,
   major_ref    = major_name,
-  major_contig_length = scaf %>% filter(sseqid == major_name) %>%
-                   slice_max(sc_length, n = 1) %>%
-                   # If the major contig have multiple blast hits against the same reference, the length will be duplicated
-                   select(qseqid, sc_length) %>% distinct() %>% pull(sc_length),
+  # Read off major_row (260805, §9.4) — same contig as major_ref, by construction.
+  major_contig_length = major_len,
   minor_ref    = minor_name,
   # Both read straight off minor_row, so minor_ref / minor_contig /
   # minor_contig_length always describe ONE contig (260803-ogc).
