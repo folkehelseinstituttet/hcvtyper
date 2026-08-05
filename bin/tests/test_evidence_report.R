@@ -49,8 +49,9 @@ tuples <- list(
   list(role = "dominant",     rr = "dominant",                         st = "confirmed", len = 9189, pid = 100,    kmer = 40),
   list(role = "co-infection", rr = "corroborated",                     st = "confirmed", len = 9479, pid = 89.0,   kmer = 514.2),
   list(role = "co-infection", rr = "corroborated",                     st = "probable",  len = 3000, pid = 80.0,   kmer = 5),
-  list(role = "background",   rr = "refuted_denovo",                   st = "refuted",   len = 600,  pid = 85.0,   kmer = 3),
-  list(role = "background",   rr = "discordant_identity",              st = "refuted",   len = 700,  pid = 84.0,   kmer = 4),
+  # 260805: refuted_denovo removed (unreachable band); discordant_identity retained
+  # (live via the GLUE leg) but now carries evidence_state `weak`.
+  list(role = "background",   rr = "discordant_identity",              st = "weak",      len = 700,  pid = 84.0,   kmer = 4),
   list(role = "background",   rr = "no_own_assembly",                  st = "weak",      len = NA,   pid = NA,     kmer = NA, assembly_exists = FALSE),
   list(role = "background",   rr = "weak_own_assembly_below_floor",    st = "weak",      len = 200,  pid = 50.0,   kmer = 0.5),
   list(role = "background",   rr = "same_genotype_as_dominant",        st = "confirmed", len = 9000, pid = 94.0,   kmer = 30),

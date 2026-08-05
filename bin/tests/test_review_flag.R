@@ -5,7 +5,7 @@
 # helpers in bin/classify_roles.R:
 #   - candidate_review_fragment(): per-candidate; NA for a clean candidate, else a
 #     "candidate <rank> (<subtype>_<ref>): <reason with the concrete value>" fragment.
-#     Fires for weak/probable/refuted/discordant AND the D-08 demotions.
+#     Fires for weak/probable/discordant AND the D-08 demotions.
 #   - sample_review_message(): sample-level; D-10 triggers stay generic (no candidate
 #     name), D-11 triggers (dominant_unconfirmed, major_ref_changed) name the candidate,
 #     merges the pre-collapsed candidate fragment, NA when nothing fires.
@@ -44,10 +44,12 @@ frag <- function(role, role_reason, evidence_state, rank = 2L,
 # and carry a concrete value (measured contig numbers where a contig exists).
 weak  <- frag("background", "weak_own_assembly_below_floor", "weak", len = 200, pid = 50, kmer = 0.5)
 prob  <- frag("co-infection", "corroborated", "probable", len = 3000, pid = 80, kmer = 5)
-refu  <- frag("background", "refuted_denovo", "refuted", len = 600, pid = 85, kmer = 3)
-disc  <- frag("background", "discordant_identity", "refuted", len = 700, pid = 84, kmer = 4)
+# 260805: the refuted_denovo fragment case was removed with the unreachable
+# evidence_state band. discordant_identity remains — it is live via the GLUE leg —
+# but its evidence_state is now `weak`, since `refuted` no longer exists.
+disc  <- frag("background", "discordant_identity", "weak", len = 700, pid = 84, kmer = 4)
 
-for (nm in c("weak", "prob", "refu", "disc")) {
+for (nm in c("weak", "prob", "disc")) {
   s <- get(nm)
   if (is.na(s) || !nzchar(s))
     fail(sprintf("candidate_review_fragment[%s] must fire (non-NA fragment)", nm))
@@ -59,11 +61,9 @@ if (!grepl("200", weak, fixed = TRUE) || !grepl("50.0", weak, fixed = TRUE))
   fail(sprintf("weak fragment must carry the measured contig length/identity, got: %s", weak))
 if (!grepl("probable", prob, fixed = TRUE))
   fail(sprintf("probable fragment must carry the evidence_state, got: %s", prob))
-if (!grepl("85.0", refu, fixed = TRUE) && !grepl("600", refu, fixed = TRUE))
-  fail(sprintf("refuted fragment must carry a concrete contig value, got: %s", refu))
 if (!grepl("84.0", disc, fixed = TRUE) && !grepl("700", disc, fixed = TRUE))
   fail(sprintf("discordant fragment must carry a concrete contig value, got: %s", disc))
-ok("ReviewFlag-1 (EVID-06/D-05/D-07): weak/probable/refuted/discordant each name the candidate + carry a concrete value")
+ok("ReviewFlag-1 (EVID-06/D-05/D-07): weak/probable/discordant each name the candidate + carry a concrete value")
 
 # --- D-08 demotion pair: each produces a NAMED fragment despite good own evidence ---
 dem_same <- frag("background", "same_genotype_as_dominant", "confirmed", len = 9000, pid = 94, kmer = 30)

@@ -1664,8 +1664,7 @@ if (!"denovo_major_subtype" %in% colnames(final)) {
 # Per-sample role-reason summary for the rewired review_flag (D-13/D-15). The
 # review sentences are now derived from the N-candidate role model, not the retired
 # minor_denovo_status / coinfection_flag. Roll the long classified candidate_support
-# frame up to one row per sample, capturing whether ANY candidate was refuted by de
-# novo (background/refuted_denovo). These per-sample booleans feed the pmap_chr
+# frame up to one row per sample. These per-sample booleans feed the pmap_chr
 # below alongside overall_sample_call + gate_flag + the subtype-match columns.
 #
 # CR-01/WR-05 (12-REVIEW): the old any_uncorroborated trigger checked
@@ -1679,23 +1678,33 @@ if (!"denovo_major_subtype" %in% colnames(final)) {
 # not the stronger "confirmed" band (>=0.72) — surfacing exactly the confidence
 # gradient the continuous-score redesign was meant to preserve.
 #
-# CR-02 (12-REVIEW): any_refuted_denovo checks role_reason == "refuted_denovo",
-# whose ONLY production trigger (denovo_contradicts & quality_fails_state,
-# classify_roles.R L482-507) is preempted in every real run by the
-# discordant_identity hard gate in classify_one_sample() (L565-570), which runs
-# first and reads apply_concordance()'s identical denovo_conflict predicate
-# (L106) — apply_concordance() ALWAYS runs before classify_roles() in this file
-# (L818/L830). any_refuted_denovo is therefore effectively dead on real data;
-# any_discordant_identity is the trigger that ACTUALLY fires for a genuine own-
-# assembly-vs-mapping (or GLUE) identity conflict, and is added here as an
-# ADDITIONAL review signal alongside (not replacing) the pre-existing
-# any_refuted_denovo — see test_classify_roles.R Test20 for the integrated
-# (apply_concordance -> score_candidates -> classify_roles) call-order proof.
+# CR-02 SUPERSEDED (260805). The note here used to say any_refuted_denovo was
+# "effectively dead on real data" because the discordant_identity hard gate
+# pre-empted it. Both halves of that were wrong:
+#
+#   * refuted_denovo was not merely pre-empted, it was STRUCTURALLY UNREACHABLE.
+#     assembly_support_join() attributes a contig to a candidate only when their
+#     genotypes are EQUAL, and the refuted predicate required them to DIFFER. The
+#     trigger, the evidence_state band behind it, and this rollup have all been
+#     removed; any_refuted_denovo no longer exists.
+#
+#   * discordant_identity was said to be "the trigger that ACTUALLY fires" for an
+#     own-assembly-vs-mapping conflict. It never fired for that reason either — the
+#     de novo leg of apply_concordance() read the same dead predicate. It IS live,
+#     but only via the GLUE leg (mapping genotype vs candidate_glue_genotype), which
+#     is unconstrained by the assembly join. That is why it is retained below.
+#
+# Genuine mapping-vs-assembly contradiction is owned by RESCUE_EVALUATION, which is
+# sample-scoped and explicitly seeks a DIFFERENT-subtype contig.
+#
+# The earlier note was reasoned from test_classify_roles.R Test20, which builds the
+# joined frame by hand (assembly_support_subtype = "3a" on a genotype-1 candidate) and
+# so encodes a state the production join cannot emit. Those fixtures now compose
+# assembly_support_join() so the invariant is enforced rather than assumed.
 if (nrow(candidate_support) > 0) {
   role_review <- candidate_support %>%
     group_by(sampleName) %>%
     summarise(
-      any_refuted_denovo      = any(role_reason == "refuted_denovo",       na.rm = TRUE),
       any_discordant_identity = any(role_reason == "discordant_identity",  na.rm = TRUE),
       any_probable_only       = any(role == "co-infection" &
                                     !is.na(evidence_state) &
@@ -1708,7 +1717,6 @@ if (nrow(candidate_support) > 0) {
 } else {
   role_review <- tibble(
     sampleName               = character(),
-    any_refuted_denovo       = logical(),
     any_discordant_identity  = logical(),
     any_probable_only        = logical(),
     dominant_unconfirmed     = logical()
@@ -1831,16 +1839,12 @@ final <- final %>%
 #   3. monoinfection AND denovo_minor_subtype is non-NA AND its genotype differs from
 #      the major genotype — de novo found evidence of a second, different-genotype strain
 #      that the role classifier demoted to background (possible missed co-infection)
-#   4. any_refuted_denovo — a minor candidate refuted by de novo; likely single infection
-#      (CR-02: on real data this specific trigger is effectively dead — see #4a)
-#   4a. any_discordant_identity — a candidate's mapping identity genuinely conflicts
-#      with its own GLUE and/or de novo assembly identity (role_reason ==
-#      "discordant_identity"). This is the trigger that ACTUALLY fires in production
-#      for a genuine own-assembly-vs-mapping contradiction: apply_concordance()
-#      always runs before classify_roles() in this file, so its discordant_identity
-#      hard gate pre-empts the refuted_denovo path above before it can ever be
-#      reached (CR-02, 12-REVIEW; see test_classify_roles.R Test20 for the proof).
-#      Added as an ADDITIONAL trigger alongside any_refuted_denovo, not a replacement.
+#   4. any_discordant_identity — a candidate's mapping identity conflicts with its
+#      GLUE identity (role_reason == "discordant_identity"). 260805: the former
+#      trigger #4, any_refuted_denovo, has been REMOVED as structurally unreachable,
+#      and this one's scope is narrower than the old note claimed — its de novo leg
+#      was dead for the same reason, so GLUE is its only live source. Genuine
+#      mapping-vs-assembly contradiction is handled upstream by RESCUE_EVALUATION.
 #   5. any_probable_only — a co-infection candidate's own evidence only cleared the
 #      marginal "probable" band (assembly_support_score 0.50-0.72), not "confirmed"
 #      (>=0.72); warrants analyst review of QC plots / contigs (CR-01/WR-05, replaces
@@ -2024,7 +2028,6 @@ final <- final %>%
         overall_sample_call == "co-infection (indeterminate dominance)"  ~ "review",
       coalesce(dominant_unconfirmed, FALSE) |
         coalesce(any_probable_only, FALSE) |
-        coalesce(any_refuted_denovo, FALSE) |
         coalesce(any_discordant_identity, FALSE) |
         # 260804-dnrank: same artefact, other end of the same bitscore ordering.
         (!is.na(denovo_minor_subtype_match) & denovo_minor_subtype_match == "NO" &
@@ -2038,7 +2041,7 @@ final <- final %>%
   # Also drop the two EVID-06 transients: candidate_flag_fragment (per-sample collapsed
   # per-candidate fragment) and dominant_cand_ref (dominant reference name) — both merged
   # into review_flag by sample_review_message() above and not part of the emitted schema.
-  select(-any_refuted_denovo, -any_discordant_identity, -any_probable_only, -dominant_unconfirmed,
+  select(-any_discordant_identity, -any_probable_only, -dominant_unconfirmed,
          -candidate_flag_fragment, -dominant_cand_ref,
          # 260803-ogc transients: the length-masked copy of denovo_minor_subtype and the
          # off-genotype contig metrics + their rendered clause, all consumed by

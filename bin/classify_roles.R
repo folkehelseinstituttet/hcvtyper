@@ -35,7 +35,8 @@
 #   D-10/D-11 (WR-01, 12-REVIEW: superseded by Phase-12 Plan-03 — see EVID-01..04
 #         below; kept here for the ID numbering, not for the OLD behaviour they used
 #         to describe). Role / role_reason are now DERIVED from a per-candidate,
-#         continuous `evidence_state` (confirmed/probable/weak/refuted) computed by
+#         continuous `evidence_state` (confirmed/probable/weak; `refuted` removed
+#         260805 as structurally unreachable) computed by
 #         score_assembly_support() + classify_roles()'s evidence-band derivation
 #         (see the D-01/D-09/D-10/D-05 comment above evidence_hi_cut/evidence_lo_cut,
 #         and the EVID-02/EVID-04 comments in classify_one_sample()). This REPLACED
@@ -64,34 +65,38 @@ if (!exists("group_by")) {
   library(tidyverse)
 }
 
-# own_denovo_conflict(map_genotype, assembly_support, assembly_support_subtype)
-#   WR-04 (12-REVIEW): single source of truth for the "candidate's OWN de novo
-#   assembly genotype genuinely differs from its OWN mapping genotype" predicate.
-#   Before this helper existed, apply_concordance()'s denovo_conflict leg (used to
-#   derive concordance_status == "discordant") and classify_roles()'s
-#   denovo_contradicts leg (used to derive evidence_state == "refuted") recomputed
-#   this near-verbatim, independently — nothing enforced that they stayed in sync,
-#   which is what let CR-02 exist (the discordant_identity hard gate in
-#   classify_one_sample() always runs before the refuted evidence_state branch is
-#   reached, so the two predicates MUST agree or the refuted branch silently
-#   becomes unreachable dead code). Both call sites now read from here.
-#   Pure; vectorised over the three input vectors (equal length, one row per
-#   candidate). NA-tolerant: an absent/blank subtype or genotype never contradicts.
-own_denovo_conflict <- function(map_genotype, assembly_support, assembly_support_subtype) {
-  map_gt <- as.character(map_genotype)
-  n <- length(map_gt)
+# has_own_denovo(assembly_support, assembly_support_subtype)
+#   Does this candidate have a de novo contig attributed to it? Presence only.
+#
+#   260805 (refuted-unreachable): this replaces own_denovo_conflict(), which also
+#   returned a `conflict` flag — "the candidate's OWN de novo genotype differs from
+#   its OWN mapping genotype". That predicate was STRUCTURALLY UNSATISFIABLE and has
+#   been removed along with its two consumers.
+#
+#   Why it could never fire: assembly_support_join() attributes a contig to a
+#   candidate only when the contig's genotype EQUALS the candidate's — the join key
+#   is `candidate_genotype` on one side and `genotype_from_subtype(subtype)` on the
+#   other (assembly_support_join.R:90-131), and assembly_support_subtype is then the
+#   winning contig's subtype from within that key group. So
+#   genotype_from_subtype(assembly_support_subtype) == candidate_genotype by
+#   construction, and a predicate testing those two for INEQUALITY is always FALSE.
+#   Confirmed on 358 candidate rows across 10 result directories: zero rows where the
+#   attributed contig's genotype differs from the candidate's.
+#
+#   WR-04 had unified the two copies of that predicate so they could not drift apart.
+#   They could not — they were identically dead.
+#
+#   Genuine mapping-vs-assembly contradiction is owned by RESCUE_EVALUATION
+#   (rescue_evaluation.R), which filters the support table by SAMPLE only and then
+#   explicitly seeks the best contig of a DIFFERENT subtype (L207, L246-249). Because
+#   it is not keyed on genotype equality it can see what this function never could.
+#
+#   Pure; vectorised. NA/blank subtype counts as absent.
+has_own_denovo <- function(assembly_support, assembly_support_subtype, n = NULL) {
+  if (is.null(n)) n <- max(length(assembly_support), length(assembly_support_subtype))
   asup_subtype <- if (is.null(assembly_support_subtype)) rep(NA_character_, n) else as.character(assembly_support_subtype)
   supported <- if (is.null(assembly_support)) rep(FALSE, n) else (!is.na(assembly_support) & assembly_support == "supported")
-  has_denovo <- supported & !is.na(asup_subtype) & nzchar(asup_subtype)
-  denovo_gt <- ifelse(
-    has_denovo,
-    vapply(asup_subtype, function(s) {
-      if (is.na(s) || !nzchar(s)) NA_character_ else as.character(genotype_from_subtype(s))
-    }, character(1L)),
-    NA_character_
-  )
-  conflict <- has_denovo & !is.na(denovo_gt) & !is.na(map_gt) & map_gt != denovo_gt
-  list(has_denovo = has_denovo, denovo_gt = denovo_gt, conflict = conflict)
+  supported & !is.na(asup_subtype) & nzchar(asup_subtype)
 }
 
 # apply_concordance(df) — D8 pre-annotation helper.
@@ -120,15 +125,15 @@ apply_concordance <- function(df) {
 
   has_glue <- !is.na(df$candidate_glue_genotype) & nzchar(as.character(df$candidate_glue_genotype))
 
-  # WR-04: own-de-novo-vs-mapping contradiction, computed ONCE via the shared
-  # own_denovo_conflict() helper (also used by classify_roles()'s refuted-band
-  # evidence_state derivation, below) instead of a locally-duplicated predicate.
-  own_denovo <- own_denovo_conflict(df$candidate_genotype, df$assembly_support, df$assembly_support_subtype)
-  has_denovo <- own_denovo$has_denovo
+  # 260805: the de novo leg is PRESENCE-ONLY. It contributes to confirmed vs
+  # unconfirmed (a de novo contig corroborates the mapping identity) but can no
+  # longer contribute to `discordant`, because an attributed contig always shares the
+  # candidate's genotype — see has_own_denovo()'s docstring. The GLUE leg below is
+  # unaffected and remains the live source of `discordant`.
+  has_denovo <- has_own_denovo(df$assembly_support, df$assembly_support_subtype, nrow(df))
 
   map_gt    <- as.character(df$candidate_genotype)
   glue_gt   <- as.character(df$candidate_glue_genotype)
-  denovo_gt <- own_denovo$denovo_gt
 
   # 2k1b structural exception (CLAUDE.md Constraints): HCV-GLUE's clade-placement
   # tree has no CRF_02k/1b category, so a genuine 2k/1b recombinant is ALWAYS
@@ -141,21 +146,19 @@ apply_concordance <- function(df) {
   glue_2k1b_exempt <- map_gt == "2k1b" & glue_gt %in% c("1", "2")
 
   glue_conflict   <- has_glue & !is.na(glue_gt) & map_gt != glue_gt & !glue_2k1b_exempt
-  denovo_conflict <- own_denovo$conflict
 
   status <- character(nrow(df))
   reason <- character(nrow(df))
 
   for (i in seq_len(nrow(df))) {
-    if (glue_conflict[i] || denovo_conflict[i]) {
+    # 260805: `discordant` now has exactly one source, the GLUE leg. The former
+    # de novo leg was structurally unsatisfiable, so the two reason strings that
+    # depended on it ("discordant_all_legs", "discordant_mapping_vs_denovo") were
+    # unreachable and have been removed with it. `discordant` itself and the
+    # downstream discordant_identity role gate are LIVE and untouched.
+    if (glue_conflict[i]) {
       status[i] <- "discordant"
-      reason[i] <- if (glue_conflict[i] && denovo_conflict[i]) {
-        "discordant_all_legs"
-      } else if (glue_conflict[i]) {
-        "discordant_mapping_vs_glue"
-      } else {
-        "discordant_mapping_vs_denovo"
-      }
+      reason[i] <- "discordant_mapping_vs_glue"
     } else if (has_glue[i] && has_denovo[i]) {
       status[i] <- "confirmed"
       reason[i] <- if (glue_2k1b_exempt[i]) "confirmed_2k1b_recombinant" else "all_legs_concordant"
@@ -501,9 +504,9 @@ classify_roles <- function(scored_df, minRead, minCov,
 
   # D-14: emit the continuous assembly_support_score + assembly_exists columns on
   # every output row (EVID-01). As of Plan 03, role / role_reason / overall_sample_call
-  # are DERIVED from the per-candidate evidence_state (below) — the binary ANDed
-  # own_substantial floor now survives ONLY as the refuted quality re-check
-  # (quality_fails_state) feeding evidence_state, never as the role gate itself.
+  # are DERIVED from the per-candidate evidence_state (below). The binary ANDed
+  # own_substantial floor is gone entirely as of 260805 — its last consumer was the
+  # refuted band's quality re-check, and that band was unreachable.
   # score_assembly_support() reads only the candidate's OWN assembly metrics
   # (identity/length/k-mer, D-11).
   # WR-03 (12-REVIEW): score_assembly_support() always sets assembly_support_score
@@ -516,15 +519,13 @@ classify_roles <- function(scored_df, minRead, minCov,
     scored_df <- score_assembly_support(scored_df)
   }
 
-  # Per-candidate substantiality of OWN assembly support (D-10 ANDed floors on the
-  # joined metrics). Missing metrics (assembly_support="none" / NA) => FALSE, never NA.
-  has_len  <- if ("assembly_support_best_contig_length"  %in% names(scored_df)) scored_df$assembly_support_best_contig_length  else rep(NA_real_, nrow(scored_df))
-  has_kmer <- if ("assembly_support_best_contig_kmer_cov" %in% names(scored_df)) scored_df$assembly_support_best_contig_kmer_cov else rep(NA_real_, nrow(scored_df))
-  has_pid  <- if ("assembly_support_best_contig_pident"  %in% names(scored_df)) scored_df$assembly_support_best_contig_pident  else rep(NA_real_, nrow(scored_df))
-  own_substantial <- !is.na(has_len) & !is.na(has_kmer) & !is.na(has_pid) &
-    has_len  >= denovo_min_contig_length &
-    has_kmer >= denovo_min_kmer_cov &
-    has_pid  >= denovo_min_blast_identity
+  # 260805: the per-candidate `own_substantial` ANDed-floor computation was removed
+  # here. Its last remaining consumer was the refuted band's quality re-check
+  # (quality_fails_state), and that band is gone. The three denovo_min_* parameters
+  # are RETAINED in the signature — callers pass them positionally, and
+  # score_assembly_support() still uses the same metrics to build
+  # assembly_support_score — but classify_roles() itself no longer applies them as a
+  # floor. Do not mistake their presence in the signature for an active gate here.
 
   # --- EVID-02 / EVID-03 / EVID-04: per-candidate evidence_state ---------------
   # Computed for EACH candidate from its OWN assembly_support_score + assembly_exists
@@ -547,42 +548,34 @@ classify_roles <- function(scored_df, minRead, minCov,
   asup_score  <- scored_df$assembly_support_score
   asup_exists <- scored_df$assembly_exists
 
-  # Contradiction leg (D-01): the candidate's OWN de novo genotype genuinely differs
-  # from its OWN mapping genotype. WR-04 (12-REVIEW): reuse the shared
-  # own_denovo_conflict() helper — the SAME predicate apply_concordance() uses for
-  # its denovo_conflict leg — rather than a locally re-derived copy, so the two
-  # can never drift apart (see the helper's docstring for why that mattered, CR-02).
-  # NA / absent legs fall through to non-contradiction (T-12-02: an absent subtype
-  # or genotype can never drive a spurious refutation).
-  own_denovo_state <- own_denovo_conflict(
-    scored_df$candidate_genotype,
-    if ("assembly_support" %in% names(scored_df)) scored_df$assembly_support else NULL,
-    if ("assembly_support_subtype" %in% names(scored_df)) scored_df$assembly_support_subtype else NULL
-  )
-  denovo_contradicts <- own_denovo_state$conflict
-
-  # Quality re-check (D-03): reuse the existing ANDed denovo floor (own_substantial).
-  # A genuine contradiction that survives to classify_roles.R with the original
-  # reference intact is by construction a failed-rescue / low-quality case; refuted
-  # requires the contradicting assembly to ALSO fail these floors. A high-quality
-  # contradiction (own_substantial TRUE) is NOT refuted here — it should already have
-  # been reassigned by rescue_evaluation.R upstream (D-03).
-  quality_fails_state <- !own_substantial
-
-  # Bands (D-01/D-09/D-10/D-05): assembly_exists==FALSE forces weak regardless of
-  # score (D-09); refuted requires ALL THREE of D-01 (own assembly exists AND its de
-  # novo genotype differs from its own mapping genotype AND it fails quality); k-mer
-  # never forces refutation because it only enters through the bonus-only score, never
-  # a raw floor (D-10).
+  # Bands (D-09/D-10/D-05): assembly_exists==FALSE forces weak regardless of score
+  # (D-09); otherwise the assembly_support_score decides.
+  #
+  # 260805 (refuted-unreachable): the fourth band, `refuted`, has been REMOVED. It
+  # required `denovo_contradicts & quality_fails_state`, where denovo_contradicts came
+  # from the structurally unsatisfiable own_denovo_conflict() predicate — see
+  # has_own_denovo()'s docstring. The band was dead code and evidence_state is now
+  # three-valued: confirmed / probable / weak.
+  #
+  # It is not being repaired, and repairing it would be harmful. Note what the band
+  # actually required: a contradicting contig that ALSO FAILS the substantiality
+  # floors (quality_fails_state = !own_substantial). That is the profile of assembly
+  # noise, not of a real second strain. The IVT dilution series demonstrates this
+  # directly — nine controlled 1a/2a mixtures carry six off-genotype contigs at
+  # 226-320 bp / 0.79-1.22x k-mer, every one failing own_substantial. Had attribution
+  # been widened so these could be seen, each would have REFUTED a correct dominant
+  # candidate on the strength of noise.
+  #
+  # The case genuinely worth catching — a SUBSTANTIAL contradicting contig — is owned
+  # by RESCUE_EVALUATION (floors 3000 bp / 85% / 3000 bp aln / 2.0x k-mer), which is
+  # unconditional and sample-scoped. A candidate whose only contig is off-genotype
+  # still gets assembly_support = "none" here and lands in `weak`, so it is demoted
+  # either way; only the label differs.
   evidence_state_col <- ifelse(
     !asup_exists,
     "weak",
-    ifelse(
-      denovo_contradicts & quality_fails_state,
-      "refuted",
-      ifelse(asup_score >= evidence_hi_cut, "confirmed",
-             ifelse(asup_score >= evidence_lo_cut, "probable", "weak"))
-    )
+    ifelse(asup_score >= evidence_hi_cut, "confirmed",
+           ifelse(asup_score >= evidence_lo_cut, "probable", "weak"))
   )
 
   # Per-candidate floor pass (D-07/D-09: now informational annotation only, not a hard gate).
@@ -657,18 +650,18 @@ classify_roles <- function(scored_df, minRead, minCov,
       # background regardless of whether the dominant assembled.
       #   confirmed / probable -> co-infection (subject to the UNCHANGED
       #                           is_valid_minor() demotion below; D-17)
-      #   refuted              -> background / refuted_denovo (genuine own-assembly
-      #                           genotype contradiction; reason retained, D-18)
       #   weak                 -> background, with the D-06/D-18 reason split:
       #                           no_own_assembly (assembly_exists FALSE) vs
       #                           weak_own_assembly_below_floor (present, below cut)
+      #
+      # 260805: the `refuted -> background / refuted_denovo` arm has been removed
+      # with the unreachable evidence_state band that fed it. A candidate whose only
+      # contig is off-genotype gets assembly_support = "none" -> weak -> background /
+      # no_own_assembly, which is the same role by a differently-worded reason.
       st <- g$evidence_state[i]
       if (st %in% c("confirmed", "probable")) {
         role <- "co-infection"
         reason <- "corroborated"
-      } else if (identical(st, "refuted")) {
-        role <- "background"
-        reason <- "refuted_denovo"
       } else {
         role <- "background"
         reason <- if (isTRUE(g$assembly_exists[i])) "weak_own_assembly_below_floor" else "no_own_assembly"
@@ -820,8 +813,6 @@ build_evidence_summary <- function(role, role_reason, evidence_state,
   } else if (identical(rr, "corroborated")) {
     paste0("co-infection member corroborated by a matching-genotype contig",
            if (nzchar(metrics)) paste0(" (", metrics, ")") else "")
-  } else if (identical(rr, "refuted_denovo")) {
-    paste0("background — the sample's contig genotype contradicts the mapping assignment", contig_clause)
   } else if (identical(rr, "discordant_identity")) {
     paste0("background — mapping identity conflicts with the contig/GLUE identity", contig_clause)
   } else if (identical(rr, "no_own_assembly")) {
@@ -847,7 +838,7 @@ build_evidence_summary <- function(role, role_reason, evidence_state,
 # candidate_review_fragment(): per-candidate review_flag fragment (EVID-06). Returns
 # NA_character_ for a clean dominant / clean confirmed / clean background candidate,
 # else "candidate <rank> (<subtype>_<ref>): <reason with the concrete driving value>".
-# Fires for EVERY non-dominant, non-clean candidate — weak/probable/refuted evidence
+# Fires for EVERY non-dominant, non-clean candidate — weak/probable evidence
 # states and the D-08 demotions (same_genotype_as_dominant / recombinant_2k1b) that
 # fire even though the candidate's own contig evidence was good. NO numeric flag-gating
 # threshold is introduced (D-06); severity is conveyed by the concrete measured value in
@@ -868,8 +859,11 @@ candidate_review_fragment <- function(role, role_reason, evidence_state, concord
   if (identical(rr, "indeterminate_dominance_conflict")) return(NA_character_)
 
   is_demotion  <- !is.na(rr) && rr %in% c("same_genotype_as_dominant", "recombinant_2k1b")
-  is_conflict  <- !is.na(rr) && rr %in% c("refuted_denovo", "discordant_identity")
-  is_weakstate <- !is.na(st) && st %in% c("weak", "probable", "refuted")
+  # 260805: "refuted_denovo" removed from is_conflict and "refuted" from is_weakstate —
+  # both were unreachable evidence_state/role_reason values. discordant_identity stays:
+  # it is LIVE via apply_concordance()'s GLUE leg.
+  is_conflict  <- !is.na(rr) && rr %in% c("discordant_identity")
+  is_weakstate <- !is.na(st) && st %in% c("weak", "probable")
 
   # D-06: flag every non-dominant, non-clean candidate. A clean confirmed co-infection
   # / clean background (no flaggable state, not a demotion or conflict) => NA.
@@ -885,8 +879,6 @@ candidate_review_fragment <- function(role, role_reason, evidence_state, concord
     "no contig with the same genotype/subtype as the candidate"
   } else if (identical(rr, "corroborated") && identical(st, "probable")) {
     paste0("co-infection only marginally corroborated by contig", m_paren)
-  } else if (identical(rr, "refuted_denovo")) {
-    paste0("contig genotype contradicts the mapping assignment", m_paren)
   } else if (identical(rr, "discordant_identity")) {
     paste0("mapping identity conflicts with the contig/GLUE identity", m_paren)
   } else if (identical(rr, "same_genotype_as_dominant")) {

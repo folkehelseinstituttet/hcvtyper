@@ -391,8 +391,12 @@ conc_df <- bind_rows(
   mk_conc("S1", "1a", "1", "supported", "1a"),
   # discordant (mapping vs GLUE): mapping 4g + GLUE gt1 -> discordant
   mk_conc("S2", "4g", "1", "none",       NA),
-  # discordant (mapping vs de novo): mapping 1a + de novo 3a -> discordant
-  mk_conc("S3", "1a", NA,  "supported", "3a"),
+  # 260805: S3 used to be "mapping 1a + de novo 3a -> discordant". That state cannot
+  # exist — assembly_support_join() only attributes a contig whose genotype EQUALS the
+  # candidate's, so the de novo leg can never disagree and it no longer contributes to
+  # `discordant` at all (GLUE is the sole source, S2). Repurposed to cover the case
+  # the suite was actually missing: de novo present and agreeing, no GLUE.
+  mk_conc("S3", "1a", NA,  "supported", "1a"),
   # unconfirmed: mapping 1a + no GLUE + no de novo
   mk_conc("S4", "1a", NA,  "none",       NA),
   # unconfirmed: mapping 1a + GLUE agrees + no de novo
@@ -409,10 +413,10 @@ if (status_of(conc_out, "S2") != "discordant")
   fail(sprintf("Test11: S2 (4g vs GLUE gt1) must be discordant, got '%s'", status_of(conc_out, "S2")))
 if (reason_of_c(conc_out, "S2") != "discordant_mapping_vs_glue")
   fail(sprintf("Test11: S2 reason must be discordant_mapping_vs_glue, got '%s'", reason_of_c(conc_out, "S2")))
-if (status_of(conc_out, "S3") != "discordant")
-  fail(sprintf("Test11: S3 (mapping 1a vs de novo 3a) must be discordant, got '%s'", status_of(conc_out, "S3")))
-if (reason_of_c(conc_out, "S3") != "discordant_mapping_vs_denovo")
-  fail(sprintf("Test11: S3 reason must be discordant_mapping_vs_denovo, got '%s'", reason_of_c(conc_out, "S3")))
+if (status_of(conc_out, "S3") != "unconfirmed")
+  fail(sprintf("Test11: S3 (de novo only, agreeing) must be unconfirmed, got '%s'", status_of(conc_out, "S3")))
+if (reason_of_c(conc_out, "S3") != "two_legs_denovo_only")
+  fail(sprintf("Test11: S3 reason must be two_legs_denovo_only, got '%s'", reason_of_c(conc_out, "S3")))
 if (status_of(conc_out, "S4") != "unconfirmed")
   fail(sprintf("Test11: S4 (no corroborating legs) must be unconfirmed, got '%s'", status_of(conc_out, "S4")))
 if (reason_of_c(conc_out, "S4") != "no_corroborating_legs")
@@ -669,49 +673,44 @@ for (col in c("assembly_support_score", "assembly_exists",
 ok("Test16 (EVID-01/D-14): calibrated anchors reproduced; assembly_support_score + assembly_exists wired additively onto classify_roles() output")
 
 # --- Test 17: per-candidate evidence_state (EVID-02/EVID-03, D-01/D-05/D-09/D-10) ---
-# Phase-12 Plan-02 Task 1. evidence_state (confirmed/probable/weak/refuted) is an
+# Phase-12 Plan-02 Task 1. evidence_state (confirmed/probable/weak) is an
 # ADDITIVE column computed from each candidate's OWN assembly_support_score +
 # assembly_exists + its OWN de novo contradiction — never from another candidate's
 # dominance. role/role_reason/overall_sample_call are UNCHANGED this plan (Plan 03
 # re-derives them from the state). Band cutpoints are calibration-VALIDATED against
 # the real 203-candidate dataset (12-RESEARCH §4, D-13). state_of() defined near the top.
 
-# (a) Synthetic own-assembly contradiction -> refuted (the ONLY path to refuted, D-07).
-# mapping says 1a, de novo assembled a 3a contig (genotype 3 != 1), and the contig
-# FAILS quality (pid 85 < 90 floor). apply_concordance() run first (Test 14 idiom).
-syn_contra <- mk_cand("SYN17", "1a_ref", "1a", 5000, 80, 0.70,
-                      sup_len = 600, sup_kmer = 3, sup_pid = 85) %>%
-  mutate(candidate_glue_genotype  = NA_character_,
-         assembly_support         = "supported",
-         assembly_support_subtype = "3a")
-r17_syn <- classify(apply_concordance(syn_contra))
-if (state_of(r17_syn, "1a_ref") != "refuted")
-  fail(sprintf("Test17 synthetic own-assembly contradiction must be refuted, got '%s'", state_of(r17_syn, "1a_ref")))
+# (a) 260805: the "synthetic own-assembly contradiction -> refuted" case was REMOVED.
+# It set assembly_support_subtype = "3a" on a genotype-1 candidate — a state
+# assembly_support_join() cannot emit, since it attributes a contig only when the
+# genotypes are EQUAL. The band it exercised was therefore unreachable in production
+# and has been deleted; evidence_state is now three-valued. Test21 below composes the
+# real join and asserts the invariant that made it unreachable.
 
-# (b) No own assembly -> weak (NOT refuted): the 4d shape, no contig at all (D-01/D-09).
+# (b) No own assembly -> weak: the 4d shape, no contig at all (D-01/D-09).
 no_asm17 <- mk_cand("S17b", "4d_none", "4d", 8, NA, 0)
 r17_no <- classify(no_asm17)
 if (state_of(r17_no, "4d_none") != "weak")
-  fail(sprintf("Test17 no-assembly candidate must be weak, not refuted, got '%s'", state_of(r17_no, "4d_none")))
+  fail(sprintf("Test17 no-assembly candidate must be weak, got '%s'", state_of(r17_no, "4d_none")))
 
-# (c) k-mer cliff (2714372 1a shape: id 90.996%, k-mer 1.93) -> NOT refuted (D-10).
+# (c) k-mer cliff (2714372 1a shape: id 90.996%, k-mer 1.93) -> confirmed (D-10).
 # k-mer alone cannot force refutation; the strong contig scores ~0.941 -> confirmed.
 kcliff17 <- mk_cand("S17c", "1a_HQ850279", "1a", 4462, NA, 0,
                     sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)
 r17_k <- classify(kcliff17)
-if (state_of(r17_k, "1a_HQ850279") == "refuted")
-  fail("Test17 k-mer-cliff (91% id, k-mer 1.93) must NOT be refuted (D-10 k-mer bonus-only)")
+if (state_of(r17_k, "1a_HQ850279") == "weak")
+  fail("Test17 k-mer-cliff (91% id, k-mer 1.93) must not be downgraded to weak (D-10 k-mer bonus-only)")
 if (state_of(r17_k, "1a_HQ850279") != "confirmed")
   fail(sprintf("Test17 k-mer-cliff strong contig must be confirmed, got '%s'", state_of(r17_k, "1a_HQ850279")))
 
-# (d) Real named anchors never reach refuted; the strong-but-89% 2c is confirmed
+# (d) The strong-but-89% 2c is confirmed
 # (EVID-01: ~89% identity is NOT disqualifying).
 s51k17 <- mk_cand("S17d1", "2c_JX227949", "2c", 26023, NA, 0, sup_len = 9479, sup_kmer = 514.2, sup_pid = 89.009)
 s61k17 <- mk_cand("S17d2", "2c_JX227949", "2c", 6919,  NA, 0, sup_len = 9477, sup_kmer = 102.8, sup_pid = 88.987)
 if (state_of(classify(s51k17), "2c_JX227949") != "confirmed")
-  fail("Test17 Sample51K-2c (89.009%) must be confirmed, not refuted (EVID-01)")
+  fail("Test17 Sample51K-2c (89.009%) must be confirmed (EVID-01)")
 if (state_of(classify(s61k17), "2c_JX227949") != "confirmed")
-  fail("Test17 Sample61K-2c (88.987%) must be confirmed, not refuted (EVID-01)")
+  fail("Test17 Sample61K-2c (88.987%) must be confirmed (EVID-01)")
 
 # (e) evidence_state present on every output row incl. zero-row (CLASS-03/D-14 additive).
 if (!"evidence_state" %in% names(r17_no))
@@ -723,9 +722,9 @@ if (!"evidence_state" %in% names(classify(no_asm17[0, ])))
 # perturb the existing dominant/monoinfection outcome of a known fixture.
 if ((classify(false_4g) %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
   fail("Test17 additive evidence_state must not change false_4g's monoinfection call (Plan 03 owns role changes)")
-ok("Test17 (EVID-02/EVID-03): per-candidate evidence_state — contradiction->refuted, no-assembly->weak, k-mer-cliff/89%-2c->not refuted; additive only")
+ok("Test17 (EVID-02/EVID-03): per-candidate evidence_state — no-assembly->weak, k-mer-cliff/89%-2c->confirmed; additive only")
 
-# --- Test 18: per-candidate independence + sole-refuted (EVID-02, D-07) -------
+# --- Test 18: per-candidate independence + state vocabulary (EVID-02) --------
 # Phase-12 Plan-02 Task 2 (reconciled in Plan 03). The Sample51K paradox: the SAME
 # 2c contig (89.009%, ~9479bp, k-mer 514) was refuted at the ROLE layer under the old
 # model only because a 3a co-infects the sample and wins dominance — while in samples
@@ -769,23 +768,14 @@ if ((r51 %>% pull(overall_sample_call) %>% unique()) != "co-infection")
 if (role_of(r52, "2c_JX227949") != "dominant")
   fail("Test18: the lone 2c is dominant when no competitor shares the sample")
 
-# Sole-refuted (D-07): across every real/anchor fixture frame in the suite, NO
-# candidate reaches refuted — only a synthetic own-assembly contradiction can.
+# 260805: evidence_state is three-valued; `refuted` no longer exists in the
+# vocabulary. Assert that directly across every real/anchor fixture frame.
 all_states <- bind_rows(r1, r2, r3, r4, r5, r5b, r6, r7, r8, ra, rb, rc,
                         r12a, r12b, r_err507, r14, r16, r17_no, r17_k, r51, r52)
-if (any(all_states$evidence_state == "refuted"))
-  fail("Test18 no real/anchor fixture may reach refuted — only the synthetic contradiction does (D-07)")
-
-# The synthetic contradiction (mapping 1a vs de novo 2b, low quality) is the sole
-# refuted case — assembly exists AND genotype differs AND fails quality (D-01).
-syn18 <- mk_cand("SYN18", "1a_ref", "1a", 5000, 80, 0.70,
-                 sup_len = 700, sup_kmer = 4, sup_pid = 86) %>%
-  mutate(candidate_glue_genotype  = NA_character_,
-         assembly_support         = "supported",
-         assembly_support_subtype = "2b")
-if (state_of(classify(apply_concordance(syn18)), "1a_ref") != "refuted")
-  fail("Test18 synthetic own-assembly contradiction (1a mapping vs 2b de novo, low quality) must be refuted (D-07)")
-ok("Test18 (EVID-02/D-07): 2c evidence_state independent of competing 3a (role flips, state does not); synthetic contradiction is the sole refuted case")
+if (!all(all_states$evidence_state %in% c("confirmed", "probable", "weak")))
+  fail(sprintf("Test18 evidence_state must be one of confirmed/probable/weak, got: %s",
+               paste(sort(unique(all_states$evidence_state)), collapse = ", ")))
+ok("Test18 (EVID-02): 2c evidence_state independent of competing 3a (role flips, state does not); evidence_state vocabulary is confirmed/probable/weak")
 
 # --- Test 19: role/role_reason/overall_sample_call DERIVED from evidence_state ---
 # Phase-12 Plan-03 Task 1 (EVID-04, D-16/D-18). role is now re-derived from each
@@ -840,21 +830,11 @@ if (role_of(r19c, "2c_weak") != "background")
 if (reason_of(r19c, "2c_weak") != "weak_own_assembly_below_floor")
   fail(sprintf("Test19c weak-present reason must be weak_own_assembly_below_floor, got '%s'", reason_of(r19c, "2c_weak")))
 
-# (d) non-dominant genuine contradiction (refuted state) -> background/refuted_denovo
-# (D-18 retains refuted_denovo for a GENUINE own-assembly genotype contradiction).
-# No apply_concordance() is run, so the discordant hard gate does not pre-empt it.
-refuted_role <- bind_rows(
-  mk_cand("R19", "2a_dom", "2a", 300000, 99, 0.95, sup_len = 9500, sup_kmer = 40, sup_pid = 99),
-  mk_cand("R19", "1a_contra", "1a", 5000, 80, 0.70, sup_len = 600, sup_kmer = 3, sup_pid = 85) %>%
-    mutate(assembly_support = "supported", assembly_support_subtype = "3a")
-)
-r19d <- classify(refuted_role)
-if (state_of(r19d, "1a_contra") != "refuted")
-  fail(sprintf("Test19d genuine own-assembly contradiction must be refuted, got '%s'", state_of(r19d, "1a_contra")))
-if (role_of(r19d, "1a_contra") != "background")
-  fail("Test19d refuted candidate must be background")
-if (reason_of(r19d, "1a_contra") != "refuted_denovo")
-  fail(sprintf("Test19d refuted candidate reason must be refuted_denovo, got '%s'", reason_of(r19d, "1a_contra")))
+# (d) 260805: the "genuine contradiction -> background/refuted_denovo" case was
+# REMOVED. Like Test17(a) it hand-set assembly_support_subtype to a foreign genotype,
+# which the production join cannot produce. A candidate whose only contig is
+# off-genotype instead gets assembly_support = "none" -> weak -> background /
+# no_own_assembly, which case (c) above already covers.
 
 # (e) D-16: a dominant candidate is role=dominant regardless of a weak evidence_state.
 lone_weak <- mk_cand("L19", "1a_lone", "1a", 100000, 95, 0.90)   # no assembly -> weak
@@ -865,34 +845,78 @@ if (role_of(r19e, "1a_lone") != "dominant")
   fail("Test19e a dominant candidate must stay dominant even when its evidence_state is weak (D-16)")
 if ((r19e %>% pull(overall_sample_call) %>% unique()) != "monoinfection")
   fail("Test19e lone dominant weak candidate -> monoinfection")
-ok("Test19 (EVID-04/D-16/D-18): role/role_reason/overall_sample_call derived from evidence_state — 2c co-infection flip, false-4g weak/background, weak-present vs no-assembly split, genuine contradiction refuted_denovo, dominant stays dominant when weak")
+ok("Test19 (EVID-04/D-16/D-18): role/role_reason/overall_sample_call derived from evidence_state — 2c co-infection flip, false-4g weak/background, weak-present vs no-assembly split, dominant stays dominant when weak")
 
-# --- Test 20: production call-order integration (CR-02, 12-REVIEW) -----------
-# summarize.R ALWAYS runs apply_concordance() BEFORE score_candidates() /
-# classify_roles() (bin/summarize.R L818, L820, L830). Test19d's synthetic
-# contradiction, run WITHOUT apply_concordance() first, locks in
-# role_reason == "refuted_denovo" — but that is NOT what production actually
-# produces for the identical candidate frame, because apply_concordance()
-# computes the SAME own-de-novo-vs-mapping contradiction as concordance_status
-# == "discordant" (denovo_conflict, classify_roles.R L106), and the
-# discordant_identity hard gate in classify_one_sample() (L565-570) runs and
-# `next`s BEFORE the evidence_state branch is ever reached (L586-596). Mirror
-# the real call order here and assert on the ACTUALLY-OBSERVED role_reason, so
-# a future rename of either gate cannot silently regress this back to a
-# comforting-but-wrong "refuted_denovo" expectation.
-integ_contra <- bind_rows(
-  mk_cand("I20", "2a_dom",    "2a", 300000, 99, 0.95, sup_len = 9500, sup_kmer = 40, sup_pid = 99),
-  mk_cand("I20", "1a_contra", "1a", 5000,   80, 0.70, sup_len = 600,  sup_kmer = 3,  sup_pid = 85) %>%
-    mutate(assembly_support = "supported", assembly_support_subtype = "3a")
+# --- Test 20: the attribution invariant, through the REAL join (260805) ------
+# This test exists because its predecessor did not. The old Test20 hand-built the
+# joined frame — assembly_support_subtype = "3a" on a genotype-1 candidate — and
+# asserted the behaviour of the `refuted` evidence_state band. That input is one
+# assembly_support_join() can never produce, so the band was unreachable in
+# production while three unit tests certified it green for months. The old note in
+# summarize.R (CR-02) was reasoned from that fixture and was wrong in both halves.
+#
+# The fix is to COMPOSE the real join instead of imitating its output. If someone
+# later widens attribution so an off-genotype contig can be attached, this test
+# fails and the design decision gets made deliberately rather than by accident.
+source(file.path(bin_dir, "assembly_support_join.R"))
+
+mk_support <- function(sample, subtype, length, pident, aln_length, kmer_cov) {
+  tibble(sampleName = sample, subtype = subtype,
+         best_contig_length = length, best_contig_pident = pident,
+         best_contig_aln_length = aln_length, best_contig_kmer_cov = kmer_cov)
+}
+
+# A genotype-1 candidate in a sample whose ONLY contig is genotype 3.
+cands20 <- tibble(
+  sampleName         = "T20",
+  candidate_ref      = "1a_ref",
+  candidate_subtype  = "1a",
+  candidate_genotype = genotype_from_subtype("1a"),
+  candidate_reads    = 5000,
+  candidate_cov      = 80,
+  cv_evenness        = 0.70
 )
-# Real production order: apply_concordance() -> score_candidates() -> classify_roles().
-r20 <- classify(apply_concordance(integ_contra))
-if (state_of(r20, "1a_contra") != "refuted")
-  fail(sprintf("Test20 CR-02: the candidate's own evidence_state must still be 'refuted' regardless of call order, got '%s'", state_of(r20, "1a_contra")))
-if (role_of(r20, "1a_contra") != "background")
-  fail("Test20 CR-02: the contradicting candidate must be background either way")
-if (reason_of(r20, "1a_contra") != "discordant_identity")
-  fail(sprintf("Test20 CR-02: in the REAL production call order, the discordant-identity hard gate pre-empts the refuted-evidence_state branch — role_reason must be 'discordant_identity', got '%s' (NOT 'refuted_denovo', which only Test19d's non-integrated call order can observe)", reason_of(r20, "1a_contra")))
-ok("Test20 (CR-02): production call order (apply_concordance -> score_candidates -> classify_roles) yields role_reason=='discordant_identity' for a genuine own-assembly contradiction, not the isolated-call-order 'refuted_denovo' Test19d observes")
+supp20 <- mk_support("T20", "3a", 600, 85, 590, 3)
+
+for (lvl in c("genotype", "subtype")) {
+  j20 <- join_assembly_support(cands20, supp20, match_level = lvl)
+
+  # (a) The off-genotype contig is NOT attributed — this is the invariant.
+  if (!identical(as.character(j20$assembly_support[1]), "none"))
+    fail(sprintf("Test20[%s]: a genotype-3 contig must NOT be attributed to a genotype-1 candidate, got assembly_support='%s'",
+                 lvl, j20$assembly_support[1]))
+  if (!is.na(j20$assembly_support_subtype[1]))
+    fail(sprintf("Test20[%s]: assembly_support_subtype must stay NA when nothing is attributed, got '%s'",
+                 lvl, j20$assembly_support_subtype[1]))
+
+  # (b) Wherever a contig IS attributed, its genotype equals the candidate's. This is
+  #     the property that made the old refuted band unsatisfiable.
+  attributed <- j20 %>% filter(!is.na(assembly_support_subtype))
+  if (nrow(attributed) > 0) {
+    same <- as.character(genotype_from_subtype(attributed$assembly_support_subtype)) ==
+            as.character(attributed$candidate_genotype)
+    if (!all(same))
+      fail(sprintf("Test20[%s]: an attributed contig's genotype must equal the candidate's", lvl))
+  }
+
+  # (c) End to end, the candidate lands in weak/background/no_own_assembly — the same
+  #     demotion the deleted refuted arm produced, by a truthful reason.
+  r20 <- classify(apply_concordance(j20))
+  if (state_of(r20, "1a_ref") != "weak")
+    fail(sprintf("Test20[%s]: candidate with no same-genotype contig must be weak, got '%s'",
+                 lvl, state_of(r20, "1a_ref")))
+  if (reason_of(r20, "1a_ref") != "no_own_assembly" && role_of(r20, "1a_ref") != "dominant")
+    fail(sprintf("Test20[%s]: expected no_own_assembly, got '%s'", lvl, reason_of(r20, "1a_ref")))
+}
+
+# (d) A same-genotype contig IS attributed and does corroborate (the join works).
+supp20_ok <- mk_support("T20", "1a", 9000, 99, 8900, 40)
+j20_ok <- join_assembly_support(cands20, supp20_ok, match_level = "genotype")
+if (!identical(as.character(j20_ok$assembly_support[1]), "supported"))
+  fail("Test20: a same-genotype contig must be attributed")
+if (state_of(classify(apply_concordance(j20_ok)), "1a_ref") != "confirmed")
+  fail("Test20: a strong same-genotype contig must yield confirmed")
+
+ok("Test20 (260805): composed through the REAL assembly_support_join — off-genotype contigs are never attributed, attributed contigs always share the candidate genotype, and the no-same-genotype candidate lands weak/no_own_assembly")
 
 cat("\nALL PASS\n")

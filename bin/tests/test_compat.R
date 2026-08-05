@@ -246,7 +246,7 @@ run_summarize <- function(case, sampleName, cands,
   # stage <sample>.assembly_support.csv so join_assembly_support() (called from
   # summarize.R L799) populates real assembly_support_* metrics on candidate_support,
   # which score_assembly_support() -> classify_roles() then turns into a per-candidate
-  # evidence_state (confirmed/probable/weak/refuted). Absent by default (assembly_exists
+  # evidence_state (confirmed/probable/weak; `refuted` removed 260805). Absent by default (assembly_exists
   # stays FALSE / evidence_state stays "weak" for every candidate, matching every
   # existing caller's fixtures, which never set this up — this is a distinct fixture
   # from the RPT-CONTIG `denovo` block above, which only staged the rescue-path
@@ -807,7 +807,7 @@ if (is.na(probable_summary$call_confidence[1]) ||
     probable_summary$call_confidence[1] != "provisional")
   fail(sprintf("CR-01 probable-band: call_confidence must be 'provisional', got '%s'",
                probable_summary$call_confidence[1]))
-# WR-05: the confirmed/probable/weak/refuted band must also be surfaced as its
+# WR-05: the confirmed/probable/weak band must also be surfaced as its
 # own wide Summary.csv column, not just folded into the review_flag prose.
 if (is.na(probable_summary$Minor_evidence_state[1]) ||
     probable_summary$Minor_evidence_state[1] != "probable")
