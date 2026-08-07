@@ -907,8 +907,9 @@ candidate_review_fragment <- function(role, role_reason, evidence_state, concord
 # accounted for 92% of the cohort's `provisional` calls: the one signal meant to mark
 # a possibly missed co-infection was firing mostly on assembly noise.
 #
-# Two independent gates, both settled empirically in
-# hcvtyper_offgenotype_flag_sweep_results_2026-08-03.md:
+# Two independent gates, both settled empirically by the 2026-08-03 threshold
+# sweep over that cohort (bin/tests/offgeno_flag_sweep.R re-derives it; the sweep
+# report itself is not in the repo, as it quotes diagnostic sample identifiers):
 #
 #   (1) CONTIG LENGTH >= min_length. Length is the ONLY usable leg. The three
 #       legacy-typable minors this build demotes to monoinfection — the cases that

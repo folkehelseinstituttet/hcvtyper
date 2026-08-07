@@ -183,8 +183,8 @@ ok("ReviewFlag-8: candidate_review_fragment vectorizes via pmap_chr and collapse
 # --- 260803-ogc: offgenotype_contig_reviewable() -------------------------------
 # The gate for the monoinfection different-genotype-contig review sentence. Two
 # legs: the 2k1b recombinant pair exclusion (is_valid_minor rule 2) and the
-# contig-length floor. Empirical basis: hcvtyper_offgenotype_flag_sweep_results_
-# 2026-08-03.md (5 runs / 140 samples; flag fired on 72 with no floor).
+# contig-length floor. Empirical basis: the 2026-08-03 threshold sweep over 5 runs
+# / 140 samples, on which the flag fired on 72 samples with no floor applied.
 
 ogc <- offgenotype_contig_reviewable
 

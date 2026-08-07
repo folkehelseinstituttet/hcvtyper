@@ -14,3 +14,10 @@ CLAUDE.md
 # GSD planning docs (local-only)
 .planning/
 .planning/STATE.md
+
+# Internal development handoff and validation notes (local-only). These quote
+# laboratory sample and sequencing run identifiers from routine diagnostic runs,
+# so they must not be published with the pipeline. Findings that outlive a
+# handoff belong in CHANGELOG.md, docs/, or a code comment instead.
+/hcvtyper_*
+/*_hcvtyper_*

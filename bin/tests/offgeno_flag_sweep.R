@@ -25,8 +25,7 @@
 #               0 disables.
 #
 # Two bugs in the first version of this script, both fixed here, both of which
-# produced plausible output and exit 0 (see
-# hcvtyper_offgenotype_flag_sweep_results_2026-08-03.md §1):
+# produced plausible output and exit 0:
 #
 #   BUG 1 — the recursive Summary.csv glob picked up every result directory under
 #   the root, not just the cohort: 10 runs / 437 samples instead of 5 / 140,
