@@ -60,7 +60,24 @@ Candidates that are demoted are **never silently dropped** — they appear in th
 The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
 > [!IMPORTANT]
-> HCV-GLUE is currently only available with the Docker profile. We recommend that you always run the pipeline with Docker.
+> **HCV-GLUE is only supported on the `docker` profile.** Unlike every other step, the GLUE analysis is not
+> performed inside the container Nextflow starts for it. Instead it drives the **host's** container runtime to
+> start the `cvrbioinformatics/gluetools-mysql` database and run `cvrbioinformatics/gluetools` against each BAM,
+> which is why the GLUE task needs the host Docker socket bind-mounted into it (see `conf/modules_hcv.config`).
+>
+> This has three practical consequences:
+>
+> - The GLUE step is **not supported under `-profile singularity` or `-profile conda`**, where that bind-mount
+>   does not apply. Run those profiles with `--skip_hcvglue`.
+> - The host running the pipeline must allow **non-root access to the Docker socket** (see the link above) and
+>   must be able to **pull images from Docker Hub at run time**. On sites where either is blocked — many HPC
+>   clusters — use `--skip_hcvglue`.
+> - The `--skip_hcvglue` run is otherwise complete: trimming, classification, candidate selection, assembly,
+>   rescue, mapping, consensus, the review flags and `Summary.csv` all behave normally. Only the GLUE-derived
+>   columns (`GLUE_genotype`, `GLUE_subtype`, the resistance columns, and the GLUE version fields) are reported
+>   as `NA`, and the genotype/subtype call falls back to the mapping-based call.
+>
+> We recommend that you always run the pipeline with Docker.
 
 ## Run the pipeline
 
@@ -155,6 +172,12 @@ The output directory is specified using the `--outdir` parameter, e.g.:
 ### Profiles
 
 The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`.
+
+> [!IMPORTANT]
+> `docker` is the only profile on which the pipeline runs end to end. The HCV-GLUE step needs access to the
+> host's container runtime and is **not supported** under `singularity` or `conda` — combine those with
+> `--skip_hcvglue`, which leaves the rest of the pipeline fully functional. See
+> [Requirements](#requirements) for what this changes in the output.
 
 ### Provide parameters in a file
 
