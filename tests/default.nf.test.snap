@@ -128,7 +128,7 @@
                     "untar": 1.34
                 },
                 "Workflow": {
-                    "folkehelseinstituttet/hcvtyper": "v1.3.0"
+                    "folkehelseinstituttet/hcvtyper": "v2.0.0"
                 }
             },
             [
@@ -690,7 +690,7 @@
                 "multiqc_glue_resistance_table.txt:md5,a8973b1828a2faec605e62e4dd4ae514",
                 "multiqc_kraken-1_kraken-1.txt:md5,5a253204b192a4d211b35abd5dada86d",
                 "multiqc_kraken.txt:md5,805f856012188fdde796f2049aa46934",
-                "multiqc_software_versions.txt:md5,fec082fb95e4edf9f39e4c72e5c8531c",
+                "multiqc_software_versions.txt:md5,a7c4bc197eaf8bd16bac8cf812547b95",
                 "multiqc_summary.txt:md5,dd8ba615b9e5dd4c283a5f86ad263ebd",
                 "Test_1.1b_EU781827_cand2.fa:md5,adfbbbe2888176a86fb06277e29b8b52",
                 "Test_1.2a_AB047639_cand1.fa:md5,f24df467ce79cd1d1933ce2b9e9968fe",
@@ -730,11 +730,11 @@
                 "Test_2.assembly.gfa.gz:md5,a06895753c5684cdf8998a643b78c1e5",
                 "Test_2.contigs.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
                 "Test_2.scaffolds.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
-                "Summary.csv:md5,d3e88a5b1a5e15b84618d02b214dbfcd",
+                "Summary.csv:md5,0b7c8b9ac154e7a75fe7030aed78bb65",
                 "candidates.csv:md5,5e744163a5f871465633b8f7ef3741d8"
             ]
         ],
-        "timestamp": "2026-08-05T08:19:04.460819579",
+        "timestamp": "2026-08-07T22:13:46.659016755",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "24.10.1"
