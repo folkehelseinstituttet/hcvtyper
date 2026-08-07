@@ -11,9 +11,15 @@ full_test/
 .claude/
 CLAUDE.md
 
-# GSD planning docs (local-only)
+# Pipeline output directories. `results` is the conventional --outdir, and run
+# comparisons tend to land beside it as results_<something>/.
+results/
+results_*/
+
+# GSD planning docs and session handoff state (local-only)
 .planning/
 .planning/STATE.md
+.continue-here.md
 
 # Internal development handoff and validation notes (local-only). These quote
 # laboratory sample and sequencing run identifiers from routine diagnostic runs,
