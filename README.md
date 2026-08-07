@@ -1,6 +1,6 @@
 # ![folkehelseinstituttet/hcvtyper](docs/images/logo-engelsk-hele-navnet.jpg#gh-light-mode-only) ![folkehelseinstituttet/hcvtyper](docs/images/logo-engelsk-hele-navnet-hvit.png#gh-dark-mode-only)
 
-[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
+[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A524.04.0-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 
 ## Table of Contents
@@ -120,7 +120,7 @@ To run a full test on a real dataset type:
 
 ```
 # First download the test dataset using nf-core/fetchngs
-nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/refs/heads/dev/assets/test_ids.csv' --outdir full_test
+nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/master/assets/test_ids.csv' --outdir full_test
 
 # Then run the pipeline on the downloaded dataset
 nextflow run folkehelseinstituttet/hcvtyper -profile docker,test_full
