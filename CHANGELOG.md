@@ -19,9 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`bin/tests/test_dominance_breadth_source.R`** (DBS-1..9) — covers the per-row source preference, the units trap, rescued-candidate scoring and eligibility, the deliberate non-change that keeps eligibility from demoting anyone, and that `untypable` stays reachable for genuinely uncovered samples. Verified to fail against the pre-fix code.
 - **A breadth-source wiring guard in `tests/default.nf.test`** asserting `summary/candidates.csv` carries `cand_cov_breadth`. No function-level test can catch "nothing populates the column the score prefers" — the resolver stays green either way — so this assertion is the only thing standing between a silent revert and a score that quietly returns to first-pass breadth.
 
+### `Validation`
+
+- The scoring fixes above were checked by re-running `summarize.R` pre- and post-fix over two existing runs (Thomson 2016 accessions, simulated co-infections, and the IVT dilution series) — **20 samples, 30 candidates, 11 multi-candidate samples**. The pre-fix rerun reproduces both runs' shipped `candidates.csv` byte-for-byte, so the comparison isolates this change. Result: **no dominance ordering flips, no `role` changes, and no `overall_sample_call` changes**; `dominance_score` moves on every candidate (−1.16 to +2.88) and `below_floor` on 5 of 30. Both anchor cases reproduce their predicted values exactly — ERR1810469's 3a/1a pair at 5.9479→5.1130 and 7.5571→8.3677, and ERR1810447's rescued 2b at 5.2307→8.1086. Re-running an existing dataset is therefore expected to change the scores and the floor annotation without changing which strains are reported.
+
 ### `Known issues`
 
 - **`below_floor` is inverted in name**: the column is assigned `clears_floor`, so `TRUE` means the candidate **clears** the floor. The value is now correct; the name is not. Renaming a published column is deferred as an outward-facing contract change.
+- **The `Major_role_*` / `Minor_role_*` family is empty for `co-infection (indeterminate dominance)` samples.** When the indeterminate-dominance trigger fires, both candidates take `role = "indeterminate"`, which matches neither the `dominant` nor the `co-infection` filter that fills those slots — so the references, subtypes, `Major_`/`Minor_dominance_score`, role reasons, evidence states and contig metrics all read `NA` in `Summary.csv` for exactly the samples where dominance is most in question. The values are present in `candidates.csv`. Pre-existing; unrelated to the scoring fixes above.
 
 ## 2.0.0 - 2026.08.07
 
