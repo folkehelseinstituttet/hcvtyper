@@ -3,6 +3,26 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### `Fixed`
+
+- **The dominance score's breadth term read the first-pass mapping, not the targeted one** (`260810-dbs`). `score_candidates()` prefers a `cand_cov_breadth` column and falls back to `candidate_cov` — but **no module has ever emitted `cand_cov_breadth`**, so the fallback was the only live path, and `candidate_cov` is the first-pass all-reference breadth while every other term in the same score is a second-pass quantity. This contradicts decision **D-08** ("the floor and the breadth-evenness score read each candidate's targeted (second) mapping coverage"), and the score's own calibration fixtures were built from targeted breadths. `bin/summarize.R`'s coverage loop now carries the deduplicated targeted breadth@>=5x (`cov_breadth_min_5`) as `cand_cov_breadth`, and the score resolves the two axes **per row** — targeted where it exists, first-pass where the candidate was never targeted-mapped, never 0. Worked example (ERR1810469, Thomson 2016): the 3a candidate was scored on 46% first-pass breadth against a real targeted breadth of 18.17%, and its 1a partner on 69% against 96.02%.
+- **Rescued and nominated candidates scored as if none of their reference were covered.** `rescue_evaluation.R` correctly blanks `candidate_reads`/`candidate_cov` after a reference replacement (those numbers described the *displaced* reference), but nothing recomputed breadth for the score, so the breadth term silently fell to 0 — a systematic 3.0-point penalty on exactly the candidates the de novo layer exists to surface. In the Thomson 2016 run this hit all five de-novo-surfaced co-infections, whose real targeted breadths are 62–99%.
+- **A rescued or nominated candidate could never be selected as dominant, and a sole one was reported `untypable`.** The dominance eligibility test read the same blanked `candidate_cov`, so `NA` was treated as "no coverage" rather than "not measured on this axis". A sample whose only candidate had been rescued was reported with `overall_sample_call = untypable` — documented as "no usable coverage on any candidate" — while simultaneously carrying a `co-infection` role, regardless of how strong its targeted coverage and contig evidence were. Eligibility now resolves coverage across both axes; it can only ever *add* candidates to the eligible pool, never demote one.
+- **Coverage breadth below 1% scored as if it were 100%.** The percent-to-fraction coercion used a `> 1` units heuristic, so any value in `[0, 1]` was read as an already-fractional breadth. Because the first-pass breadth is rounded to an integer, every candidate at 0.5–1.5% breadth landed on exactly `1` and collected the **full** 3.0-point breadth award: at the default weights, 1% breadth scored 6.599 against 2% breadth's 3.659. Breadth is now coerced as a 0–100 percent unconditionally. (Raised as a warning during the Phase-8 review and dismissed because such candidates "always fail the gate" — no longer true once D-07/D-09 made the floor informational.)
+- **The `below_floor` annotation in `candidates.csv` ignored the targeted mapping.** It compared the first-pass read count (with duplicates) and first-pass breadth against thresholds named `min_targeted_read`/`min_targeted_cov`, so it shared neither source with the score nor semantics with its own parameters, and reported every rescued candidate as failing a floor it clears by a wide margin. It now reads `targeted_reads_nodup` and `cand_cov_breadth`, falling back per row.
+
+### `Added`
+
+- **`cand_cov_breadth` column in `summary/candidates.csv`** — the deduplicated targeted breadth@>=5x per candidate, the value the dominance score's breadth term now reads. `candidate_cov` is unchanged and still reports the first-pass all-reference breadth.
+- **`bin/tests/test_dominance_breadth_source.R`** (DBS-1..9) — covers the per-row source preference, the units trap, rescued-candidate scoring and eligibility, the deliberate non-change that keeps eligibility from demoting anyone, and that `untypable` stays reachable for genuinely uncovered samples. Verified to fail against the pre-fix code.
+- **A breadth-source wiring guard in `tests/default.nf.test`** asserting `summary/candidates.csv` carries `cand_cov_breadth`. No function-level test can catch "nothing populates the column the score prefers" — the resolver stays green either way — so this assertion is the only thing standing between a silent revert and a score that quietly returns to first-pass breadth.
+
+### `Known issues`
+
+- **`below_floor` is inverted in name**: the column is assigned `clears_floor`, so `TRUE` means the candidate **clears** the floor. The value is now correct; the name is not. Renaming a published column is deferred as an outward-facing contract change.
+
 ## 2.0.0 - 2026.08.07
 
 Major release. The major/minor strain model is replaced end to end by a neutral, evidence-first candidate model: references are ranked without dominance semantics, each candidate is corroborated against an independent _de novo_ assembly, and roles (`dominant` / `co-infection` / `background`) are assigned only at the reporting step. Output filenames and the `Summary.csv` schema change accordingly — see `Breaking changes`.

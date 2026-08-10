@@ -34,7 +34,7 @@ have to reconstruct confidence in your head.
 | `co-infection` | Two (or more) strains cleared the abundance floor **and** have de-novo/assembly support. |
 | `co-infection (indeterminate dominance)` | Two strains are present but read-count and k-mer-coverage rankings disagree on which is dominant. Reported as present; do not rely on the major/minor ordering. |
 | `indeterminate` | No candidate passed the major-gate (first-mapping quality thresholds). |
-| `untypable` | No usable coverage on any candidate. |
+| `untypable` | No usable coverage on any candidate, on **either** mapping — neither the first-pass panel-wide breadth (`candidate_cov`) nor the targeted post-competition breadth (`cand_cov_breadth`) shows anything above zero. A candidate measured on only one of the two axes is still typable; up to and including 2.0.0 a de novo-rescued candidate, whose first-pass numbers are deliberately blank, could reach this state with excellent targeted coverage. |
 
 ### Confidence tiers
 

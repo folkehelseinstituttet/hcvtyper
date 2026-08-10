@@ -35,8 +35,15 @@ fail <- function(msg) {
 ok <- function(msg) cat("PASS:", msg, "\n")
 
 # Builder: a scored-input candidate row carrying the columns score_candidates()
-# reads — candidate_reads, candidate_cov (breadth %), cv_evenness factor, and the
-# joined k-mer-cov metric. Defaults give a neutral baseline.
+# reads — candidate_reads, candidate_cov, cv_evenness factor, and the joined
+# k-mer-cov metric. Defaults give a neutral baseline.
+#
+# NOTE (260810-dbs): `cov` here is the FIRST-pass candidate_cov, used as the
+# breadth fallback because these fixtures carry no cand_cov_breadth. The
+# calibration values below (67.7 / 90.3) were always TARGETED breadths taken from
+# the handoff evidence table — the score was tuned on the second-pass measurement
+# while production fed it the first-pass one, which is the defect 260810-dbs
+# fixed. Breadth is a 0-100 PERCENT on both axes; see test_dominance_breadth_source.R.
 mk_score_cand <- function(reads, cov = 90, even = 0.5, kmer = NA_real_, ref = "ref") {
   tibble(
     sampleName                            = "S",

@@ -66,6 +66,11 @@ nextflow_pipeline {
                 'denovo_minor_contig_length'
             ]
 
+            // 260810-dbs: the long candidates table, for the breadth-source guard below.
+            def candidatesFile = new File("$outputDir/summary/candidates.csv")
+            def candLines = candidatesFile.exists() ? candidatesFile.readLines().findAll { it.trim() } : []
+            def candHeader = candLines ? splitCsv(candLines[0]) : []
+
             assertAll(
                 { assert workflow.success},
                 { assert snapshot(
@@ -100,7 +105,21 @@ nextflow_pipeline {
                 //     populated. This is the assertion that would have caught the removal
                 //     of skip_assembly silently NA-ing the whole de novo layer.
                 { assert ['Test_1', 'Test_2'].every { s -> valueIn(rowFor(s), 'denovo_major_ref') != 'NA' }
-                    : "Expected a de novo top hit for Test_1 and Test_2; got ${['Test_1','Test_2'].collect { [it, valueIn(rowFor(it), 'denovo_major_ref')] }}" }
+                    : "Expected a de novo top hit for Test_1 and Test_2; got ${['Test_1','Test_2'].collect { [it, valueIn(rowFor(it), 'denovo_major_ref')] }}" },
+                // (f) 260810-dbs BREADTH-SOURCE WIRING GUARD. score_candidates() prefers
+                //     `cand_cov_breadth` (the targeted second-pass breadth, D-08) and falls
+                //     back to `candidate_cov` (the first-pass all-reference breadth). For the
+                //     whole life of the score NO module emitted cand_cov_breadth, so the
+                //     fallback was the only live path and every candidate was ranked on
+                //     pre-competition breadth — while every rescued/nominated candidate, whose
+                //     candidate_cov is deliberately blanked, scored as if none of its reference
+                //     were covered at all. summarize.R's cov loop now carries the column.
+                //     This is the ONLY test that can catch a silent revert of that wiring:
+                //     bin/tests/test_dominance_breadth_source.R exercises the resolver, which
+                //     stays green whether or not anything populates its preferred input.
+                { assert candidatesFile.exists() : "summary/candidates.csv was not published" },
+                { assert candHeader.contains('cand_cov_breadth')
+                    : "candidates.csv is missing cand_cov_breadth — the dominance score has silently reverted to first-pass breadth; header was: ${candHeader}" }
             )
         }
     }

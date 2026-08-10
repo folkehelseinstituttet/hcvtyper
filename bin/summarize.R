@@ -588,6 +588,18 @@ tmp_df <- tmp_df %>%
 # long candidate_support frame so score_candidates() can read cv_evenness per
 # candidate. A candidate whose reference was never targeted-mapped (no depth file)
 # NA-fills here and score_candidates() treats the missing factor as neutral 0.
+#
+# 260810-dbs: this lookup now ALSO carries the targeted breadth as `cand_cov_breadth`.
+# D-08 (08-CONTEXT.md:33) decided that "the floor AND the breadth-evenness score read
+# each candidate's targeted (second) mapping coverage", but no module ever emitted the
+# `cand_cov_breadth` column that score_candidates() prefers, so its `candidate_cov`
+# fallback — the FIRST-PASS all-reference breadth — was the only path that ever ran.
+# `cov_breadth_min_5` is the >=5x breadth from the DEDUPLICATED targeted depth file
+# (`*.nodup.tsv`, conf/modules_hcv.config JOINT_MAPPING:SAMTOOLS_DEPTH), the same >=5x
+# semantics as the first-pass `percent_gt_4_int` it replaces and as the --minCov gate.
+# It rides this lookup rather than a new one because it is computed in the SAME cov
+# loop as cv_evenness, at the same grain, and joins on the same key: one join, one
+# NA-fill rule, no second way for the two to disagree.
 cv_by_ref <- tmp_df %>%
   filter(reference != "first_mapping") %>%
   # Phase-9 (COMPAT-02 / D-02): the cov-loop `reference` carries the new `_cand{rank}`
@@ -596,7 +608,9 @@ cv_by_ref <- tmp_df %>%
   # this column from the coverage candidate_rank join, but re-derive it here so the
   # strip is explicit and cannot drift from the other sites.
   mutate(candidate_ref = str_remove(reference, "_cand[0-9]+$")) %>%
-  select(sampleName, candidate_ref, cv_evenness) %>%
+  select(sampleName, candidate_ref, cv_evenness,
+         # 0-100 percent; score_candidates() divides by 100 (SCORE-01).
+         cand_cov_breadth = cov_breadth_min_5) %>%
   filter(!is.na(candidate_ref)) %>%
   distinct(sampleName, candidate_ref, .keep_all = TRUE)
 
@@ -810,9 +824,11 @@ if (length(support_files) > 0) {
 candidate_support <- join_assembly_support(candidates_long, support_df, denovo_match_level)
 
 # Phase 8 dominance scoring + role classification (SCORE-01/02, CLASS-01..04, D-15).
-# Attach the per-candidate cv_evenness factor computed in the cov loop (joined on
-# sampleName + candidate_ref; a candidate whose reference was never targeted-mapped
-# NA-fills and score_candidates() treats it as neutral 0), then run the pure
+# Attach the per-candidate cv_evenness factor AND the targeted breadth cand_cov_breadth
+# computed in the cov loop (joined on sampleName + candidate_ref; a candidate whose
+# reference was never targeted-mapped NA-fills — score_candidates() treats a missing
+# evenness factor as neutral 0, and falls back per row to the first-pass candidate_cov
+# for breadth rather than to 0, see 260810-dbs), then run the pure
 # classifier: score_candidates() emits dominance_score (breadth-evenness dominating
 # raw reads), classify_roles() emits role / role_reason / overall_sample_call per
 # candidate. This is the N-candidate role model that REPLACES the legacy

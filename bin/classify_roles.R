@@ -360,16 +360,83 @@ score_assembly_support <- function(df, w = .default_assembly_weights(),
     )
 }
 
+# =============================================================================
+# 260810-dbs — two-axis coverage resolution
+#
+# Every candidate has up to TWO coverage-breadth measurements, and they are NOT
+# interchangeable:
+#
+#   candidate_cov     FIRST pass. Breadth@>=5x from the all-reference mapping
+#                     (bin/summarize_mapping_to_all_references.R:156, from
+#                     `percent_gt_4_int`). Competition spans the whole 224-sequence
+#                     panel; duplicates are included. Present for every mapped
+#                     candidate; deliberately NA for a candidate whose reference was
+#                     REPLACED or NOMINATED by rescue_evaluation.R (:482, :549-553),
+#                     because the number described the DISPLACED reference.
+#
+#   cand_cov_breadth  SECOND pass. Breadth@>=5x from the deduplicated joint-mapping
+#                     depth file, joined in by summarize.R's cov loop. Competition
+#                     spans only this sample's candidates. Present only for a
+#                     candidate that was actually targeted-mapped (confirmation_status
+#                     == "pass", subworkflows/local/joint_mapping/main.nf:162);
+#                     absent — hence NA — for a below-threshold candidate.
+#
+# D-08 (08-CONTEXT.md:33) makes the second-pass value authoritative for the score and
+# the floor. Neither column is authoritative for EXISTENCE, though, since each is NA
+# in a case where the other is fine. Hence two resolvers, used for two different
+# questions. Both are pure, vectorised and NA-tolerant.
+# =============================================================================
+
+# .prefer_targeted(targeted, fallback, n)
+#   "WHICH measurement should I score/gate on?" — per-ROW preference: take `targeted`
+#   where present, else `fallback`. NA only where BOTH are absent. Either argument may
+#   be NULL (column not in the frame).
+#
+#   The preference MUST be per row, not per column. Per-column is wrong in both
+#   directions, and the pipeline has now been bitten by each: before 260810-dbs no
+#   module emitted `cand_cov_breadth`, so the whole-column test never fired and every
+#   candidate was scored on first-pass breadth; the moment the column exists, a
+#   whole-column test would send every never-targeted candidate from "first-pass
+#   breadth" straight to 0.
+.prefer_targeted <- function(targeted, fallback, n) {
+  tgt <- if (is.null(targeted)) rep(NA_real_, n) else as.numeric(targeted)
+  fbk <- if (is.null(fallback)) rep(NA_real_, n) else as.numeric(fallback)
+  ifelse(is.na(tgt), fbk, tgt)
+}
+
+# .coverage_evidence(targeted, fallback, n)
+#   "Is there ANY evidence this reference was covered at all?" — per-row MAX over the
+#   available axes. NA only where both are absent.
+#
+#   Deliberately NOT .prefer_targeted(). Eligibility is a sanity floor, not a ranking:
+#   it asks whether a candidate may compete for dominance at all, and the score already
+#   does the ranking. Taking the max means this resolver can only ever ADD a candidate
+#   to the eligible pool relative to the pre-260810-dbs `candidate_cov > 0` test — it
+#   can never remove one — which is what keeps the eligibility repair from silently
+#   demoting candidates that no one has re-validated.
+#
+#   The stricter reading (targeted-only, so a candidate that lost every read to its
+#   joint-mapping competitor becomes ineligible) is arguably closer to D-08 and is
+#   NOT adopted here: it can newly strand a sample at `untypable`, which is a reported
+#   call, and it needs a cohort re-run to justify. See the 260810-dbs follow-ups.
+.coverage_evidence <- function(targeted, fallback, n) {
+  tgt <- if (is.null(targeted)) rep(NA_real_, n) else as.numeric(targeted)
+  fbk <- if (is.null(fallback)) rep(NA_real_, n) else as.numeric(fallback)
+  both_na <- is.na(tgt) & is.na(fbk)
+  ifelse(both_na, NA_real_,
+         pmax(ifelse(is.na(tgt), -Inf, tgt), ifelse(is.na(fbk), -Inf, fbk)))
+}
+
 # score_candidates(df, score_weights, evenness_const, kmercov_cap)
 #   df             : candidate frame. Expected columns (NA-tolerant):
 #                    candidate_reads (numeric) AND/OR targeted_reads_nodup (numeric,
 #                    preferred for the reads term — the deduplicated targeted count;
 #                    candidate_reads is the neutral first-mapping count which can be
-#                    inverted by co-infection read mis-recruitment), the per-candidate breadth fraction
-#                    (cand_cov_breadth as a 0-100 percent OR candidate_cov; coerced
-#                    to a 0-1 fraction), cv_evenness (0-1 factor, supplied by the
-#                    Plan-02 cov loop), and assembly_support_best_contig_kmer_cov
-#                    (numeric; NA/"none" => no boost).
+#                    inverted by co-infection read mis-recruitment), the per-candidate breadth
+#                    as a 0-100 PERCENT (cand_cov_breadth preferred per row, else
+#                    candidate_cov — see the two-axis note above), cv_evenness (0-1
+#                    factor, supplied by the Plan-02 cov loop), and
+#                    assembly_support_best_contig_kmer_cov (numeric; NA/"none" => no boost).
 #   score_weights  : list(evenness=, reads=, kmercov=). evenness weights BOTH the
 #                    breadth fraction and the cv_evenness factor (the breadth-evenness
 #                    headline). Defaults to .default_score_weights().
@@ -390,18 +457,32 @@ score_candidates <- function(df, score_weights = .default_score_weights(),
   wr <- score_weights$reads    %||% 1.0
   wk <- score_weights$kmercov  %||% 0.5
 
-  # Breadth fraction (0-1). Prefer an explicit breadth column; fall back to
-  # candidate_cov (the targeted-mapping coverage percent). Coerce a 0-100 percent
-  # to a 0-1 fraction; an already-fractional value (<=1) is left as-is.
-  breadth_src <- if ("cand_cov_breadth" %in% names(df)) {
-    df$cand_cov_breadth
-  } else if ("candidate_cov" %in% names(df)) {
-    df$candidate_cov
-  } else {
-    rep(NA_real_, nrow(df))
-  }
-  breadth_frac <- ifelse(is.na(breadth_src), 0,
-                         ifelse(breadth_src > 1, breadth_src / 100, breadth_src))
+  # Breadth fraction (0-1). Per-ROW source preference: the targeted second-pass
+  # breadth (D-08) where it exists, else the first-pass all-reference breadth. See
+  # the two-axis note above .prefer_targeted() for why per-row and not per-column,
+  # and why the fallback is candidate_cov rather than 0.
+  breadth_src <- .prefer_targeted(
+    if ("cand_cov_breadth" %in% names(df)) df$cand_cov_breadth else NULL,
+    if ("candidate_cov"    %in% names(df)) df$candidate_cov    else NULL,
+    nrow(df)
+  )
+  # BOTH sources are 0-100 PERCENTS, so divide unconditionally.
+  #
+  # 260810-dbs: this used to be `ifelse(breadth_src > 1, breadth_src/100, breadth_src)`,
+  # a "guess the units" heuristic that silently read any value in [0,1] as an
+  # already-fractional breadth. The two live sources are both percents, so the only
+  # thing the heuristic ever did was misread SMALL percents by 100x — inverting the
+  # score exactly where breadth matters most. `percent_gt_4_int` is round()ed, so any
+  # candidate at 0.5-1.5% first-pass breadth landed on exactly 1 and collected the FULL
+  # 3.0-point breadth award: at the production weights, 1% breadth scored 6.599 against
+  # 2% breadth's 3.659. Flagged as a warning in 08-REVIEW.md:136 and dismissed on the
+  # grounds that "these candidates always fail the gate"; that reasoning went stale when
+  # D-07/D-09 turned the floor into an informational annotation and left `eligible`
+  # asking only for cov > 0. Swapping in cov_breadth_min_5 (2 decimals, not rounded to
+  # an integer) makes the (0,1) band ROUTINE rather than rare, so the heuristic had to
+  # go with the same change that introduced it. Any future caller supplying a 0-1
+  # fraction must scale it to a percent first; pinned by test DBS-3.
+  breadth_frac <- ifelse(is.na(breadth_src), 0, breadth_src / 100)
   breadth_frac <- pmax(0, pmin(1, breadth_frac))
 
   # CV-evenness factor (0-1). If a precomputed cv_evenness column is present, use
@@ -579,20 +660,65 @@ classify_roles <- function(scored_df, minRead, minCov,
   )
 
   # Per-candidate floor pass (D-07/D-09: now informational annotation only, not a hard gate).
-  reads <- scored_df$candidate_reads
-  cov   <- if ("candidate_cov" %in% names(scored_df)) scored_df$candidate_cov else rep(NA_real_, nrow(scored_df))
+  #
+  # 260810-dbs: both axes now resolve targeted-first, per row. The thresholds are
+  # named min_targeted_read / min_targeted_cov at the summarize.R call site and D-08
+  # says "floor and score therefore share one coverage source" — but this test read
+  # `candidate_reads` (the first-pass count, WITH duplicates) and `candidate_cov` (the
+  # first-pass breadth), so it shared neither source with the score nor semantics with
+  # its own parameter names. It also reported every rescued/nominated candidate as
+  # failing a floor it clears by a wide margin, because rescue blanks both first-pass
+  # columns: ERR1810447's 2b sits at 95.9% targeted breadth and read FALSE here. Note
+  # that reading the targeted axis is the ONLY way to fix the rescued case at all —
+  # for those rows both first-pass columns are NA, so there is nothing to fall back to.
+  #
+  # CAVEAT, unresolved: minRead/minCov (499/29, conf/modules_hcv.config:16-17) are the
+  # SAME numbers used as the FIRST-PASS selection gate that sets confirmation_status
+  # (summarize_mapping_to_all_references.R:157-158), and their calibration provenance
+  # for the targeted axis is unverified. Targeted nodup counts are much smaller than
+  # first-pass with-duplicates counts (ERR1810469's 3a: 190 vs 5009), so this annotation
+  # will read FALSE considerably more often than it did. That is what D-08 and the
+  # min_targeted_* parameter names ask for, and below_floor gates nothing — but if the
+  # column is to be USED for anything, the thresholds want a calibration pass first.
+  n_rows <- nrow(scored_df)
+  reads <- .prefer_targeted(
+    if ("targeted_reads_nodup" %in% names(scored_df)) scored_df$targeted_reads_nodup else NULL,
+    if ("candidate_reads"      %in% names(scored_df)) scored_df$candidate_reads      else NULL,
+    n_rows
+  )
+  cov <- .prefer_targeted(
+    if ("cand_cov_breadth" %in% names(scored_df)) scored_df$cand_cov_breadth else NULL,
+    if ("candidate_cov"    %in% names(scored_df)) scored_df$candidate_cov    else NULL,
+    n_rows
+  )
   clears_floor <- !is.na(reads) & !is.na(cov) & reads > minRead & cov > minCov
 
-  # New eligible pool: not discordant + has any coverage (breadth@>=1x sanity).
-  has_concordance_outer <- "concordance_status" %in% names(scored_df)
-  concordance_ok_outer <- if (!has_concordance_outer) rep(TRUE, nrow(scored_df)) else
-    (is.na(scored_df$concordance_status) | scored_df$concordance_status != "discordant")
-  eligible <- concordance_ok_outer & !is.na(cov) & cov > 0
+  # Coverage EXISTENCE, a weaker question than the floor: see .coverage_evidence().
+  #
+  # 260810-dbs: this drives the eligible pool, and it used bare `candidate_cov`. That
+  # column is deliberately NA for every rescued or nominated candidate, so `!is.na(cov)`
+  # was FALSE and a de-novo-surfaced strain could NEVER be selected as dominant — the
+  # exact candidates the de novo layer exists to surface were structurally barred from
+  # winning. Where such a candidate was the ONLY one (a rank-1 replacement, which the
+  # dominant_protect_cov guard at rescue_evaluation.R:239 permits whenever first-pass
+  # cov < 90 or own-contig quality fails, and which the 2k1b rule bypasses outright),
+  # dom_idx stayed NA and the sample was reported `untypable` — documented in
+  # docs/output_interpretation.md as "no usable coverage on any candidate" — while
+  # simultaneously carrying a `co-infection` role. Verified reproducible before the fix.
+  cov_evidence <- .coverage_evidence(
+    if ("cand_cov_breadth" %in% names(scored_df)) scored_df$cand_cov_breadth else NULL,
+    if ("candidate_cov"    %in% names(scored_df)) scored_df$candidate_cov    else NULL,
+    n_rows
+  )
 
   scored_df <- scored_df %>%
     mutate(
       below_floor      = clears_floor,
-      .eligible        = eligible,
+      # Materialised so the per-sample classifier below reads the SAME vector this
+      # outer scope computed. It used to recompute the eligibility test from
+      # candidate_cov independently, which is two chances to get one rule wrong.
+      # Dropped from the output alongside .row_order.
+      .cov_evidence    = cov_evidence,
       .row_order       = row_number(),
       evidence_state   = evidence_state_col
     )
@@ -606,7 +732,9 @@ classify_roles <- function(scored_df, minRead, minCov,
     g$role_reason <- NA_character_
 
     has_concordance <- "concordance_status" %in% names(g)
-    cov_vec <- if ("candidate_cov" %in% names(g)) g$candidate_cov else rep(NA_real_, nrow(g))
+    # 260810-dbs: the two-axis coverage evidence resolved once at outer scope, sliced
+    # here by group — NOT a second read of candidate_cov.
+    cov_vec <- g$.cov_evidence
     concordance_ok <- if (!has_concordance) rep(TRUE, nrow(g)) else
       (is.na(g$concordance_status) | g$concordance_status != "discordant")
     eligible <- concordance_ok & !is.na(cov_vec) & cov_vec > 0
@@ -740,7 +868,7 @@ classify_roles <- function(scored_df, minRead, minCov,
 
   out %>%
     arrange(.row_order) %>%
-    select(-.eligible, -.row_order)
+    select(-.cov_evidence, -.row_order)
 }
 
 # =============================================================================

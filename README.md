@@ -422,10 +422,13 @@ Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC 
 
 #### candidates.csv
 
-`summary/candidates.csv` is the long-format companion to `Summary.csv`: **one row per candidate per sample**, including candidates that were demoted to `background`. This is where you look when you want to know why a strain was or was not reported. Columns include `candidate_rank`, `candidate_ref`, `candidate_subtype`, `candidate_reads`, `candidate_cov`, `dominance_score`, `role`, `role_reason`, `evidence_state`, all the `assembly_support_*` metrics, and:
+`summary/candidates.csv` is the long-format companion to `Summary.csv`: **one row per candidate per sample**, including candidates that were demoted to `background`. This is where you look when you want to know why a strain was or was not reported. Columns include `candidate_rank`, `candidate_ref`, `candidate_subtype`, `candidate_reads`, `dominance_score`, `role`, `role_reason`, `evidence_state`, all the `assembly_support_*` metrics, and:
 
+- `candidate_cov` - Coverage breadth at ≥5× from the **first mapping**, against the full reference panel and including duplicates. This is the entry measurement the `--minCov` selection threshold reads. It is deliberately empty for a candidate whose reference was reassigned or added by _de novo_ rescue, because the number described the reference that was displaced.
+- `cand_cov_breadth` - Coverage breadth at ≥5× from the **targeted mapping**, after reads have been competitively assigned among this sample's candidates and deduplicated. This is the value the dominance score's breadth term reads. It is empty for a candidate that never reached targeted mapping (`confirmation_status` below threshold). The two columns answer different questions and routinely disagree — a candidate that recruits reads panel-wide can lose most of them once it competes only against the other candidates in its own sample.
 - `evidence_summary` - A plain-language sentence describing the contig corroboration for that candidate.
 - `contig_identity_contribution` / `contig_length_contribution` / `contig_kmer_contribution` - The weighted per-metric contributions to the candidate's `assembly_support_score`, so the score can be reconstructed from the file.
+- `below_floor` - Whether the candidate **clears** the `--minRead` / `--minCov` floor on its targeted numbers (the name is inverted; `TRUE` means it clears). Informational only — it does not gate the role.
 
 #### Per-sample evidence files
 
