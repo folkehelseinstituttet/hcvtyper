@@ -819,4 +819,81 @@ if (is.na(probable_summary$Major_evidence_state[1]) ||
                probable_summary$Major_evidence_state[1]))
 ok("CR-01/WR-05: a probable-band (evidence_state=probable) co-infection minor fires the any_probable_only review_flag sentence, demotes call_confidence to provisional, and surfaces Major_evidence_state/Minor_evidence_state in Summary.csv, end-to-end via the real summarize.R")
 
+# =========================================================================
+# IDT-1 (260810-idt) — an indeterminate-dominance sample must still report its
+# role stats, keyed coherently to one candidate.
+#
+# Lives in test_compat.R because the slot-fill logic is inline in summarize.R
+# rather than in a sourced pure helper, so run_summarize() is the only way to
+# exercise it without re-implementing it.
+#
+# When the D2 trigger fires (targeted reads favour one candidate, best-contig
+# k-mer coverage the other), classify_roles() sets BOTH candidates to role
+# "indeterminate". The Major_role_*/Minor_role_* slots used to be filled by
+# `filter(role == "dominant")` / `filter(role == "co-infection")`, so neither
+# matched and the ENTIRE role family NA-filled — on exactly the samples where a
+# reader most wants the numbers. Modelled on ERR1810469 (Thomson 2016).
+# =========================================================================
+
+# rank 1 recruits FEWER deduplicated reads but has the far deeper contig;
+# rank 2 recruits more reads on a shallow contig. reads and k-mer therefore
+# disagree on the ranking -> D2 fires.
+idt_cands <- mk_cands(
+  mk_cand(1, "3a_D17763",   "3a", 5009, 46, nodup_reads =  190),
+  mk_cand(2, "1a_HQ850279", "1a", 1069, 69, nodup_reads = 1017)
+)
+idt_support <- tibble(
+  subtype              = c("3a", "1a"),
+  best_contig_length   = c(9200, 9100),
+  best_contig_pident   = c(95, 93),
+  best_contig_kmer_cov = c(60.0, 5.4)      # 3a deep, 1a shallow
+)
+idt_summary <- run_summarize("idt", "IDT", idt_cands, assembly_support = idt_support)
+if (is.null(idt_summary)) fail("IDT-1: summarize.R wrote no Summary.csv")
+
+# Precondition: the fixture really did trigger indeterminate dominance. Without
+# this the rest of the block would pass vacuously against the normal slot path.
+if (!identical(idt_summary$overall_sample_call[1], "co-infection (indeterminate dominance)"))
+  fail(sprintf("IDT-1 precondition: fixture must produce an indeterminate-dominance call, got '%s'",
+               idt_summary$overall_sample_call[1]))
+
+# The role family must be populated, not NA.
+idt_role_cols <- c("Major_role_reference", "Major_role_subtype", "Major_dominance_score",
+                   "Major_role_reason", "Major_evidence_state",
+                   "Minor_role_reference", "Minor_role_subtype", "Minor_dominance_score",
+                   "Minor_role_reason", "Minor_evidence_state")
+missing_vals <- idt_role_cols[vapply(idt_role_cols,
+                                     function(k) is.na(idt_summary[[k]][1]), logical(1))]
+if (length(missing_vals) > 0)
+  fail(paste("IDT-1: role columns NA on an indeterminate-dominance sample:",
+             paste(missing_vals, collapse = ", ")))
+
+# Slot order is by candidate_rank, so the role columns agree with every other
+# Major_*/Minor_* column in the row (which are keyed to rank and NOT re-keyed,
+# because the L1391 swap fires only on dominant_cand_rank == 2). This is the
+# assertion that fails if someone "improves" the slot fill to order by
+# dominance_score: Major_role_reference would become the 1a candidate while
+# Major_reference, Major_cov_breadth_min_5 and GLUE_subtype still describe 3a.
+if (!identical(idt_summary$Major_role_reference[1], idt_summary$Major_reference[1]))
+  fail(sprintf("IDT-1: Major_role_reference '%s' must equal Major_reference '%s' — the row must describe ONE strain per slot",
+               idt_summary$Major_role_reference[1], idt_summary$Major_reference[1]))
+if (!identical(idt_summary$Minor_role_reference[1], idt_summary$Minor_reference[1]))
+  fail(sprintf("IDT-1: Minor_role_reference '%s' must equal Minor_reference '%s'",
+               idt_summary$Minor_role_reference[1], idt_summary$Minor_reference[1]))
+if (!identical(idt_summary$Major_role_reference[1], "3a_D17763"))
+  fail(sprintf("IDT-1: Major slot must take candidate_rank 1 (3a_D17763), got '%s'",
+               idt_summary$Major_role_reference[1]))
+
+# The uncertainty must survive being reported: both role_reason columns say so.
+if (!identical(idt_summary$Major_role_reason[1], "indeterminate_dominance_conflict") ||
+    !identical(idt_summary$Minor_role_reason[1], "indeterminate_dominance_conflict"))
+  fail(sprintf("IDT-1: both role_reason columns must read indeterminate_dominance_conflict, got '%s' / '%s'",
+               idt_summary$Major_role_reason[1], idt_summary$Minor_role_reason[1]))
+
+# The two slots must be DIFFERENT candidates — one row must never fill both.
+if (identical(idt_summary$Major_role_reference[1], idt_summary$Minor_role_reference[1]))
+  fail("IDT-1: Major and Minor role slots resolved to the same candidate")
+
+ok("IDT-1 (260810-idt): an indeterminate-dominance sample reports its full role family, slot-ordered by candidate_rank so every Major_*/Minor_* column in the row describes the same strain")
+
 cat("\nALL PASS\n")

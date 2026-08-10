@@ -870,16 +870,77 @@ candidate_support <- classify_roles(
   match_level               = denovo_match_level
 )
 
+# ---- Slot sources (260810-idt) --------------------------------------------
+# WHICH candidate rows fill the Major_role_* / Minor_role_* slots.
+#
+# These used to be `filter(role == "dominant")` and `filter(role == "co-infection")`
+# directly. That silently emptied the ENTIRE role family for any sample whose call is
+# `co-infection (indeterminate dominance)`: the D2 trigger in classify_roles() sets
+# BOTH candidates to role "indeterminate", which matches neither filter, so the
+# references, subtypes, dominance scores, role reasons, evidence states and contig
+# metrics all NA-filled — for exactly the samples where dominance is most in question,
+# and where a reader most wants the numbers. ERR1810469 lost all ten columns.
+#
+# `indeterminate` candidates are therefore slot-eligible. Ordering rule:
+#
+#   MAJOR  the `dominant` if the sample has one (unchanged for every normal sample),
+#          otherwise the LOWEST-RANKED indeterminate.
+#   MINOR  the best-scoring `co-infection` if the sample has one (unchanged),
+#          otherwise the next indeterminate by rank.
+#
+# Major is picked by candidate_rank, NOT by dominance_score, and that is deliberate.
+# Every other Major_*/Minor_* column in the row — reference, read counts, coverage
+# breadth, avg depth, consensus similarity, and the GLUE resistance profile — is keyed
+# to candidate_rank and is only re-keyed by the swap at L1391, which fires on
+# dominant_cand_rank. Picking the top scorer here would put Major_role_reference on one
+# strain while Major_cov_breadth_min_5 and GLUE_subtype still described the other, i.e.
+# a resistance profile attached to the strain NOT named in the role slot. Since the
+# premise of an indeterminate call is precisely that the two cannot be ranked, rank
+# order is equally defensible and keeps the row internally consistent.
+#
+# The uncertainty is not lost by filling the slots: `role` stays "indeterminate" in
+# candidates.csv, both role_reason columns read "indeterminate_dominance_conflict", and
+# overall_sample_call still says "co-infection (indeterminate dominance)".
+slot_major_src <- candidate_support %>%
+  filter(role %in% c("dominant", "indeterminate")) %>%
+  group_by(sampleName) %>%
+  # `role != "dominant"` is FALSE(0) for the dominant, so it always sorts first;
+  # candidate_rank then orders the indeterminates. candidate_ref is the final
+  # deterministic tie-break, mirroring the D-06 convention in classify_roles().
+  arrange(role != "dominant", candidate_rank, candidate_ref, .by_group = TRUE) %>%
+  slice(1) %>%
+  ungroup()
+
+slot_minor_src <- candidate_support %>%
+  filter(role %in% c("co-infection", "indeterminate")) %>%
+  # Never let one candidate fill both slots.
+  anti_join(slot_major_src %>% select(sampleName, candidate_rank),
+            by = c("sampleName", "candidate_rank")) %>%
+  group_by(sampleName) %>%
+  # co-infections first (highest dominance_score, the pre-existing rule); the
+  # score key is NA for indeterminates so they fall through to rank order.
+  arrange(role != "co-infection",
+          desc(if_else(role == "co-infection", dominance_score, NA_real_)),
+          candidate_rank, candidate_ref, .by_group = TRUE) %>%
+  slice(1) %>%
+  ungroup()
+
 # Per-sample candidate_rank of the role-dominant. Used below to swap Major_*/Minor_*
 # stat/coverage/consensus/GLUE columns when the role classifier's dominant is at
 # candidate_rank 2 (i.e. the mapping-minor carried the true dominant strain, as in
 # a co-infection where first-mapping read mis-recruitment inverted the abundance order).
+#
+# 260810-idt: this reads the SAME row that fills the Major_role_* slot, so the swapped
+# stat/coverage/GLUE columns and the role columns can never describe different strains.
+# For every normal sample that row IS the dominant, so this is unchanged. On an
+# indeterminate-dominance sample it is now the lowest-ranked indeterminate instead of
+# NA — at the shipped n_candidates = 2 that is always rank 1, so needs_swap stays FALSE
+# and the GLUE `coalesce(dominant_cand_rank, 1L)` fallback resolves identically; the
+# value matters only if a future n_candidates > 2 leaves rank 1 background while a
+# higher rank is indeterminate, which is exactly the case that would otherwise
+# reintroduce the cross-column mismatch this slot ordering exists to prevent.
 role_dominant_rank <- if (nrow(candidate_support) > 0) {
-  candidate_support %>%
-    filter(role == "dominant") %>%
-    group_by(sampleName) %>%
-    slice(1) %>%
-    ungroup() %>%
+  slot_major_src %>%
     transmute(sampleName, dominant_cand_rank = as.integer(candidate_rank))
 } else {
   tibble(sampleName = character(), dominant_cand_rank = integer())
@@ -891,6 +952,14 @@ role_dominant_rank <- if (nrow(candidate_support) > 0) {
 # enriched monoinfection subtype-conflict messages (RESEARCH Pattern 3 / Pitfall 3: enrich the
 # sample-level trigger with the candidate rank+ref from the L850 lookup). Transient — joined
 # into final just before the review_flag mutate and dropped in the same select() afterwards.
+#
+# 260810-idt: this one deliberately keeps the strict `role == "dominant"` filter and is NOT
+# switched to slot_major_src. Unlike role_dominant_rank, which only needs a row to key the
+# stat columns to, this names "the dominant candidate" inside review sentences. On an
+# indeterminate-dominance sample there IS no dominant — that is the whole finding — so
+# feeding it the slot-major would make the D-11 triggers assert a dominance the classifier
+# explicitly declined to assert, and would newly fire dominant_unconfirmed / major_ref_changed
+# text on those samples. Staying NA leaves those triggers inert, which is correct.
 role_dominant_ref <- if (nrow(candidate_support) > 0) {
   candidate_support %>%
     filter(role == "dominant") %>%
@@ -936,11 +1005,7 @@ write_csv(candidate_support, file = "candidates.csv")
 # model is Phase 9 / COMPAT-03 — Phase 8 only retires the legacy confirmation
 # LOGIC, D-15). overall_sample_call is taken per-sample (constant within a sample).
 if (nrow(candidate_support) > 0) {
-  role_dominant <- candidate_support %>%
-    filter(role == "dominant") %>%
-    group_by(sampleName) %>%
-    slice(1) %>%
-    ungroup() %>%
+  role_dominant <- slot_major_src %>%
     transmute(
       sampleName,
       Major_role_reference     = candidate_ref,
@@ -960,15 +1025,11 @@ if (nrow(candidate_support) > 0) {
       Major_best_contig_kmer_cov = assembly_support_best_contig_kmer_cov
     )
 
-  role_minor <- candidate_support %>%
-    filter(role == "co-infection") %>%
-    group_by(sampleName) %>%
-    # Deterministic: the highest-scoring corroborated co-infection fills the minor
-    # slot (ties already broken inside classify_roles()'s dominant selection; here
-    # we just take the top remaining co-infection by dominance_score then ref name).
-    arrange(desc(dominance_score), candidate_ref, .by_group = TRUE) %>%
-    slice(1) %>%
-    ungroup() %>%
+  # Deterministic: the highest-scoring corroborated co-infection fills the minor slot
+  # (ties already broken inside classify_roles()'s dominant selection), or the second
+  # indeterminate by rank on an indeterminate-dominance sample. Selection is done in
+  # slot_minor_src above.
+  role_minor <- slot_minor_src %>%
     transmute(
       sampleName,
       Minor_role_reference     = candidate_ref,
