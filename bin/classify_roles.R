@@ -1282,8 +1282,17 @@ sample_review_message <- function(overall_sample_call,
     msgs <- c(msgs, paste0("Genotype call for ", dom_label,
       " is provisional — identity not corroborated (mapping evidence only; no GLUE or de novo confirmation). Please review."))
   # D-10 generic (no candidate name).
+  #
+  # 260813: reworded. This used to read "No candidate passed the major-gate", which
+  # described a minRead/minCov test that classify_roles() has not applied since
+  # D-07/D-09 made the floor an informational annotation (see the `below_floor`
+  # comment above). `indeterminate` is reached when has_any_cov is TRUE but dom_idx
+  # is NA — i.e. no candidate is BOTH covered on some axis AND concordance_ok, so
+  # in practice every covered candidate's mapping genotype conflicts with the GLUE
+  # genotype (the only live source of `discordant`; see apply_concordance()).
+  # The old wording sent a reader to the wrong column entirely.
   if (is_indet)
-    msgs <- c(msgs, "No candidate passed the major-gate — overall sample call indeterminate.")
+    msgs <- c(msgs, "No candidate eligible to be called dominant — no candidate combines measurable coverage with a mapping identity that agrees with GLUE. Overall sample call indeterminate. Please review.")
   if (!is.na(gflag) && gflag != "ok")
     msgs <- c(msgs, "Major strain failed mapping quality thresholds — genotype call uncertain.")
   # D-11: name the reassigned dominant candidate for a Major-slot rescue.

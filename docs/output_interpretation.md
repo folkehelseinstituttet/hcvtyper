@@ -33,7 +33,7 @@ have to reconstruct confidence in your head.
 | `monoinfection` | One dominant strain; any other candidate was demoted to background. |
 | `co-infection` | Two (or more) strains cleared the abundance floor **and** have de-novo/assembly support. |
 | `co-infection (indeterminate dominance)` | Two strains are present but read-count and k-mer-coverage rankings disagree on which is dominant. Reported as present; do not rely on the major/minor ordering. |
-| `indeterminate` | No candidate passed the major-gate (first-mapping quality thresholds). |
+| `indeterminate` | No candidate is eligible to be called dominant: coverage exists, but no candidate combines measurable coverage with a mapping identity that agrees with GLUE. Note this is **not** a `--minRead`/`--minCov` test — that floor has been informational since D-07/D-09 and gates nothing here. |
 | `untypable` | No usable coverage on any candidate, on **either** mapping — neither the first-pass panel-wide breadth (`candidate_cov`) nor the targeted post-competition breadth (`cand_cov_breadth`) shows anything above zero. A candidate measured on only one of the two axes is still typable; up to and including 2.0.0 a de novo-rescued candidate, whose first-pass numbers are deliberately blank, could reach this state with excellent targeted coverage. |
 
 ### Confidence tiers
@@ -65,7 +65,7 @@ in a prompt to review. The triggers:
 4. **Genotype call provisional** — dominant identity not corroborated by GLUE or de novo (mapping evidence only).
 5. **Co-infection kept without de-novo corroboration** — de novo inconclusive for both strains; the minor may be a genuine low-yield co-infection.
 6. **Indeterminate dominance** — read-count and k-mer rankings disagree.
-7. **No candidate passed the major-gate** — call indeterminate.
+7. **No candidate eligible to be called dominant** — no candidate combines measurable coverage with a mapping identity that agrees with GLUE; call indeterminate.
 8. **Major strain failed mapping quality thresholds.**
 10. **De-novo rescue overrode the Major reference** — the primary call was reassigned automatically; confirm against `rescue_audit.csv` before reporting.
 
