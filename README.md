@@ -84,24 +84,31 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 
 ```
-nextflow run folkehelseinstituttet/hcvtyper -r v1.1.7 \
+nextflow run folkehelseinstituttet/hcvtyper -r 2.0.0 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
 
-Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 1.1.7 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.0 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+
+> [!IMPORTANT]
+> **From 2.0.0 the release tags are bare version numbers with no `v` prefix** — `-r 2.0.0`, not
+> `-r v2.0.0` — matching `manifest.version` and nf-core convention. The existing `v1.0`–`v1.2.0`
+> tags are untouched, so `-r v1.1.7` keeps working.
 
 > [!NOTE]
 > The evidence-based classification described in this README (neutral candidate selection, dominance
-> scoring, per-candidate roles, `call_confidence`, _de novo_ rescue and competitive joint mapping) is on
-> the `dev` branch and ships in the next release. To try it before then, use `-r dev`. See the
-> [`CHANGELOG.md`](CHANGELOG.md) `[Unreleased]` section for the full list of changes.
+> scoring, per-candidate roles, `call_confidence`, _de novo_ rescue and competitive joint mapping) is
+> **new in 2.0.0** and is not available in the 1.x releases. 2.0.0 also changes the per-candidate
+> output filenames (`.major.` / `.minor.` → `.cand1.` / `.cand2.`) and the `Summary.csv` schema, so if
+> you are upgrading from 1.x — or have scripts reading either — read the `Breaking changes` in the
+> [`CHANGELOG.md`](CHANGELOG.md) `2.0.0` section first.
 
 If you want to download a local copy of the pipeline you can run:
 
 ```
-nextflow pull folkehelseinstituttet/hcvtyper -r v1.1.7
+nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.0
 ```
 
 Again, `-r` is optional.
@@ -417,8 +424,8 @@ Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC 
 
 **Deprecated columns:**
 
-- `minor_denovo_status` and `coinfection_flag` are no longer populated by the reporting path and remain as NA-filled stubs for one release. The information they carried is now in `Major_evidence_state` / `Minor_evidence_state`, `Minor_role_reason` and `overall_sample_call`.
-- The `Major_*` / `Minor_*` columns are aliased for one release alongside their `Major_role_*` / `Minor_role_*` equivalents, and will be removed in the next release.
+- `minor_denovo_status` and `coinfection_flag` are no longer populated by the reporting path and remain as NA-filled stubs in 2.0.0, and will be removed in the next release. The information they carried is now in `Major_evidence_state` / `Minor_evidence_state`, `Minor_role_reason` and `overall_sample_call`.
+- The `Major_*` / `Minor_*` columns are aliased in 2.0.0 alongside their `Major_role_*` / `Minor_role_*` equivalents, and will be removed in the next release.
 
 #### candidates.csv
 
