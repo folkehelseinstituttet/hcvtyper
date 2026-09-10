@@ -730,11 +730,11 @@
                 "Test_2.assembly.gfa.gz:md5,a06895753c5684cdf8998a643b78c1e5",
                 "Test_2.contigs.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
                 "Test_2.scaffolds.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
-                "Summary.csv:md5,0b7c8b9ac154e7a75fe7030aed78bb65",
-                "candidates.csv:md5,5e744163a5f871465633b8f7ef3741d8"
+                "Summary.csv:md5,ee4d4133cb423a1ec284432cf1c462eb",
+                "candidates.csv:md5,a49a594882afeba00484b67fcc0717b0"
             ]
         ],
-        "timestamp": "2026-08-07T22:13:46.659016755",
+        "timestamp": "2026-09-11T00:16:27.697033442",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "24.10.1"
