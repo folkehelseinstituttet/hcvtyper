@@ -511,7 +511,7 @@ if (any(is.na(s15_sweep$assembly_support_score)))
 if (any(s15_sweep$assembly_support_score < 0 | s15_sweep$assembly_support_score > 1))
   fail("Test15 assembly_support_score must be bounded [0,1] for every input (D-08)")
 
-# D-10: k-mer is BONUS-ONLY — the 2714372 1a shape (id 90.996, k-mer 1.93) must NOT
+# D-10: k-mer is BONUS-ONLY — the SampleKC-1a shape (id 90.996, k-mer 1.93) must NOT
 # score BELOW the identical contig with no k-mer at all.
 kcliff_with <- mk_cand("S15c", "1a_k", "1a", 4462, NA, 0, sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)
 kcliff_none <- mk_cand("S15c", "1a_k", "1a", 4462, NA, 0, sup_len = 6811, sup_kmer = NA,   sup_pid = 90.996)
@@ -604,14 +604,14 @@ if (abs(s61k - 0.872) > 0.01)
 if (s61k < 0.80)
   fail("Test16 Sample61K-2c must land in the genuine-corroborated band, not near 0 (EVID-01)")
 
-# 2714372 1a k-mer cliff: 90.996% id, 6811 bp, k-mer 1.93 -> ~0.941 (k-mer no longer refutes).
-s2714 <- score_of(score_assembly_support(
+# SampleKC-1a k-mer cliff: 90.996% id, 6811 bp, k-mer 1.93 -> ~0.941 (k-mer no longer refutes).
+s_kc <- score_of(score_assembly_support(
   mk_cand("S2714", "1a_HQ850279", "1a", 4462, NA, 0, sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)),
   "1a_HQ850279")
-if (abs(s2714 - 0.941) > 0.01)
-  fail(sprintf("Test16 2714372 1a (k-mer 1.93) must score ~0.941, got %.4f", s2714))
+if (abs(s_kc - 0.941) > 0.01)
+  fail(sprintf("Test16 SampleKC-1a (k-mer 1.93) must score ~0.941, got %.4f", s_kc))
 
-# 2768856 4d no-assembly -> exactly 0, assembly_exists FALSE.
+# SampleNA-4d no-assembly -> exactly 0, assembly_exists FALSE.
 s4d_df <- score_assembly_support(mk_cand("S4d", "4d_DQ418786", "4d", 8, NA, 0))
 if (score_of(s4d_df, "4d_DQ418786") != 0)
   fail("Test16 4d no-assembly anchor must score exactly 0")
@@ -693,7 +693,7 @@ r17_no <- classify(no_asm17)
 if (state_of(r17_no, "4d_none") != "weak")
   fail(sprintf("Test17 no-assembly candidate must be weak, got '%s'", state_of(r17_no, "4d_none")))
 
-# (c) k-mer cliff (2714372 1a shape: id 90.996%, k-mer 1.93) -> confirmed (D-10).
+# (c) k-mer cliff (SampleKC-1a shape: id 90.996%, k-mer 1.93) -> confirmed (D-10).
 # k-mer alone cannot force refutation; the strong contig scores ~0.941 -> confirmed.
 kcliff17 <- mk_cand("S17c", "1a_HQ850279", "1a", 4462, NA, 0,
                     sup_len = 6811, sup_kmer = 1.93, sup_pid = 90.996)

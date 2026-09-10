@@ -325,7 +325,7 @@ major_len    <- major_row$sc_length[1]
 # whose OWN top hit is off-genotype; the downstream re-derivation searched all contigs
 # unrestricted and could therefore return a contig that this filter had excluded.
 #
-# Sample 2633901 is the case in the wild: NODE_3 (1620 bp, top hit 6i_DQ835770,
+# SampleSA-1a is the case in the wild: NODE_3 (1620 bp, top hit 6i_DQ835770,
 # bitscore 97) wins here, but NODE_2 — a 1a contig whose 5'UTR/core region hits the
 # same 6i reference at bitscore 1074 — won the downstream lookup. Summary.csv reported
 # denovo_minor_ref = 6i_DQ835770 and denovo_minor_contig_length = 1620 (both NODE_3)

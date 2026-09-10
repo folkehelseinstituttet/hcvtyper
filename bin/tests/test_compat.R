@@ -222,7 +222,7 @@ run_summarize <- function(case, sampleName, cands,
       "NODE_99_len_400",     denovo$major_ref,   900,    # decoy on major_ref (lower)
       denovo$minor_contig,   denovo$minor_ref,   4200,   # the SELECTED minor contig
       # 260803-ogc: this decoy deliberately OUTSCORES the selected minor contig on
-      # the minor reference, reproducing sample 2633901 — where NODE_2 (an on-genotype
+      # the minor reference, reproducing SampleSA-1a — where NODE_2 (an on-genotype
       # contig whose conserved 5'UTR/core region hit the off-genotype reference at
       # bitscore 1074) beat NODE_3 (the actual off-genotype contig, bitscore 97) in
       # summarize.R's top-bitscore-per-reference lookup. The old re-resolution would
@@ -702,7 +702,7 @@ if (!identical(as.character(cs$denovo_minor_ref[1]), "1b_D90208"))
 if (!identical(as.character(cs$denovo_minor_contig[1]), "NODE_7_len_2500"))
   fail(sprintf(paste("RPT-CONTIG: denovo_minor_contig = '%s', expected NODE_7_len_2500 —",
                      "the contig blast_parse.R SELECTED, not NODE_98_len_350 which",
-                     "outscores it on 1b_D90208 (the 2633901 defect: a re-resolution",
+                     "outscores it on 1b_D90208 (the SampleSA-1a defect: a re-resolution",
                      "against the full hit table names a contig the minor selection",
                      "had excluded)"), cs$denovo_minor_contig[1]))
 ok("RPT-CONTIG: Summary.csv denovo_major/minor_contig + _ref present and populated per strain")

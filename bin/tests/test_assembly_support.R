@@ -196,7 +196,7 @@ if (!is.null(r_c$support) && nrow(r_c$support) != 0)
 ok("empty -> header-only CSV, exit 0, seven-column contract (T-07-01 DoS guard)")
 
 # --- Case D: minor_ref / minor_contig / minor_contig_length name ONE contig ----
-# Regression for the 2633901 defect (260803-ogc). Shape reproduced exactly:
+# Regression for the SampleSA-1a defect (260803-ogc). Shape reproduced exactly:
 #   NODE_1  5159 bp, top hit 1a, aln 5160  -> the major (best overall hit)
 #   NODE_2  3232 bp, top hit 1a, aln 3088  -> a 1a contig that ALSO hits the 6i
 #                                             reference at aln 879 (5'UTR/core)
@@ -233,7 +233,7 @@ name_len <- as.numeric(sub(".*_length_([0-9]+)_.*", "\\1", bp$minor_contig[1]))
 if (!identical(name_len, as.numeric(bp$minor_contig_length[1])))
   fail(sprintf("minor-coherence: contig name says %s bp but minor_contig_length says %s",
                name_len, bp$minor_contig_length[1]))
-ok("minor-coherence: minor_ref / minor_contig / minor_contig_length all describe ONE contig (2633901 regression)")
+ok("minor-coherence: minor_ref / minor_contig / minor_contig_length all describe ONE contig (SampleSA-1a regression)")
 
 # --- Case E: several contigs share the minor reference as their top hit --------
 # The changed length semantics, pinned. Two genotype-2 contigs both top-hit the same

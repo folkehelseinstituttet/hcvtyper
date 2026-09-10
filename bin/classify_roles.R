@@ -252,8 +252,8 @@ is_valid_minor <- function(cand_subtype, cand_genotype, dom_subtype, dom_genotyp
 #   90.4-94.1%; centering a steep curve at 90 would re-create the very cliff EVID-01
 #   removes. Named-anchor scores under these constants: Sample51K-2c (89.009%, 9479bp,
 #   k-mer 514) -> 0.874; Sample61K-2c (88.987%, 9477bp, k-mer 103) -> 0.872;
-#   2714372 1a (90.996%, 6811bp, k-mer 1.93 — k-mer no longer penalizes) -> 0.941;
-#   2768856 4d (no assembly) -> 0.000. The 15 genuine corroborated minors all land
+#   SampleKC-1a (90.996%, 6811bp, k-mer 1.93 — k-mer no longer penalizes) -> 0.941;
+#   SampleNA-4d (no assembly) -> 0.000. The 15 genuine corroborated minors all land
 #   >= 0.87, cleanly separable from the score-0 no-assembly floor.
 #
 #   D-09: a candidate with NO own assembly (assembly_exists FALSE, or NA identity/
@@ -620,7 +620,7 @@ classify_roles <- function(scored_df, minRead, minCov,
   #
   # Band cutpoints are calibration-VALIDATED against the real 203-candidate dataset
   # (12-RESEARCH §4, D-13): the 15 genuine corroborated minors + the Sample51K/61K 2c
-  # (~0.87) + 2714372 1a (~0.94) anchors all score >= hi_cut (confirmed); the
+  # (~0.87) + SampleKC-1a (~0.94) anchors all score >= hi_cut (confirmed); the
   # no-assembly floor scores 0 (weak). GLUE agreement is NOT read here — it can only
   # help reach confirmed, never gate it (D-05).
   evidence_hi_cut <- 0.72   # confirmed when assembly_support_score >= hi_cut (D-13)
@@ -1110,7 +1110,7 @@ offgenotype_contig_reviewable <- function(contig_subtype, major_subtype,
 # aligned length lives ONLY in blastparse/<sample>.assembly_support.csv, because the
 # candidate-grain join never reaches a subtype that is not itself a candidate.
 #
-# Worked example (2633901, run 20251212-01, major 1a). A 1,620 bp contig was reported
+# Worked example (SampleSA-1a, major 1a). A 1,620 bp contig was reported
 # as a genotype-6i off-genotype contig. Its BLAST alignment is 69 bp — 4% of the
 # contig. Confirmed independently against nt: the contig's only HCV-like region is a
 # ~212 bp tail (13% of it), closest to 1a — the SAME genotype as the major. So the
