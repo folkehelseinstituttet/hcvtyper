@@ -5,8 +5,8 @@
 #                   and an “alignment” bar‑plot of top hits.
 #
 # Usage: blast_parse.R <prefix> <blast_out> <contigs> <references> <agens>
-#        * <references> and <agens> are kept for CLI compatibility
-#          but no longer used by this script.
+#        * <references> IS used (read and consumed by write_ref_fasta).
+#        * <agens> is retained for CLI compatibility but no longer used.
 # ---------------------------------------------------------------------------
 
 suppressPackageStartupMessages({
@@ -155,6 +155,51 @@ scaf %>%
 }
 write_csv(scaf_top, paste0(prefix, "_top_hits.csv"))
 
+## ── 4b. Neutral per‑subtype assembly‑support roll‑up (ASUP‑01, D‑01/D‑02/D‑03) ----
+# Dominance‑neutral replacement for the §7 major/minor logic: for every subtype
+# seen in the de novo contigs, summarise the SINGLE best contig by sc_length
+# (D‑03) and carry THAT contig's four ASUP‑01 metrics — full contig length,
+# BLAST % identity, BLAST alignment length, and k‑mer coverage. Raw metrics ONLY:
+# no denovo_min_* threshold floor is applied (D‑01 — the substantiality verdict
+# is Phase 8). The raw subtype token is carried; genotype derivation is deferred
+# to summarize.R (D‑02). §6/§7 below stay UNCHANGED (D‑04 legacy shim).
+if (nrow(scaf_top) > 0) {
+  support_tbl <- scaf_top %>%
+    group_by(subtype) %>%
+    # single best contig per subtype, by full contig length (D‑03). distinct() on
+    # qseqid/sc_length is load‑bearing: one contig can have several BLAST hits to
+    # the same reference and would otherwise duplicate the winning row.
+    slice_max(sc_length, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    select(subtype, sseqid, qseqid, sc_length, pident, length, kmer_cov) %>%
+    distinct() %>%
+    transmute(
+      sample                = prefix,
+      subtype,
+      best_ref              = sseqid,
+      best_contig_length    = sc_length,
+      best_contig_pident    = pident,
+      best_contig_aln_length = length,
+      best_contig_kmer_cov  = kmer_cov
+    )
+} else {
+  # T‑07‑01 DoS guard: zero hits / skip‑assembly → typed header‑only CSV, exit 0,
+  # never abort (mirror the §6/§7 empty guards and the line‑110 empty‑write idiom).
+  support_tbl <- tibble(
+    sample                 = character(0),
+    subtype                = character(0),
+    best_ref               = character(0),
+    best_contig_length     = double(0),
+    best_contig_pident     = double(0),
+    # WR-03: double (not integer) to match the populated path (`length` from
+    # read_tsv) and the join helper's typed-empty support frame, so the same
+    # logical column has ONE consistent type everywhere.
+    best_contig_aln_length = double(0),
+    best_contig_kmer_cov   = double(0)
+  )
+}
+write_csv(support_tbl, paste0(prefix, ".assembly_support.csv"))
+
 ## ── 5. Alignment‑style bar plot (100 top hit contigs) ----------------------------
 # Create scaffold factor levels sorted by subtype, then by sstart
 if (nrow(scaf_top) > 0) {
@@ -250,57 +295,85 @@ scaf_top_long %>%
     )
   })
 }
-# --- 7. Major / minor reference summary + FASTA export ---------------------
+# --- 7. Major / minor reference summary (display-only, consumed by summarize.R) ---
 if (nrow(scaf_top) > 0) {
 # a) pick closest major and (optionally) minor reference names
-major_name <- scaf_top$sseqid[1]                 # best overall hit
-major_geno <- str_sub(major_name, 1, 1)
-major_contig <- scaf_top %>%
-  slice_max(sc_length, n = 1) %>%               # longest contig for this reference
-  select(qseqid, sc_length) %>% distinct() %>% # Remove duplicates if several hits against the same reference
-  pull(qseqid)
+# 260805 (§9.4): the major slot now uses the same ONE ROW discipline as the minor
+# slot below. scaf_top row 1 IS the row that defines major_name (the frame is sorted
+# by descending bitscore), so reading the reference, the contig and the contig length
+# off that single row guarantees all three describe the same contig.
+#
+# Previously the three were derived three different ways:
+#   major_name          = scaf_top$sseqid[1]                        -- row 1
+#   major_contig        = longest contig in scaf_top, UNFILTERED    -- any contig
+#   major_contig_length = longest contig in the FULL scaf table
+#                         filtered to sseqid == major_name          -- any contig
+# On sim1 that reported major_ref = 1a_HQ850279 (whose own contig is 9,076 bp)
+# alongside major_contig_length = 9,339 bp — the length of the 1b contig, which
+# merely carries a secondary 78.7%-identity hit against 1a_HQ850279.
+major_row    <- scaf_top %>% slice(1)
+major_name   <- major_row$sseqid[1]              # best overall hit
+major_geno   <- str_sub(major_name, 1, 1)
+major_contig <- major_row$qseqid[1]
+major_len    <- major_row$sc_length[1]
 
-minor_vec  <- scaf_top %>%
+# The minor selection is captured as ONE ROW, and the reference, the contig name and
+# the contig length are all read off that row (260803-ogc). Previously only sseqid was
+# pulled here and the contig name was re-derived downstream in summarize.R from the
+# full BLAST table as "the best-bitscore hit to this reference" — a DIFFERENT grain.
+# scaf_top holds one row per contig (its own top hit), so this filter keeps contigs
+# whose OWN top hit is off-genotype; the downstream re-derivation searched all contigs
+# unrestricted and could therefore return a contig that this filter had excluded.
+#
+# Sample 2633901 is the case in the wild: NODE_3 (1620 bp, top hit 6i_DQ835770,
+# bitscore 97) wins here, but NODE_2 — a 1a contig whose 5'UTR/core region hits the
+# same 6i reference at bitscore 1074 — won the downstream lookup. Summary.csv reported
+# denovo_minor_ref = 6i_DQ835770 and denovo_minor_contig_length = 1620 (both NODE_3)
+# next to denovo_minor_contig = NODE_2_length_3232. Three fields, two contigs, and an
+# analyst sent to the wrong sequence.
+#
+# That particular re-derivation could only bite the MINOR slot, because it searched
+# by BITSCORE and major_name is the globally best hit — its row is necessarily also
+# the top-bitscore row for that reference.
+#
+# 260805 (§9.4): the major slot had the same disease from a different vector. Its
+# length was derived by slice_max(sc_length) — by LENGTH, not bitscore — so the
+# argument above never protected it, and a longer contig carrying a weak secondary
+# hit to major_name won. Fixed above by reading the major slot off ONE ROW too.
+minor_row  <- scaf_top %>%
   filter(!str_starts(subtype, major_geno)) %>%   # must be different genotype
-  slice_head(n = 1) %>%
-  pull(sseqid)
-minor_name <- if (length(minor_vec) == 0) NA_character_ else minor_vec
+  slice_head(n = 1)
+minor_name   <- if (nrow(minor_row) == 0) NA_character_ else minor_row$sseqid[1]
+minor_contig <- if (nrow(minor_row) == 0) NA_character_ else minor_row$qseqid[1]
+minor_len    <- if (nrow(minor_row) == 0) NA_real_      else minor_row$sc_length[1]
 } else {
   major_name <- NA_character_
   major_contig <- NA_character_
+  major_len <- NA_real_
   minor_name <- NA_character_
+  minor_contig <- NA_character_
+  minor_len <- NA_real_
 }
 
-# b) FASTA export -----------------------------------------------------------
-# Helper that writes the sequence only if it exists
-write_ref_fasta <- function(ref_name, tag) {
-  if (!is.na(ref_name) && ref_name %in% names(ref_fa)) {
-    write.fasta(
-      sequences = ref_fa[ref_name],
-      names     = ref_name,
-      file.out  = paste0(prefix, ".", ref_name, "_", tag, ".fa")
-    )
-  }
-}
-
-write_ref_fasta(major_name, "major")
-write_ref_fasta(minor_name, "minor")
-
-# c) summary CSV
+# b) summary CSV
 summary_tbl <- tibble(
   sample       = prefix,
   major_ref    = major_name,
-  major_contig_length = scaf %>% filter(sseqid == major_name) %>%
-                   slice_max(sc_length, n = 1) %>%
-                   # If the major contig have multiple blast hits against the same reference, the length will be duplicated
-                   select(qseqid, sc_length) %>% distinct() %>% pull(sc_length),
+  # Read off major_row (260805, §9.4) — same contig as major_ref, by construction.
+  major_contig_length = major_len,
   minor_ref    = minor_name,
-  minor_contig_length = if (is.na(minor_name)) NA_integer_ else
-                   scaf %>% filter(sseqid == minor_name)  %>%
-                    filter(qseqid != major_contig) %>%  # Exclude the major contig if it is also a minor hit
-                    slice_max(sc_length, n = 1) %>%
-                    # If the minor contig have multiple blast hits against the same reference, the length will be duplicated
-                    select(qseqid, sc_length) %>% distinct() %>% pull(sc_length)
+  # Both read straight off minor_row, so minor_ref / minor_contig /
+  # minor_contig_length always describe ONE contig (260803-ogc).
+  #
+  # This REPLACES a lookup that re-queried scaf_top for the longest contig sharing
+  # minor_ref as its top hit, excluding major_contig. Where exactly one contig has
+  # that reference as its top hit — the overwhelming majority — the value is
+  # unchanged. Where several do, the reported length is now the contig that actually
+  # won the selection (highest bitscore) rather than the longest of the group, and
+  # the old form could also yield a zero-length pull when the winner happened to be
+  # major_contig.
+  minor_contig = minor_contig,
+  minor_contig_length = minor_len
 )
 write_csv(summary_tbl, paste0(prefix, ".blastparse.csv"))
 

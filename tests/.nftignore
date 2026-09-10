@@ -1,14 +1,19 @@
 .DS_Store
-# MultiQC outputs with unstable content
-multiqc/multiqc_data/fastqc_top_overrepresented_sequences_table.txt
-multiqc/multiqc_data/BETA-multiqc.parquet
+# Formerly the whole multiqc_data/ directory was ignored here: MultiQC's fn_clean_exts
+# has a "truncate at first occurrence of literal substring '.trim'" rule (meant for
+# names like "sample.trim.bam"). FASTQC_TRIM's ext.prefix used to be "${meta.id}.trimmed",
+# so both mates' zip names ("${meta.id}.trimmed_1"/"_2") got truncated at ".trim" down to
+# bare "${meta.id}" and collapsed into one sample, silently overwriting each other with
+# whichever mate MultiQC parsed last (varied per run) — 13 files inherited the flip
+# (fastqc-1_*_plot.txt, multiqc_fastqc_fastqc-1.txt, multiqc_general_stats.txt, ...).
+# Fixed by renaming the prefix to "${meta.id}_trimmed" (conf/modules.config), which
+# doesn't contain the ".trim" substring. Verified deterministic across 3 consecutive
+# runs after the fix; only the files below remain genuinely unstable.
+multiqc/multiqc_data/llms-full.txt
 multiqc/multiqc_data/multiqc.log
+multiqc/multiqc_data/multiqc.parquet
 multiqc/multiqc_data/multiqc_data.json
 multiqc/multiqc_data/multiqc_sources.txt
-multiqc/multiqc_data/multiqc_software_versions.txt
-multiqc/multiqc_data/llms-full.txt
-multiqc/multiqc_data/multiqc.parquet
-multiqc/multiqc_data/multiqc_summary.txt
 multiqc/multiqc_plots/{svg,pdf,png}/*.{svg,pdf,png}
 multiqc/multiqc_report.html
 # FastQC outputs
@@ -27,6 +32,10 @@ spades/versions.yml
 # path to the same samtools/ publishDir. Last-writer-wins picks a different process-name key
 # each run -> different md5 despite an identical samtools version. Same class as CR-01.
 samtools/versions.yml
+# NOTE: bowtie2/bowtie2/* used to be non-deterministic here (BOWTIE2_BUILD's
+# per-sample index directories collided on publish, so which sample's .bt2 files
+# survived varied run to run). That is now fixed at the source — the process no
+# longer publishes at all (conf/modules.config) — so no ignore rule is needed.
 # Pipeline info with timestamps and variable content
 pipeline_info/*.{html,json,txt,yml}
 # HCV-specific outputs that may have variable content

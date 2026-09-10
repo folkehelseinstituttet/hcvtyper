@@ -1,0 +1,58 @@
+// nf-test module contract for RESCUE_EVALUATION (Phase 10, denovo-subtype-rescue).
+// Cloned from modules/local/blastparse/tests/main.nf.test. This scaffold is RED
+// until Plan 02 lands modules/local/rescueevaluation/main.nf — the `script
+// "../main.nf"` reference does not resolve yet. The snapshot
+// (main.nf.test.snap) is a placeholder regenerated in Wave 1 (Plan 02) via
+// `nf-test test --update-snapshot` once main.nf and its stub exist.
+//
+// Output contract mirrored from modules/local/parsefirstmapping/main.nf:
+//   tuple val(meta), path("*.candidates.csv"), emit: candidates
+//   tuple val(meta), path("*_cand*.fa"),       emit: candidate_fasta, optional: true
+//   path "versions.yml",                       emit: versions
+nextflow_process {
+
+  name "Test Process RESCUE_EVALUATION"
+  script "../main.nf"
+  process "RESCUE_EVALUATION"
+
+  tag "modules"
+  tag "rescueevaluation"
+
+  // Stub run (fast) — exercises the output emit contract without needing the
+  // R container. The real, container-backed run + non-stub snapshot land in
+  // Plan 02 alongside main.nf.
+  test("rescueevaluation: stub") {
+    options "-stub-run"
+    config "./nextflow.config"
+    when {
+      process {
+        """
+        // Input signature (D-07/D-09):
+        // tuple val(meta), path(candidates_csv), path(blastparse_csv), path(support_csv), path(cand_fastas)
+        // path(references)
+        input[0] = [
+          [ id: 'toy' ],
+          file("${projectDir}/modules/local/rescueevaluation/tests/data/candidates.csv",       checkIfExists: true),
+          file("${projectDir}/modules/local/rescueevaluation/tests/data/blastparse.csv",       checkIfExists: true),
+          file("${projectDir}/modules/local/rescueevaluation/tests/data/assembly_support.csv", checkIfExists: true),
+          []
+        ]
+        input[1] = file("${projectDir}/modules/local/blastparse/tests/references.fa", checkIfExists: true)
+        """
+      }
+    }
+    then {
+      assertAll(
+        { assert process.success },
+        // The rescue contract: corrected candidates CSV + optional per-rank
+        // rescued FASTA + versions. candidate_fasta is optional (no rescue =>
+        // no FASTA), so assert it is emitted as a channel without forcing a file.
+        { assert process.out.candidates },
+        { assert process.out.candidates.get(0).get(1) ==~ /.*\.candidates\.csv/ },
+        { assert process.out.candidate_fasta != null },
+        { assert process.out.versions },
+        { assert snapshot(process.out).match() }
+      )
+    }
+  }
+}

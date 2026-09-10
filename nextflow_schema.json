@@ -90,6 +90,11 @@
             "type": "integer",
             "default": 15
         },
+        "glue_min_reads": {
+            "type": "integer",
+            "default": 100,
+            "minimum": 0
+        },
         "multiqc_config": {
             "type": "string"
         },
@@ -112,9 +117,6 @@
         },
         "spades_hmm": {
             "type": "string"
-        },
-        "skip_assembly": {
-            "type": "boolean"
         },
         "skip_hcvglue": {
             "type": "boolean"
@@ -191,12 +193,12 @@
         "denovo_min_contig_length": {
             "type": "integer",
             "default": 500,
-            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+            "description": "Minimum contig length (bp) to count as substantial de novo evidence. Set to 500 (Phase 10 D-02 validation: 500 keeps genuine short minor contigs such as ERR1810507 829bp/30x/92%); effective runtime value comes from nextflow.config."
         },
         "denovo_min_kmer_cov": {
             "type": "number",
-            "default": 10,
-            "description": "Minimum SPAdes k-mer coverage for a contig to count as de novo evidence. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+            "default": 2.0,
+            "description": "Minimum SPAdes k-mer coverage for a contig to count as de novo evidence. Reconciled to the validated 2.0 (Phase 8 D-10): the prior 10.0 was stricter than validated and would wrongly refute genuine partial contigs (e.g. ERR1810453's 2b at k-mer cov ~5) that CLASS-02 must preserve."
         },
         "denovo_min_blast_identity": {
             "type": "number",
@@ -213,6 +215,73 @@
             "type": "boolean",
             "default": true,
             "description": "Require orthogonal de novo/BLAST evidence before reporting a minor strain. Consumed by the Phase 3 de novo confirmation logic (declared/inert in Phase 2)."
+        },
+        "rescue_min_length": {
+            "type": "integer",
+            "default": 3000,
+            "description": "Minimum de novo contig length (bp) required before a de novo subtype may replace a mismatched mapped candidate (Phase 10 rescue, D-02). Compared with strict greater-than."
+        },
+        "rescue_min_pident": {
+            "type": "number",
+            "default": 85,
+            "description": "Minimum BLAST percent identity of the de novo top hit required to trigger a subtype rescue (Phase 10, D-02). Compared with strict greater-than."
+        },
+        "rescue_min_aln_length": {
+            "type": "integer",
+            "default": 3000,
+            "description": "Minimum BLAST alignment length (bp) of the de novo top hit required to trigger a subtype rescue (Phase 10, D-02). Compared with greater-than-or-equal."
+        },
+        "rescue_min_kmer_cov": {
+            "type": "number",
+            "default": 2.0,
+            "description": "Minimum SPAdes k-mer coverage of the de novo contig required to trigger a subtype rescue (Phase 10, D-02). Compared with greater-than-or-equal."
+        },
+        "rescue_1a1b_length": {
+            "type": "integer",
+            "default": 5000,
+            "description": "Stricter contig-length floor (bp) applied when both the mapped candidate and the de novo top-hit subtypes are in {1a, 1b}, where the 1a/1b boundary is hard to call from short contigs (Phase 10, D-04)."
+        },
+        "rescue_kmer_cov_ratio": {
+            "type": "number",
+            "default": 10,
+            "description": "Block a de novo rescue when the candidate's own-subtype contig k-mer coverage exceeds the rescue target's by at least this factor. Guards against a low-coverage cross-mapping-noise contig replacing a well-assembled candidate. Set to 0 to disable."
+        },
+        "rescue_dominant_protect_cov": {
+            "type": "number",
+            "default": 90,
+            "description": "A first-mapping candidate at or above this genome coverage whose own subtype IS assembled (BLAST identity and k-mer floors met) is treated as self-confirming and is never replaced by a de novo rescue. Leave blank to disable."
+        },
+        "review_min_offgenotype_contig_length": {
+            "type": "integer",
+            "default": 1000,
+            "description": "Minimum de novo contig length (bp) for the monoinfection 'de novo assembly found a different-genotype contig' review sentence to fire. Deliberately separate from, and higher than, denovo_min_contig_length: that floor confirms a minor that mapping already supports, whereas here the contig is the ONLY evidence. Validated on 140 samples — with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case."
+        },
+        "n_candidates": {
+            "type": "integer",
+            "default": 2,
+            "minimum": 1,
+            "maximum": 2,
+            "description": "Number of neutrally-ranked candidate references to select and map (cand_1..cand_n). Default 2 reproduces the legacy two-slot topology under the compatibility shim. Capped at 2 until the Phase 9 filename-slot migration (COMPAT-02) adds N-slot output; values >2 would silently map later candidates to the wrong reference."
+        },
+        "score_weight_evenness": {
+            "type": "number",
+            "default": 3.0,
+            "description": "Weight on the CV-evenness factor in the Phase 8 dominance score (SCORE-02 / D-02). This is the DOMINANT term and must exceed score_weight_reads so a spiky high-read cross-mapping artefact loses to a genuine even minor."
+        },
+        "score_weight_reads": {
+            "type": "number",
+            "default": 1.0,
+            "description": "Weight on log10(candidate reads) in the Phase 8 dominance score (D-02). Read counts alone are contamination-prone, so this is kept below score_weight_evenness."
+        },
+        "score_weight_kmercov": {
+            "type": "number",
+            "default": 0.5,
+            "description": "Weight on the bonus-only log(k-mer coverage) term in the Phase 8 dominance score (D-05). Contributes only positively; missing/none assembly support yields no boost and never a penalty."
+        },
+        "score_evenness_k": {
+            "type": "number",
+            "default": 1.0,
+            "description": "Evenness-transform constant in the Phase 8 dominance score: the CV-evenness factor is 1/(1 + score_evenness_k * CV) over per-position depth including zeros (D-03)."
         },
         "contamination_hop_rate": {
             "type": "number",

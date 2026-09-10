@@ -1,0 +1,63 @@
+nextflow_process {
+
+    name "Test Process CONSENSUS_DISTANCE"
+    script "../main.nf"
+    process "CONSENSUS_DISTANCE"
+
+    tag "modules"
+    tag "consensus_distance"
+
+    test("HCV 3a consensus vs reference") {
+        options "--profile docker"
+        when {
+            process {
+                """
+                input[0] = [
+                  [ id: 'Test_2' ],
+                  file("${projectDir}/modules/local/consensus_distance/tests/data/consensus.fa", checkIfExists: true)
+                ]
+                input[1] = [
+                  [ id: 'ref' ],
+                  file("${projectDir}/modules/local/consensus_distance/tests/data/reference.fa", checkIfExists: true)
+                ]
+                """
+            }
+        }
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot([
+                    tsv     : process.out.tsv,
+                    versions: process.out.versions
+                ]).match() }
+            )
+        }
+    }
+
+    test("stub") {
+        options "-stub-run"
+        when {
+            process {
+                """
+                input[0] = [
+                  [ id: 'Test_2' ],
+                  file("${projectDir}/modules/local/consensus_distance/tests/data/consensus.fa", checkIfExists: true)
+                ]
+                input[1] = [
+                  [ id: 'ref' ],
+                  file("${projectDir}/modules/local/consensus_distance/tests/data/reference.fa", checkIfExists: true)
+                ]
+                """
+            }
+        }
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot([
+                    tsv     : process.out.tsv,
+                    versions: process.out.versions
+                ]).match() }
+            )
+        }
+    }
+}

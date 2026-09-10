@@ -24,8 +24,7 @@ include { paramsSummaryLog; paramsSummaryMap } from 'plugin/nf-schema'
 include { softwareVersionsToYAML                         } from '../subworkflows/nf-core/utils_nfcore_pipeline/main.nf'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_WITHDUP } from '../subworkflows/local/get_mapping_stats'
 include { GET_MAPPING_STATS as GET_MAPPING_STATS_MARKDUP } from '../subworkflows/local/get_mapping_stats'
-include { TARGETED_MAPPING as MAJOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
-include { TARGETED_MAPPING as MINOR_MAPPING              } from '../subworkflows/local/targeted_mapping'
+include { JOINT_MAPPING                                  } from '../subworkflows/local/joint_mapping/main'
 include { CONTAMINATION_CHECK                            } from '../subworkflows/local/contamination_check/main'
 
 /*
@@ -63,6 +62,7 @@ include { UNTAR as UNTAR_KRAKEN_FOCUSED      } from '../modules/nf-core/untar/ma
 include { INSTRUMENTID                       } from '../modules/local/instrumentid/main'
 include { BLASTPARSE                         } from '../modules/local/blastparse/main'
 include { PARSEFIRSTMAPPING                  } from '../modules/local/parsefirstmapping/main'
+include { RESCUE_EVALUATION                  } from '../modules/local/rescueevaluation/main'
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { HCVGLUE                            } from '../modules/local/hcvglue/main'
 include { SUMMARIZE                          } from '../modules/local/summarize/main'
@@ -261,57 +261,55 @@ workflow HCVTYPER {
         .filter { _meta, _fastq, n -> n > 0 } // Filter out empty fastq files
         .map { meta, fastq, _n -> [ meta, fastq, [], [] ] } // Recreate the channel structure correct for SPADES
 
-    if (!params.skip_assembly) {
-            SPADES (
-                ch_reads,
-                [], // Empty input channel. Can be used to specify hmm profile
-                []  // Empty input channel. Placeholder for separate specification of reads.
-            )
-            ch_versions = ch_versions.mix(SPADES.out.versions.first())
+    SPADES (
+        ch_reads,
+        [], // Empty input channel. Can be used to specify hmm profile
+        []  // Empty input channel. Placeholder for separate specification of reads.
+    )
+    ch_versions = ch_versions.mix(SPADES.out.versions.first())
 
-            //
-            // MODULE: Blast assembled contigs against viral references.
-            //
-            // NOTE:
-            // In some cases there is an empty contig file produced by Spades. Filter out these
-            ch_blastn = SPADES.out.contigs
-                .map { meta, contigs ->
-                def n = contigs.countFasta() // Count fasta records
-                return [meta, contigs, n] // Add the count as the last element in the tuple
-            }
-            .filter { _meta, _contigs, n -> n > 0 } // Filter out empty fasta files
-            .map { meta, contigs, _n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
-            BLAST_BLASTN (
-                ch_blastn,
-                BLAST_MAKEBLASTDB.out.db,
-                [], // taxidlist - empty, no taxonomic filtering
-                "", // taxids - empty string, no taxonomic filtering
-                false // negative_tax - false, not using negative filtering
-            )
-            ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
+    //
+    // MODULE: Blast assembled contigs against viral references.
+    //
+    // NOTE:
+    // In some cases there is an empty contig file produced by Spades. Filter out these
+    ch_blastn = SPADES.out.contigs
+        .map { meta, contigs ->
+        def n = contigs.countFasta() // Count fasta records
+        return [meta, contigs, n] // Add the count as the last element in the tuple
+    }
+    .filter { _meta, _contigs, n -> n > 0 } // Filter out empty fasta files
+    .map { meta, contigs, _n -> [meta, contigs] } // Return the count to get the channel structure correct for BLASTN_BLASTN
+    BLAST_BLASTN (
+        ch_blastn,
+        BLAST_MAKEBLASTDB.out.db,
+        [], // taxidlist - empty, no taxonomic filtering
+        "", // taxids - empty string, no taxonomic filtering
+        false // negative_tax - false, not using negative filtering
+    )
+    ch_versions = ch_versions.mix(BLAST_BLASTN.out.versions.first())
 
-            //
-            // MODULE: Parse blast output
-            //
-            ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs) // Create input channel that holds val(meta), path(blast_out), path(contigs)
-            BLASTPARSE (
-                ch_blastparse,
-                file(params.references),
-                params.agens
-            )
-            ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
+    //
+    // MODULE: Parse blast output
+    //
+    ch_blastparse = BLAST_BLASTN.out.txt.join(SPADES.out.contigs) // Create input channel that holds val(meta), path(blast_out), path(contigs)
+    BLASTPARSE (
+        ch_blastparse,
+        file(params.references),
+        params.agens
+    )
+    ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
 
-            //
-            // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
-            //
-            if (!params.skip_contamination_check) {
-                CONTAMINATION_CHECK(
-                    SPADES.out.contigs,
-                    Channel.empty(),  // fastp JSONs — not wired in main pipeline
-                    Channel.empty()   // GLUE JSONs  — not wired in main pipeline
-                )
-                ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
-            }
+    //
+    // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
+    //
+    if (!params.skip_contamination_check) {
+        CONTAMINATION_CHECK(
+            SPADES.out.contigs,
+            Channel.empty(),  // fastp JSONs — not wired in main pipeline
+            Channel.empty()   // GLUE JSONs  — not wired in main pipeline
+        )
+        ch_versions = ch_versions.mix(CONTAMINATION_CHECK.out.versions)
     }
 
     //
@@ -376,71 +374,98 @@ workflow HCVTYPER {
     )
 
     //
-    // SUBWORKFLOW: Map reads against the majority reference
+    // MODULE: De-novo subtype rescue (Phase 10, denovo-subtype-rescue, D-09..D-12)
     //
-    // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
-    // Then filter out cases where the majority reference has fewer that minRead mapped and less than minCov coverage
-    ch_major_mapping = PARSEFIRSTMAPPING.out.major_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
+    // RESCUE_EVALUATION sits BETWEEN the de-novo BLAST evidence (BLASTPARSE) and the
+    // candidate-mapping builder. It may REPLACE a mapped candidate's reference with the
+    // de-novo-derived reference when the mapped subtype disagrees with the de-novo top hit
+    // and the contig clears the four quality floors, and forces that candidate's
+    // confirmation_status to 'pass' so the builder routes it to JOINT_MAPPING.
+    //
+    // De novo assembly always runs, so BLASTPARSE.out.support is always defined.
+    ch_blastparse_support = BLASTPARSE.out.support
 
-    // Then create a new channel whith all the elements from the csv file in the meta map.
-    // The new channel has the structure tuple val(meta), path(fasta), path(reads)
-        .map { meta, _csv, major_fasta, _reads ->
-        def elements = _csv.splitCsv( header: true, sep:',')
-        def new_meta = meta + elements[0]
-
-        // Fail if meta.id is not identical to meta.sample (from the csv)
-        assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
-
-        tuple(new_meta, major_fasta, _reads)
+    // Build the RESCUE_EVALUATION input tuple (meta, candidates_csv, support_csv,
+    // cand_fastas) by joining on meta.id. PARSEFIRSTMAPPING.out.candidate_fasta
+    // is tuple(meta, parsefirstmapping_csv, cand_fastas) -- extract cand_fastas. The
+    // support leg uses remainder:true (D-10) so a sample with no de-novo contig
+    // (empty BLASTPARSE support) does not drop samples; the R script's typed-empty
+    // guard handles the missing file.
+    ch_rescue_input = PARSEFIRSTMAPPING.out.candidates
+        .join(PARSEFIRSTMAPPING.out.candidate_fasta, remainder: true)       // meta, candidates_csv, parsefirstmapping_csv?, cand_fastas?
+        .join(ch_blastparse_support, remainder: true)                       // ..., support_csv?
+        .map { meta, candidates_csv, _parsefirstmapping_csv, cand_fastas, support_csv ->
+            // remainder:true fills absent legs with null. The module's path() inputs accept []
+            // for a missing optional file; normalize null -> [] so staging never NPEs.
+            tuple(
+                meta,
+                candidates_csv,
+                support_csv ?: [],
+                cand_fastas ?: []
+            )
         }
 
-    // Then filter on read nr and coverage. This info is from the csv elements
-    // This will result in a channel with values that meet the read nr and coverage criteria
-        .filter { entry ->
-            def mappedReads = entry[0]['major_reads'].toInteger()
-            def majorCov = entry[0]['major_cov'].toInteger()
-            mappedReads > params.minRead && majorCov > params.minCov
-        }
-
-    MAJOR_MAPPING(
-        ch_major_mapping, // val(meta), path(fasta), path(reads)
+    RESCUE_EVALUATION (
+        ch_rescue_input,
+        file(params.references)
     )
-    ch_versions = ch_versions.mix(MAJOR_MAPPING.out.versions)
+    ch_versions = ch_versions.mix(RESCUE_EVALUATION.out.versions.first())
 
     //
-    // SUBWORKFLOW: Map reads against a potential minority reference
+    // SUBWORKFLOW: Competitive joint mapping (D-01/D-02/D-03 — replaces TARGETED_MAPPING)
     //
-    // Combine the output of PARSEFIRSTMAPPING with the classified reads from KRAKEN2_FOCUSED
-    // Then filter out cases where the minority reference has fewer that minRead mapped and less than minCov coverage
-    ch_minor_mapping = PARSEFIRSTMAPPING.out.minor_mapping.join(KRAKEN2_FOCUSED.out.classified_reads_fastq) // Channel structure: meta, csv, major_fasta, reads
-
-    // Then create a new channel whith all the elements from the csv file in the meta map.
-    // The new channel has the structure tuple val(meta), path(fasta), path(reads)
-        .map { meta, _csv, minor_fasta, _reads ->
-        def elements = _csv.splitCsv( header: true, sep:',')
-        def new_meta = meta + elements[0]
-
-        // Fail if meta.id is not identical to meta.sample (from the csv)
-        assert new_meta.id == new_meta.sample : "Metadata mismatch: id=${new_meta.id}, sample=${new_meta.sample}"
-
-        tuple(new_meta, minor_fasta, _reads)
+    // JOINT_MAPPING takes ONE element per SAMPLE — NOT a per-candidate flatMap. The
+    // per-candidate fan-out now happens INSIDE JOINT_MAPPING, AFTER the combined dedup BAM is
+    // split by reference (D-03). So here we build a simple per-sample tuple:
+    //   tuple(meta, cand_fastas_list, classified_reads, candidates_csv)
+    // and pass the full collected candidate-FASTA list directly (no splitCsv / no
+    // confirmation_status filter at this level — that all moves into the subworkflow).
+    //
+    // Join the per-sample inputs by meta.id: the RESCUE_EVALUATION candidates CSV, the
+    // collected candidate FASTAs (RESCUE_EVALUATION.out.candidate_fasta), and the classified
+    // reads. candidate_fasta is `optional: true` (a no-candidate sample emits nothing, a
+    // single-candidate sample emits only `_cand1.fa`), so its join uses `remainder: true` —
+    // otherwise a missing optional emit would silently DROP the whole sample. remainder:true
+    // pads the absent side with a single null (not a tuple), giving a VARIABLE-arity join
+    // output; normalize to a FIXED 2-tuple (meta, fastas_or_empty) in a .map first so the
+    // downstream shape is stable regardless of the optional emit. A single bare FASTA is
+    // normalized to a list so the subworkflow's rank-indexed lookup is uniform (mirrors the
+    // legacy line-472 normalization). candidate_rank stays a STRING throughout — never
+    // .toInteger() in channel logic (NA would crash, Pitfall 4).
+    ch_joint_mapping = RESCUE_EVALUATION.out.candidates
+        .join(RESCUE_EVALUATION.out.candidate_fasta, remainder: true)      // meta, candidates_csv, fasta_list?
+        .map { tup ->
+            // tup = [meta, candidates_csv, fasta_list?]. remainder:true gives [meta, csv, null]
+            // when no FASTA matched; a matched item gives [meta, csv, fasta_list].
+            def meta           = tup[0]
+            def candidates_csv = tup[1]
+            def fasta_list     = (tup.size() > 2) ? tup[2] : null
+            // Normalize: no-candidate sample -> [] ; single bare FASTA -> [fasta] ; list -> as-is.
+            def fastas = (fasta_list == null) ? [] : (fasta_list instanceof List ? fasta_list : [fasta_list])
+            tuple(meta, candidates_csv, fastas)
+        }
+        .join(KRAKEN2_FOCUSED.out.classified_reads_fastq)                  // meta, candidates_csv, fastas, classified_reads
+        .map { meta, candidates_csv, fastas, classified_reads ->
+            // JOINT_MAPPING take: tuple(meta, cand_fastas, reads, candidates_csv)
+            tuple(meta, fastas, classified_reads, candidates_csv)
         }
 
-    // Then route on the gate decision emitted by the selection script.
-    // minor_call == 'yes' only when the major passes both thresholds AND the minor passes its own (GATE-01).
-    // The R script already applied the read-nr/coverage comparison, so no .toInteger() re-derivation here (avoids NA.toInteger() crash).
-    .filter { entry -> entry[0]['minor_call'] == 'yes' }
-
-    MINOR_MAPPING (
-        ch_minor_mapping // val(meta), path(fasta), path(reads)
+    JOINT_MAPPING(
+        ch_joint_mapping, // val(meta), path(cand_fastas), path(reads), path(candidates_csv)
     )
+    ch_versions = ch_versions.mix(JOINT_MAPPING.out.versions)
 
     //
     // MODULE: Run GLUE genotyping and resistance annotation for HCV
     //
     if (!params.skip_hcvglue) {
+        ch_glue_bams = JOINT_MAPPING.out.aligned
+            .filter { meta, _bam -> (meta.candidate_nodup_reads ?: 0) >= params.glue_min_reads }
+            .collect({ it[1] })
+            .collect()
+
         HCVGLUE (
-            MAJOR_MAPPING.out.aligned.collect({it[1]}).mix(MINOR_MAPPING.out.aligned.collect({it[1]})).collect(), // Collect all files. Can only have one GLUE process running
+            ch_glue_bams,
             params.hcvglue_threshold
         )
         ch_versions = ch_versions.mix(HCVGLUE.out.versions)
@@ -464,30 +489,37 @@ workflow HCVTYPER {
         ch_trimmed_reads         = CUTADAPT.out.log.collect({it[1]})
     }
     ch_classified_reads = KRAKEN2_FOCUSED.out.report.collect({it[1]})
-    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]})
-    ch_stats_withdup    = MAJOR_MAPPING.out.stats_withdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_withdup.collect({it[1]}))
-    ch_stats_markdup    = MAJOR_MAPPING.out.stats_markdup.collect({it[1]}).mix(MINOR_MAPPING.out.stats_markdup.collect({it[1]}))
-    ch_depth            = MAJOR_MAPPING.out.depth.collect({it[1]}).mix(MINOR_MAPPING.out.depth.collect({it[1]}))
+    // Phase 7 (ASUP-02): stage the Phase-6 long-format *.candidates.csv alongside
+    // the legacy *.parsefirstmapping.csv into parsefirst_mapping/ so summarize.R
+    // can read it for the genotype-level assembly-support join.
+    // D-08: stage the RESCUE_EVALUATION candidates CSV (carrying rescued_from /
+    // rescue_trigger) instead of the raw PARSEFIRSTMAPPING candidates, so summarize.R
+    // reads the rescue audit columns. The legacy *.parsefirstmapping.csv leg is unchanged.
+    ch_summarize_first_mapping = PARSEFIRSTMAPPING.out.csv.collect({it[1]}).mix(RESCUE_EVALUATION.out.candidates.collect({it[1]})).collect()
+    // Phase 11 (JMAP-03, D-07/D-09/D-15): read counts now come from SAMTOOLS_IDXSTATS on the
+    // COMBINED BAM (pre- and post-dedup), ONE idxstats file per sample carrying every candidate
+    // reference as a row. SAMTOOLS_STATS is removed. The variable names ch_stats_withdup /
+    // ch_stats_markdup are KEPT so the SUMMARIZE call signature is unchanged; their content is
+    // now idxstats TSV (.withdup.idxstats / .nodup.idxstats), staged into stats_withdup/ and
+    // stats_markdup/. Plan 03 migrates summarize.R's two STATS loops to the idxstats format.
+    ch_stats_withdup    = JOINT_MAPPING.out.idxstats_withdup.collect({it[1]})
+    ch_stats_markdup    = JOINT_MAPPING.out.idxstats_nodup.collect({it[1]})
+    ch_depth            = JOINT_MAPPING.out.depth.collect({it[1]})
     // De novo / BLAST evidence (PLUMB-01/PLUMB-02): collect the parsed BLASTPARSE
     // CSVs (*.blastparse.csv) and the per-contig table (*_blast_out.csv) into one
-    // staged channel. BLASTPARSE is invoked only inside if (!params.skip_assembly),
-    // so its .out attribute is undefined on a skip-assembly run -- referencing it
-    // unconditionally is a hard Nextflow error (process not invoked), which .ifEmpty
-    // cannot rescue. Guard the channel construction with the same condition (mirroring
-    // the ch_glue if/else below): skip-assembly yields [] -> empty denovo/ staging dir
-    // -> NA de novo columns + no dropped rows (the PLUMB-02 path).
-    if (!params.skip_assembly) {
-        ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).collect().ifEmpty([])
-    } else {
-        ch_denovo = []
-    }
+    // staged channel. De novo assembly always runs, so BLASTPARSE.out is always
+    // defined; .ifEmpty([]) still handles a batch where every sample produced no
+    // contig (empty denovo/ staging dir -> NA de novo columns + no dropped rows).
+    // Phase 7 (ASUP-02): also stage the per-subtype *.assembly_support.csv into
+    // denovo/ so summarize.R can join it to candidates at genotype level.
+    ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).mix(BLASTPARSE.out.support.collect({it[1]})).collect().ifEmpty([])
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
         ch_glue = []
     }
-    ch_variation = MAJOR_MAPPING.out.variation.collect().mix(MINOR_MAPPING.out.variation.collect())
-    ch_consensus_distance = MAJOR_MAPPING.out.consensus_distance.collect({it[1]}).mix(MINOR_MAPPING.out.consensus_distance.collect({it[1]}))
+    ch_variation = JOINT_MAPPING.out.variation.collect()
+    ch_consensus_distance = JOINT_MAPPING.out.consensus_distance.collect({it[1]})
 
     SUMMARIZE (
         workflow.manifest.version,
@@ -507,6 +539,8 @@ workflow HCVTYPER {
         file("${projectDir}/bin/genotype_utils.R"),
         file("${projectDir}/bin/denovo_confirm.R"),
         file("${projectDir}/bin/denovo_layer.R"),
+        file("${projectDir}/bin/assembly_support_join.R"),
+        file("${projectDir}/bin/classify_roles.R"),
     )
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 
@@ -548,7 +582,7 @@ workflow HCVTYPER {
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_FOCUSED.out.report.collect{it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(SUMMARIZE.out.mqc.collect())
-    if (!params.skip_assembly && !params.skip_contamination_check) {
+    if (!params.skip_contamination_check) {
         ch_multiqc_files = ch_multiqc_files.mix(CONTAMINATION_CHECK.out.mqc)
     }
 

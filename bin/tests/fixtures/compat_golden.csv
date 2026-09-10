@@ -1,0 +1,3 @@
+sampleName,Major_reference,Minor_reference,Major_genotype_mapping,Minor_genotype_mapping,overall_sample_call
+MONO,1a_M62321,NA,1a,NA,monoinfection
+COINF,1a_M62321,1b_D90208,1a,1b,co-infection

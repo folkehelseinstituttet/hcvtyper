@@ -6,7 +6,7 @@ library(jsonlite)
 # Define json parser function
 parse_json_files <- function(major_minor) {
   
-  json_files <- list.files(pattern = paste0(major_minor, ".nodup.json$"),
+  json_files <- list.files(pattern = paste0("(", major_minor, ")\\.nodup\\.(single\\.)?json$"),
                            full.names = TRUE)
   
 # Create final data file
@@ -256,10 +256,10 @@ for (x in 1:length(json_files)) {
 return(df_final)
 }
 
-df_major <- parse_json_files("major")
+df_major <- parse_json_files("cand1|major")
 write_tsv(df_major, file = paste0("GLUE_collected_report_major.tsv"))
 
-df_minor <- parse_json_files("minor")
+df_minor <- parse_json_files("cand2|minor")
 write_tsv(df_minor, file = paste0("GLUE_collected_report_minor.tsv"))
 
 

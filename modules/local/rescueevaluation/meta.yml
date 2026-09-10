@@ -1,0 +1,104 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "rescue_evaluation"
+description: Evaluate de-novo subtype-rescue triggers and rewrite the candidate references table
+keywords:
+  - rescue
+  - subtype
+  - R
+tools:
+  - "rescue_evaluation":
+      description: "Uses R, tidyverse and seqinr to decide — per ranked candidate — whether the mapped reference should be replaced by the de-novo-derived reference (a subtype rescue), based on a subtype mismatch plus four de-novo contig quality floors, the 2k1b special recombinant rule, and the stricter 1a/1b boundary length floor. On rescue it forces confirmation_status to pass and re-extracts the rescue reference FASTA."
+      homepage: ""
+      documentation: ""
+      tool_dev_url: ""
+      doi: ""
+      licence: null
+      identifier: null
+
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1' ]`
+    - candidates_csv:
+        type: file
+        description: |
+          Long-format candidate table from PARSEFIRSTMAPPING with one row per
+          ranked candidate (sample, candidate_rank, candidate_ref,
+          candidate_subtype, candidate_genotype, candidate_reads, candidate_cov,
+          confirmation_status).
+        pattern: "*.{candidates.csv}"
+    - blastparse_csv:
+        type: file
+        description: |
+          De-novo BLAST top-hit summary from BLASTPARSE
+          (sample, major_ref, major_contig_length, minor_ref, minor_contig_length).
+        pattern: "*.{blastparse.csv}"
+    - support_csv:
+        type: file
+        description: |
+          Four-floor assembly-support metrics from BLASTPARSE
+          (sample, subtype, best_contig_length, best_contig_pident,
+          best_contig_aln_length, best_contig_kmer_cov).
+        pattern: "*.{assembly_support.csv}"
+    - cand_fastas:
+        type: file
+        description: |
+          The per-rank candidate reference FASTAs from PARSEFIRSTMAPPING. Pass-through
+          ranks are copied to the work dir so the candidate_fasta emit collects both
+          unchanged ranks and any rescue replacement.
+        pattern: "*_cand*.fa"
+  - - references:
+        type: file
+        description: |
+          Fasta file with HCV reference sequences.
+          Fasta headers must start with the genotype/subtype information and end with the NCBI accession separated by a single underscore.
+          E.g.: 1a_ABXXXX
+        ontologies:
+          - edam: "http://edamontology.org/format_1929" # FASTA
+
+output:
+  candidates:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*.candidates.csv":
+          type: file
+          description: |
+            The corrected long-format candidate table. Preserves the 8 input
+            columns and adds rescued_from (the original candidate ref when a
+            rescue fired, else NA) and rescue_trigger (a human-readable evidence
+            string, else NA). On a rescued row candidate_ref is overwritten with
+            the rescue reference and confirmation_status is forced to pass.
+          pattern: "*.{candidates.csv}"
+  candidate_fasta:
+    - - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'sample1' ]`
+      - "*_cand*.fa":
+          type: file
+          description: |
+            One FASTA per ranked candidate reference. Pass-through ranks are copied
+            unchanged; a rescued rank's FASTA is the re-extracted rescue reference,
+            named {prefix}.{ref}_cand{rank}.fa. Optional (no candidates => none).
+          pattern: "*_cand*.fa"
+          ontologies:
+            - edam: "http://edamontology.org/format_1929" # FASTA
+
+  versions:
+    - "versions.yml":
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
+        ontologies:
+          - edam: "http://edamontology.org/format_3750" # YAML
+
+authors:
+  - "@jonbra"
+maintainers:
+  - "@jonbra"

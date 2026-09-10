@@ -1,0 +1,78 @@
+nextflow_workflow {
+
+    name "Test Subworkflow JOINT_MAPPING"
+    script "../main.nf"
+    workflow "JOINT_MAPPING"
+    config "./nextflow.config"
+
+    tag "subworkflows"
+    tag "subworkflows_"
+    tag "subworkflows/joint_mapping"
+    tag "bowtie2"
+    tag "samtools"
+    tag "samtools/view"
+    tag "samtools/idxstats"
+    tag "samtools/sormadup"
+
+    // Two-candidate sample (JMAP-01/JMAP-02): both refA and refB pass, so the combined
+    // index holds both, reads are mapped once competitively, and the dedup BAM is split
+    // into exactly two per-candidate BAMs — each containing only its own reference's reads.
+    test("two candidates - competitive split") {
+
+        when {
+            workflow {
+                """
+                input[0] = Channel.of([
+                    [ id:'test_joint', sample:'test_joint', single_end:false ], // meta map
+                    [
+                        file("\${projectDir}/subworkflows/local/joint_mapping/tests/data/refA_cand1.fa", checkIfExists: true),
+                        file("\${projectDir}/subworkflows/local/joint_mapping/tests/data/refB_cand2.fa", checkIfExists: true)
+                    ],
+                    [
+                        file("\${projectDir}/subworkflows/local/joint_mapping/tests/data/reads_1.fastq.gz", checkIfExists: true),
+                        file("\${projectDir}/subworkflows/local/joint_mapping/tests/data/reads_2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("\${projectDir}/subworkflows/local/joint_mapping/tests/data/candidates.csv", checkIfExists: true)
+                ])
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert workflow.success },
+
+                // JMAP-02: per-candidate BAM count == number of passing candidate rows (2).
+                { assert workflow.out.aligned.size() == 2 },
+
+                // JMAP-02: each per-candidate BAM references ONLY its own candidate_ref.
+                // The output filename carries the candidate_ref slot (ext.prefix in test config),
+                // so refA's BAM must not carry refB and vice-versa.
+                { assert workflow.out.aligned.any { it[1].toString().contains('refA') } },
+                { assert workflow.out.aligned.any { it[1].toString().contains('refB') } },
+
+                // JMAP-01: the combined BAM idxstats (pre- and post-dedup) are emitted once
+                // per sample and list both references.
+                { assert workflow.out.idxstats_withdup.size() == 1 },
+                { assert workflow.out.idxstats_nodup.size() == 1 },
+                { assert path(workflow.out.idxstats_withdup[0][1]).text.contains('refA') },
+                { assert path(workflow.out.idxstats_withdup[0][1]).text.contains('refB') },
+
+                // Per-candidate downstream products exist for both candidates.
+                { assert workflow.out.consensus.size() == 2 },
+                { assert workflow.out.depth.size() == 2 },
+
+                // versions emitted.
+                { assert workflow.out.versions.size() > 0 },
+
+                // Regression snapshot once green (filenames + idxstats content are stable).
+                { assert snapshot(
+                    workflow.out.aligned.collect { file(it[1]).name }.sort(),
+                    workflow.out.idxstats_withdup.collect { file(it[1]).name },
+                    workflow.out.idxstats_nodup.collect { file(it[1]).name },
+                    workflow.out.versions
+                ).match() }
+            )
+        }
+    }
+}

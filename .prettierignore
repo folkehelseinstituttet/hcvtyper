@@ -15,3 +15,6 @@ contamination_runs/
 # are not valid standalone JSON. The parser strips the noise (bin/GLUE_json_parser.R);
 # keep the fixtures byte-for-byte real rather than reformatting them.
 modules/local/*/tests/*.json
+# Vendored nf-core modules are upstream-owned and must stay byte-identical to the
+# pinned version (nf-core lint check_local_copy). Do not reformat them locally.
+modules/nf-core/

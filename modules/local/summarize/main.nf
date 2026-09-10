@@ -30,9 +30,12 @@ process SUMMARIZE {
     path(genotype_utils)
     path(denovo_confirm)
     path(denovo_layer)
+    path(assembly_support_join)
+    path(classify_roles)
 
     output:
     path 'Summary.csv'      , emit: summary
+    path 'candidates.csv'   , emit: candidates
     path '*mqc.tsv'         , emit: mqc
     path '*png'             , emit: png
     path "versions.yml"     , emit: versions
@@ -68,16 +71,25 @@ process SUMMARIZE {
 
     # Create realistic Summary.csv with proper header and sample data
     cat > Summary.csv << 'EOF'
-sampleName,total_raw_reads,total_trimmed_reads,total_classified_reads,total_mapped_reads,fraction_mapped_reads_vs_median,Major_genotype_mapping,Major_reference,Minor_genotype_mapping,Minor_reference,major_typable,minor_typable,Reads_withdup_mapped_major,Reads_nodup_mapped_major,Percent_reads_mapped_of_trimmed_with_dups_major,Major_cov_breadth_min_5,Major_cov_breadth_min_10,percent_mapped_reads_major_firstmapping,Reads_withdup_mapped_minor,Reads_nodup_mapped_minor,Percent_reads_mapped_of_trimmed_with_dups_minor,Minor_cov_breadth_min_5,Minor_cov_breadth_min_10,percent_mapped_reads_minor_firstmapping,sequencer_id,Reads_nodup_mapped_first_mapping,Major_cov_breadth_min_1,Minor_cov_breadth_min_1,Major_avg_depth,Minor_avg_depth,Reference,GLUE_genotype,GLUE_subtype,glecaprevir,glecaprevir_mut,glecaprevir_mut_short,grazoprevir,grazoprevir_mut,grazoprevir_mut_short,paritaprevir,paritaprevir_mut,paritaprevir_mut_short,voxilaprevir,voxilaprevir_mut,voxilaprevir_mut_short,NS34A,NS34A_short,daclatasvir,daclatasvir_mut,daclatasvir_mut_short,elbasvir,elbasvir_mut,elbasvir_mut_short,ledipasvir,ledipasvir_mut,ledipasvir_mut_short,ombitasvir,ombitasvir_mut,ombitasvir_mut_short,pibrentasvir,pibrentasvir_mut,pibrentasvir_mut_short,velpatasvir,velpatasvir_mut,velpatasvir_mut_short,NS5A,NS5A_short,dasabuvir,dasabuvir_mut,dasabuvir_mut_short,sofosbuvir,sofosbuvir_mut,sofosbuvir_mut_short,NS5B,NS5B_short,HCV project version,GLUE engine version,PHE drug resistance extension version,script_name_stringency,denovo_major_ref,denovo_major_contig_length,denovo_minor_ref,denovo_minor_contig_length,minor_denovo_status
-Test_1,40000,34446,31482,31478,1.2804002521914215,NA,NA,NA,NA,NO,NO,NA,NA,NA,NA,NA,95.59,NA,NA,NA,NA,NA,3.55,@SRR24174266.1 1/1,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,HCVTyper (version unknown),NA,NA,NA,NA,NA
+sampleName,total_raw_reads,total_trimmed_reads,total_classified_reads,total_mapped_reads,fraction_mapped_reads_vs_median,Major_genotype_mapping,Major_reference,Minor_genotype_mapping,Minor_reference,major_typable,minor_typable,Reads_withdup_mapped_major,Reads_nodup_mapped_major,Percent_reads_mapped_of_trimmed_with_dups_major,Major_cov_breadth_min_5,Major_cov_breadth_min_10,percent_mapped_reads_major_firstmapping,Reads_withdup_mapped_minor,Reads_nodup_mapped_minor,Percent_reads_mapped_of_trimmed_with_dups_minor,Minor_cov_breadth_min_5,Minor_cov_breadth_min_10,percent_mapped_reads_minor_firstmapping,sequencer_id,Reads_nodup_mapped_first_mapping,Major_cov_breadth_min_1,Minor_cov_breadth_min_1,Major_avg_depth,Minor_avg_depth,Reference,GLUE_genotype,GLUE_subtype,glecaprevir,glecaprevir_mut,glecaprevir_mut_short,grazoprevir,grazoprevir_mut,grazoprevir_mut_short,paritaprevir,paritaprevir_mut,paritaprevir_mut_short,voxilaprevir,voxilaprevir_mut,voxilaprevir_mut_short,NS34A,NS34A_short,daclatasvir,daclatasvir_mut,daclatasvir_mut_short,elbasvir,elbasvir_mut,elbasvir_mut_short,ledipasvir,ledipasvir_mut,ledipasvir_mut_short,ombitasvir,ombitasvir_mut,ombitasvir_mut_short,pibrentasvir,pibrentasvir_mut,pibrentasvir_mut_short,velpatasvir,velpatasvir_mut,velpatasvir_mut_short,NS5A,NS5A_short,dasabuvir,dasabuvir_mut,dasabuvir_mut_short,sofosbuvir,sofosbuvir_mut,sofosbuvir_mut_short,NS5B,NS5B_short,HCV project version,GLUE engine version,PHE drug resistance extension version,script_name_stringency,denovo_major_ref,denovo_major_contig,denovo_major_contig_length,denovo_minor_ref,denovo_minor_contig,denovo_minor_contig_length,overall_sample_call,Major_role_reference,Major_role_subtype,Major_dominance_score,Major_role_reason,Minor_role_reference,Minor_role_subtype,Minor_dominance_score,Minor_role_reason
+Test_1,40000,34446,31482,31478,1.2804002521914215,NA,NA,NA,NA,NO,NO,NA,NA,NA,NA,NA,95.59,NA,NA,NA,NA,NA,3.55,@SRR24174266.1 1/1,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,HCVTyper (version unknown),NA,NA,NA,NA,NA,NA,indeterminate,NA,NA,NA,NA,NA,NA,NA,NA
 EOF
 
-    # Create identical summary_mqc.tsv (same data, MultiQC format — TSV avoids quoting issues)
-    printf 'sampleName\ttotal_raw_reads\ttotal_trimmed_reads\ttotal_classified_reads\ttotal_mapped_reads\tfraction_mapped_reads_vs_median\tMajor_genotype_mapping\tMajor_reference\tMinor_genotype_mapping\tMinor_reference\tmajor_typable\tminor_typable\tReads_withdup_mapped_major\tReads_nodup_mapped_major\tPercent_reads_mapped_of_trimmed_with_dups_major\tMajor_cov_breadth_min_5\tMajor_cov_breadth_min_10\tpercent_mapped_reads_major_firstmapping\tReads_withdup_mapped_minor\tReads_nodup_mapped_minor\tPercent_reads_mapped_of_trimmed_with_dups_minor\tMinor_cov_breadth_min_5\tMinor_cov_breadth_min_10\tpercent_mapped_reads_minor_firstmapping\tsequencer_id\tReads_nodup_mapped_first_mapping\tMajor_cov_breadth_min_1\tMinor_cov_breadth_min_1\tMajor_avg_depth\tMinor_avg_depth\tReference\tGLUE_genotype\tGLUE_subtype\tglecaprevir\tglecaprevir_mut\tglecaprevir_mut_short\tgrazoprevir\tgrazoprevir_mut\tgrazoprevir_mut_short\tparitaprevir\tparitaprevir_mut\tparitaprevir_mut_short\tvoxilaprevir\tvoxilaprevir_mut\tvoxilaprevir_mut_short\tNS34A\tNS34A_short\tdaclatasvir\tdaclatasvir_mut\tdaclatasvir_mut_short\telbasvir\telbasvir_mut\telbasvir_mut_short\tledipasvir\tledipasvir_mut\tledipasvir_mut_short\tombitasvir\tombitasvir_mut\tombitasvir_mut_short\tpibrentasvir\tpibrentasvir_mut\tpibrentasvir_mut_short\tvelpatasvir\tvelpatasvir_mut\tvelpatasvir_mut_short\tNS5A\tNS5A_short\tdasabuvir\tdasabuvir_mut\tdasabuvir_mut_short\tsofosbuvir\tsofosbuvir_mut\tsofosbuvir_mut_short\tNS5B\tNS5B_short\tHCV project version\tGLUE engine version\tPHE drug resistance extension version\tscript_name_stringency\tdenovo_major_ref\tdenovo_major_contig_length\tdenovo_minor_ref\tdenovo_minor_contig_length\tminor_denovo_status\n' > summary_mqc.tsv
-    printf 'Test_1\t40000\t34446\t31482\t31478\t1.2804002521914215\tNA\tNA\tNA\tNA\tNO\tNO\tNA\tNA\tNA\tNA\tNA\t95.59\tNA\tNA\tNA\tNA\tNA\t3.55\t@SRR24174266.1 1/1\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tHCVTyper (version unknown)\tNA\tNA\tNA\tNA\tNA\n' >> summary_mqc.tsv
+    # summary_mqc.tsv: triage table (final call + genotype up front, then signal flags).
+    # Co-infection samples get two rows: "sampleName [major]" and "sampleName [minor]".
+    # Metric columns use generic names; average depth is average_depth_0 (all positions, -aa).
+    printf 'sampleName\toverall_sample_call\treview_flag\tGenotype\taverage_depth_0\tsubtype_conflict\trescue_flag\ttotal_trimmed_reads\tcov_breadth_min_10\tcov_breadth_min_5\tPercent_reads_mapped_of_trimmed_with_dups\tReads_nodup_mapped\tpercent_mapped_reads_firstmapping\n' > summary_mqc.tsv
+    printf 'Test_1\tindeterminate\tNA\tNA\tNA\tNA\tFALSE\t34446\tNA\tNA\tNA\tNA\t95.59\n' >> summary_mqc.tsv
+
+    # glue_resistance_mqc.tsv: resistance section (major row per sample; [minor] row for co-infections)
+    printf 'Sample	Resistance	NS34A	glecaprevir	glecaprevir_mut	grazoprevir	grazoprevir_mut	paritaprevir	paritaprevir_mut	voxilaprevir	voxilaprevir_mut	NS5A	daclatasvir	daclatasvir_mut	elbasvir	elbasvir_mut	ledipasvir	ledipasvir_mut	ombitasvir	ombitasvir_mut	pibrentasvir	pibrentasvir_mut	velpatasvir	velpatasvir_mut	NS5B	dasabuvir	dasabuvir_mut	sofosbuvir	sofosbuvir_mut\n' > glue_resistance_mqc.tsv
+    printf 'Test_1	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA\n' >> glue_resistance_mqc.tsv
 
     # Create a minimal PNG plot placeholder
     : > summary_plot.png
+
+    # Enriched long candidates CSV placeholder (CLASS-03)
+    printf 'sampleName\tcandidate_rank\tcandidate_ref\tcandidate_subtype\tcandidate_genotype\treads\tcov\tcv_evenness\tassembly_support\tdominance_score\trole\trole_reason\toverall_sample_call\n' > candidates.csv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -3,9 +3,26 @@
 # Compare a consensus FASTA (from iVar) against its mapping reference FASTA.
 # Outputs a TSV with: sample, reference, similarity_pct, n_differences, alignment_length, consensus_length
 #
+# iVar is run with -aa (all reference positions) and -n N (mask uncovered positions),
+# so the consensus is in reference coordinates: N at each uncovered position, one
+# character per reference position.  The consensus may be shorter than the reference
+# by a few bases when the 3'/5' tail has zero coverage and was trimmed before output.
+# Some iVar versions also output '-' at positions with a confirmed consensus deletion.
+#
+# A global Needleman-Wunsch alignment (Biostrings/pwalign pairwiseAlignment) is used
+# so that internal insertions and deletions are properly placed rather than causing a
+# frame-shift in a position-by-position comparison.  Existing '-' characters are
+# stripped from the consensus before alignment (pairwiseAlignment requires ungapped
+# input); the aligner re-places them at the optimal positions.  Gap columns introduced
+# by the aligner count as differences.  N / zero-coverage columns are excluded from
+# the denominator (alignment_length) exactly as before.
+#
 # Usage: consensus_distance.R <consensus.fa> <reference.fa> <output.tsv>
 
-library(seqinr)
+suppressPackageStartupMessages({
+  library(Biostrings)
+  library(pwalign)
+})
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -18,48 +35,53 @@ reference_file <- args[2]
 output_file    <- args[3]
 
 # Read sequences
-consensus_seqs <- read.fasta(consensus_file, seqtype = "DNA", forceDNAtolower = TRUE)
-reference_seqs <- read.fasta(reference_file, seqtype = "DNA", forceDNAtolower = TRUE)
+cons_raw <- readDNAStringSet(consensus_file)[[1]]
+ref_raw  <- readDNAStringSet(reference_file)[[1]]
 
-# Take the first sequence from each file
-cons_seq <- consensus_seqs[[1]]
-ref_seq  <- reference_seqs[[1]]
+cons_name <- names(readDNAStringSet(consensus_file))[1]
+ref_name  <- names(readDNAStringSet(reference_file))[1]
 
-# Get sequence names
-cons_name <- names(consensus_seqs)[1]
-ref_name  <- names(reference_seqs)[1]
+# Consensus length: non-N, non-gap called bases in the full consensus (before alignment)
+cons_str_full    <- toupper(as.character(cons_raw))
+cons_chars_full  <- strsplit(cons_str_full, "")[[1]]
+consensus_length <- sum(!(cons_chars_full %in% c("N", "-")))
 
-# Convert to character vectors
-cons_chars <- as.character(cons_seq)
-ref_chars  <- as.character(ref_seq)
+# Strip existing '-' (confirmed iVar deletions) before alignment — pairwiseAlignment
+# requires ungapped input; the aligner will re-place gaps at optimal positions.
+cons_seq <- DNAString(gsub("-", "", cons_str_full))
+ref_seq  <- DNAString(toupper(as.character(ref_raw)))
 
-# iVar consensus sequences are the same length as the reference (position-by-position).
-# Positions where coverage was too low are filled with 'n'.
-# We compare only positions where BOTH sequences have a called base (not 'n' or '-').
+# Global pairwise alignment (Needleman-Wunsch)
+submat <- nucleotideSubstitutionMatrix(match = 1, mismatch = -1, baseOnly = FALSE, type = "DNA")
+aln <- pairwiseAlignment(
+  cons_seq, ref_seq,
+  type               = "global",
+  substitutionMatrix = submat,
+  gapOpening         = 10,
+  gapExtension       = 0.5
+)
 
-# Create masks for callable positions
-cons_callable <- !(cons_chars %in% c("n", "-"))
-ref_callable  <- !(ref_chars %in% c("n", "-"))
-both_callable <- cons_callable & ref_callable
+# as.character() on AlignedXStringSet returns the aligned string with internal gap
+# characters ('-') included; terminal overhangs (positions beyond the shorter sequence)
+# are not represented and are therefore not counted — consistent with the prior
+# min-length cap behaviour.
+cons_aln <- strsplit(as.character(pattern(aln)), "")[[1]]
+ref_aln  <- strsplit(as.character(subject(aln)), "")[[1]]
 
-# Number of comparable positions
+# Callable mask: exclude positions where either sequence has N (uncovered / zero-coverage)
+both_callable    <- cons_aln != "N" & ref_aln != "N"
 alignment_length <- sum(both_callable)
 
 if (alignment_length == 0) {
-  # No comparable positions — cannot compute distance
   similarity_pct <- NA_real_
   n_differences  <- NA_integer_
 } else {
-  # Count differences at callable positions
-  matches <- cons_chars[both_callable] == ref_chars[both_callable]
-  n_differences  <- sum(!matches)
-  similarity_pct <- round(sum(matches) / alignment_length * 100, 4)
+  # Gap characters ('-') at callable positions count as differences (indels)
+  n_differences  <- sum(cons_aln[both_callable] != ref_aln[both_callable])
+  similarity_pct <- round((alignment_length - n_differences) / alignment_length * 100, 4)
 }
 
-# Consensus length (non-N bases)
-consensus_length <- sum(cons_callable)
-
-# Write output
+# Write output — column names are identical to the previous implementation
 result <- data.frame(
   sample           = cons_name,
   reference        = ref_name,

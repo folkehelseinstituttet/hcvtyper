@@ -1,0 +1,54 @@
+{
+    "summarize: comprehensive summary": {
+        "content": [
+            {
+                "summary": [
+                    "Summary.csv:md5,75de0fcd8096653a8209be3d99e9527f"
+                ],
+                "mqc": [
+                    [
+                        "glue_resistance_mqc.tsv:md5,61fcdea243b07342251720cae5ff0bfb",
+                        "summary_mqc.tsv:md5,8d1e5cc280b484e619a6d3b20b72c0ce"
+                    ]
+                ],
+                "png": [
+                    "Variation_plot_major.png:md5,e19d8e3b61bdcb781ebb43e0328a6af4"
+                ],
+                "versions": [
+                    "versions.yml:md5,bdc410e5c9e6ecec2ea6f41acaf3f8ef"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
+        },
+        "timestamp": "2026-06-25T15:16:51.779373363"
+    },
+    "summarize: stub": {
+        "content": [
+            {
+                "summary": [
+                    "Summary.csv:md5,6155568506e74b8f986f4a2fe0ad5464"
+                ],
+                "mqc": [
+                    [
+                        "glue_resistance_mqc.tsv:md5,b3e442dc6e0537c98e383de93df65470",
+                        "summary_mqc.tsv:md5,c49de019e2a440db7a718eb48d8e417e"
+                    ]
+                ],
+                "png": [
+                    "summary_plot.png:md5,d41d8cd98f00b204e9800998ecf8427e"
+                ],
+                "versions": [
+                    "versions.yml:md5,6a95a24db9848e61173bfd3c05ee2bde"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
+        },
+        "timestamp": "2026-06-25T15:17:11.35066786"
+    }
+}

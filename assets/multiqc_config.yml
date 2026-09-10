@@ -3,7 +3,9 @@ report_comment: >
   analysis pipeline.
 report_section_order:
   "results_summary":
-    order: 1
+    order: 1000
+  "glue_resistance":
+    order: 999
   "folkehelseinstituttet-hcvtyper-methods-description":
     order: -1000
   software_versions:
@@ -48,7 +50,7 @@ module_order:
   - fastqc:
       name: "FastQC (trimmed)"
       path_filters:
-        - "*.trimmed_*.zip"
+        - "*_trimmed_*.zip"
   - kraken:
       name: "Kraken2 all database"
       path_filters:
@@ -59,20 +61,399 @@ module_order:
         - "*focused*.txt"
 
 custom_data:
+  # -------------------------------------------------------------------------
+  # Primary triage table — 6 problem-signal flags + final call
+  # -------------------------------------------------------------------------
   results_summary:
     id: "results_summary"
-    fn: "*/summary_mqc.tsv" # glob pattern; TSV avoids quoting issues with comma-containing fields
+    fn: "*/summary_mqc.tsv"
     file_format: "tsv"
     plot_type: "table"
     section_name: "Results summary"
     pconfig:
       id: "results_summary_table"
-      # Colour the review_flag column orange whenever it is non-NA so analysts
-      # can quickly spot samples that need manual inspection. MultiQC maps the
-      # "warn" class to an orange/amber background in its default CSS.
-      cond_formatting_rules:
+      col1_header: "Sample"
+      only_defined_headers: false
+      headers:
+        sampleName:
+          title: "Sample"
+        overall_sample_call:
+          title: "Final call"
+          description: "Overall sample classification: monoinfection, co-infection, indeterminate, or co-infection (indeterminate dominance). Read together with Confidence: the call states what the data indicate; Confidence states how much to trust it."
+        call_confidence:
+          title: "Confidence"
+          description: "Evidence tier for the Final call. high = clean evidence, call stands. provisional = a soft caveat (identity uncorroborated, minor kept without corroboration, or a minor-slot rescue) — usable but note it. review = a hard conflict that should block auto-reporting (major failed mapping QC, major subtype conflict, the de-novo rescue overrode the Major reference, or dominance is ambiguous) — see the Review note. indeterminate = no actionable call. A sample with a non-empty Review note is never high (it is demoted to at least provisional), so a high call always has an empty Review note."
+          cond_formatting_rules:
+            - pass:
+                - s_eq: "high"
+            - warn:
+                - s_eq: "provisional"
+                - s_eq: "indeterminate"
+            - fail:
+                - s_eq: "review"
         review_flag:
-          - warn:
-              - s_contains: "Please review"
-              - s_contains: "refuted"
-              - s_contains: "uncertain"
+          title: "Review note"
+          description: "Human-readable reasons why this sample may require manual inspection. Empty when the call is clean."
+          cond_formatting_rules:
+            - warn:
+                - s_contains: "Please review"
+                - s_contains: "uncertain"
+        Genotype:
+          title: "Genotype"
+          description: "HCV subtype for this row. Major strain for monoinfection and [major] rows; minor strain for [minor] rows of co-infections."
+        average_depth_0:
+          title: "Avg depth (≥0×)"
+          description: "Mean read depth across all reference positions (including zero-coverage positions; samtools depth -aa). Major row = major strain, [minor] row = minor strain for co-infections."
+          suffix: "×"
+          format: "{:,.0f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 1000
+        subtype_conflict:
+          title: "Subtype conflict"
+          description: "CONFLICT when de novo assembly and mapping disagree on the major subtype. OK when they agree. NA when no assembly was available."
+          cond_formatting_rules:
+            - pass:
+                - s_eq: "OK"
+            - fail:
+                - s_eq: "CONFLICT"
+        denovo_best_contig:
+          title: "De novo contig"
+          description: "SPAdes node ID (qseqid) of the best de novo contig backing this strain's reference — the top-bitscore contig whose BLAST hit landed on the strain's de novo reference. Major row = major strain's contig; [minor] row = minor strain's contig. Empty when no de novo contig backs this strain (skip-assembly or no de novo evidence)."
+        denovo_best_contig_ref:
+          title: "De novo contig ref"
+          description: "Best BLAST-hit reference for the contig named in \"De novo contig\" (denovo_major_ref / denovo_minor_ref). It should match the strain's mapping reference when de novo and mapping agree; a mismatch signals de novo and mapping disagree on the strain identity. Empty when no de novo contig backs this strain."
+        rescue_flag:
+          title: "Rescue"
+          description: "TRUE when the de-novo rescue step replaced the first-mapping reference for at least one candidate. The per-sample rescue_audit.csv is the authoritative from/to + trigger ledger, and additionally records rescues that fired then were dropped by genotype-collapse or the candidate cap."
+          cond_formatting_rules:
+            - warn:
+                - s_eq: "TRUE"
+            - pass:
+                - s_eq: "FALSE"
+        rescue_effect:
+          title: "Rescue effect"
+          description: "Where a SURVIVING de-novo rescue landed in the final call. major_ref_changed = the dominant/Major reference was reassigned (highest-stakes; always forces review). minor_ref_changed = only a minor-slot reference was reassigned. none = no rescue survived into the call. See rescue_audit.csv for the from/to detail."
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "major_ref_changed"
+            - warn:
+                - s_eq: "minor_ref_changed"
+            - pass:
+                - s_eq: "none"
+        total_trimmed_reads:
+          title: "Trimmed reads"
+          description: "Total reads after adapter trimming."
+          format: "{:,.0f}"
+        cov_breadth_min_10:
+          title: "Breadth ≥10×"
+          description: "Fraction of the strain reference covered at ≥10× depth (major row = major strain, [minor] row = minor strain for co-infections)."
+          suffix: "%"
+          format: "{:,.1f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        cov_breadth_min_5:
+          title: "Breadth ≥5×"
+          description: "Fraction of the strain reference covered at ≥5× depth (major row = major strain, [minor] row = minor strain for co-infections)."
+          suffix: "%"
+          format: "{:,.1f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        Percent_reads_mapped_of_trimmed_with_dups:
+          title: "Mapped % (dedup)"
+          description: "Percentage of trimmed reads mapping to the strain reference, computed from de-duplicated counts (major row = major strain, [minor] row = minor strain for co-infections)."
+          suffix: "%"
+          format: "{:,.1f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        Reads_nodup_mapped:
+          title: "Mapped reads"
+          description: "De-duplicated reads mapped to the strain reference (major row = major strain, [minor] row = minor strain for co-infections)."
+          format: "{:,.0f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100000
+        percent_mapped_reads_firstmapping:
+          title: "Mapping %"
+          description: "Percentage of trimmed reads that mapped to the strain reference at first-mapping (major row = major strain, [minor] row = minor strain for co-infections)."
+          suffix: "%"
+          format: "{:,.1f}"
+          scale: "RdYlGn"
+          min: 0
+          max: 100
+        pct_similarity_to_nearest_reference:
+          title: "% similarity to nearest ref"
+          description: "Global alignment identity (%) between the strain consensus and its nearest reference (major row = major strain, [minor] row = minor strain for co-infections)."
+          suffix: "%"
+          format: "{:,.2f}"
+          scale: "RdYlGn"
+          min: 90
+          max: 100
+        n_differences_to_nearest_reference:
+          title: "Differences from nearest ref"
+          description: "Number of positions where the strain consensus differs from its nearest reference (major row = major strain, [minor] row = minor strain for co-infections)."
+          format: "{:,.0f}"
+
+  # -------------------------------------------------------------------------
+  # HCV-GLUE resistance section (appears right below Results summary)
+  # -------------------------------------------------------------------------
+  glue_resistance:
+    id: "glue_resistance"
+    fn: "*/glue_resistance_mqc.tsv"
+    file_format: "tsv"
+    plot_type: "table"
+    section_name: "Resistance (HCV-GLUE)"
+    description: >
+      Drug resistance predictions from HCV-GLUE for each sample.
+      Co-infection samples have two rows: the major strain (sample name)
+      and the minor strain (sample name [minor]).
+    pconfig:
+      id: "glue_resistance_table"
+      col1_header: "Sample"
+      only_defined_headers: false
+      headers:
+        Resistance:
+          title: "Resistance"
+          description: "Overall resistance assessment — strongest signal detected across all drugs. Resistance > Probable/Possible resistance > No resistance."
+          placement: 5
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_eq: "Probable/Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        # NS3/4A class summary, then per-drug
+        NS34A:
+          title: "NS3/4A class"
+          description: "Combined NS3/4A resistance summary across all inhibitors."
+          placement: 10
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        glecaprevir:
+          title: "Glecaprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 20
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        glecaprevir_mut:
+          title: "Glecaprevir mutations"
+          description: "Full mutation list for glecaprevir resistance."
+          placement: 21
+        grazoprevir:
+          title: "Grazoprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 30
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        grazoprevir_mut:
+          title: "Grazoprevir mutations"
+          description: "Full mutation list for grazoprevir resistance."
+          placement: 31
+        paritaprevir:
+          title: "Paritaprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 40
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        paritaprevir_mut:
+          title: "Paritaprevir mutations"
+          description: "Full mutation list for paritaprevir resistance."
+          placement: 41
+        voxilaprevir:
+          title: "Voxilaprevir"
+          description: "NS3/4A inhibitor resistance status."
+          placement: 50
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        voxilaprevir_mut:
+          title: "Voxilaprevir mutations"
+          description: "Full mutation list for voxilaprevir resistance."
+          placement: 51
+        # NS5A class summary, then per-drug
+        NS5A:
+          title: "NS5A class"
+          description: "Combined NS5A resistance summary across all inhibitors."
+          placement: 60
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        daclatasvir:
+          title: "Daclatasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 70
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        daclatasvir_mut:
+          title: "Daclatasvir mutations"
+          description: "Full mutation list for daclatasvir resistance."
+          placement: 71
+        elbasvir:
+          title: "Elbasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 80
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        elbasvir_mut:
+          title: "Elbasvir mutations"
+          description: "Full mutation list for elbasvir resistance."
+          placement: 81
+        ledipasvir:
+          title: "Ledipasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 90
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        ledipasvir_mut:
+          title: "Ledipasvir mutations"
+          description: "Full mutation list for ledipasvir resistance."
+          placement: 91
+        ombitasvir:
+          title: "Ombitasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 100
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        ombitasvir_mut:
+          title: "Ombitasvir mutations"
+          description: "Full mutation list for ombitasvir resistance."
+          placement: 101
+        pibrentasvir:
+          title: "Pibrentasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 110
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        pibrentasvir_mut:
+          title: "Pibrentasvir mutations"
+          description: "Full mutation list for pibrentasvir resistance."
+          placement: 111
+        velpatasvir:
+          title: "Velpatasvir"
+          description: "NS5A inhibitor resistance status."
+          placement: 120
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        velpatasvir_mut:
+          title: "Velpatasvir mutations"
+          description: "Full mutation list for velpatasvir resistance."
+          placement: 121
+        # NS5B class summary, then per-drug
+        NS5B:
+          title: "NS5B class"
+          description: "Combined NS5B resistance summary across all inhibitors."
+          placement: 130
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        dasabuvir:
+          title: "Dasabuvir"
+          description: "NS5B inhibitor resistance status."
+          placement: 140
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        dasabuvir_mut:
+          title: "Dasabuvir mutations"
+          description: "Full mutation list for dasabuvir resistance."
+          placement: 141
+        sofosbuvir:
+          title: "Sofosbuvir"
+          description: "NS5B inhibitor resistance status."
+          placement: 150
+          cond_formatting_rules:
+            - fail:
+                - s_eq: "Resistance"
+            - warn:
+                - s_contains: "Probable resistance"
+                - s_contains: "Possible resistance"
+            - pass:
+                - s_eq: "No resistance"
+        sofosbuvir_mut:
+          title: "Sofosbuvir mutations"
+          description: "Full mutation list for sofosbuvir resistance."
+          placement: 151

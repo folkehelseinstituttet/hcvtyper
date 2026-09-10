@@ -20,8 +20,14 @@ if (prefix != sampleName) {
   stop("Error: Prefix and sample name do not match. Please check the input files.", call.=FALSE)
 }
 
-# Extract if it's a major or minor variant from the bam file name
-major_minor <- unlist(str_split(basename(bam_file), pattern = "\\."))[3]
+# Extract the cand-slot token (e.g. "cand1", "cand2") from the BAM file name.
+# Phase-9 naming: <id>.<ref>_cand{rank}.nodup.bam — the cand token is embedded in
+# the second dot-field (ref_cand{rank}), not a standalone position-3 field.
+# We match the first part containing "^cand[0-9]+$"; fall back to position 3 for
+# legacy filenames that pre-date the cand-slot rename.
+parts <- unlist(str_split(basename(bam_file), pattern = "\\."))
+major_minor <- parts[grep("^cand[0-9]+$", parts)][1]
+if (is.na(major_minor)) major_minor <- parts[3]
 
 # Set variation threshold for highlighting (modify as needed)
 variation_threshold <- 0.15

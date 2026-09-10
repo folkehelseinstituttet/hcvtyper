@@ -3,7 +3,12 @@ name: Release Management
 on:
   push:
     tags:
-      - "v*.*.*" # Triggers on version tags like v1.1.0
+      # Release tags are bare version numbers (2.0.0), per nf-core convention — the
+      # "v" belongs only in the displayed name, which getWorkflowVersion() prepends.
+      # The legacy v1.0-v1.2.0 tags keep their prefix, so both forms are matched here;
+      # the step below strips any leading "v". A "v*.*.*"-only filter is what stopped
+      # the 1.3.0 tag from ever producing a release.
+      - "*.*.*"
 
 jobs:
   release:

@@ -10,6 +10,7 @@ on:
 
 env:
   NXF_ANSI_LOG: false
+  NFT_VER: "0.9.5"
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
@@ -41,6 +42,59 @@ jobs:
         # Remember that you can parallelise this by using strategy.matrix
         run: |
           nextflow run ${GITHUB_WORKSPACE} -profile test,docker --outdir ./results
+
+  nf-test:
+    name: nf-test pipeline snapshot
+    # The `test` job above only proves the pipeline EXITS 0 — it never looks at an
+    # output file. This job runs the same minimal profile under nf-test, which
+    # additionally asserts the published file tree, the stable-content md5s
+    # (tests/default.nf.test.snap) and the named de novo plumbing assertions.
+    # Without it those assertions rot silently: the snapshot had drifted 92 commits
+    # before this job existed.
+    if: "${{ github.event_name != 'push' || (github.event_name == 'push' && github.repository == 'folkehelseinstituttet/hcvtyper') }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      # nf-test 0.9.5 is compiled for class file version 61 (Java 17+). Java 17 is
+      # pinned rather than left to the runner default: it is the version this
+      # suite + the pinned nft-* plugins are known good on.
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: "24.04.0"
+
+      - name: Install nf-test
+        uses: nf-core/setup-nf-test@v1
+        with:
+          version: "${{ env.NFT_VER }}"
+
+      # "+docker" PREPENDS to the profile already set in nf-test.config (`profile
+      # "test"`), giving test,docker — passing "test,docker" instead would replace it.
+      #
+      # Deliberately scoped to tests/default.nf.test rather than a bare `nf-test test`.
+      # A bare invocation picks up all 26 tests in the repo (modules/local/**,
+      # subworkflows/local/**); those have not been run since the phase 12-14 changes
+      # and are unverified, so gating merges on them today would land a red job.
+      # Broadening this to the full suite is a follow-up — do it once those tests have
+      # been run and re-baselined locally.
+      - name: Run nf-test
+        run: |
+          nf-test test tests/default.nf.test --verbose --profile "+docker" --junitxml=test.xml
+
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          report_paths: test.xml
+          annotate_only: true
 
   r-regression:
     name: R regression guard

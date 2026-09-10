@@ -29,13 +29,20 @@ nextflow_process {
       }
     }
     then {
+      // The long-format candidates emit (REFSEL-01) must be present and carry the
+      // Plan-01 long-format header (one row per neutrally-ranked candidate).
+      def candHeader = path(process.out.candidates.get(0).get(1)).readLines()[0]
       assertAll(
         { assert process.success },
+        { assert process.out.candidates.size() == 1 },
+        { assert candHeader.contains('candidate_rank') },
+        { assert candHeader.contains('candidate_ref') },
+        { assert candHeader.contains('confirmation_status') },
         { assert snapshot([
-            csv          : process.out.csv,
-            major_mapping: process.out.major_mapping,
-            minor_mapping: process.out.minor_mapping,
-            versions     : process.out.versions
+            csv           : process.out.csv,
+            candidate_fasta: process.out.candidate_fasta,
+            candidates    : process.out.candidates,
+            versions      : process.out.versions
           ]).match() }
       )
     }
@@ -58,13 +65,20 @@ nextflow_process {
       }
     }
     then {
+      // -stub-run must fan out into 2 candidate rows (cand_1/cand_2) so the
+      // workflow splitCsv fan-out exercises the multi-candidate path.
+      def candLines = path(process.out.candidates.get(0).get(1)).readLines()
       assertAll(
         { assert process.success },
+        { assert process.out.candidates.size() == 1 },
+        { assert candLines[0].contains('candidate_rank') },
+        // header + 2 candidate rows
+        { assert candLines.size() == 3 },
         { assert snapshot([
-            csv          : process.out.csv,
-            major_mapping: process.out.major_mapping,
-            minor_mapping: process.out.minor_mapping,
-            versions     : process.out.versions
+            csv           : process.out.csv,
+            candidate_fasta: process.out.candidate_fasta,
+            candidates    : process.out.candidates,
+            versions      : process.out.versions
           ]).match() }
       )
     }
@@ -72,7 +86,13 @@ nextflow_process {
 
   // GATE-03: a dominant 2k1b subtype must keep its whole name as the genotype
   // (the helper returns "2k1b", NOT "2"). The selected major FASTA is the 2k1b
-  // reference. Single dominant reference => no valid minor.
+  // reference.
+  //
+  // D-05 note: selection no longer applies validity filtering (is_valid_minor is
+  // deleted; validity rules moved to Phase 8). Here no 2nd candidate is selected
+  // NOT because a rule blocked it, but because this fixture maps to a SINGLE
+  // distinct subtype (2k1b only) — neutral read-recruitment ranking yields exactly
+  // one candidate, so candidate_fasta carries only _cand1.fa and only 1 candidates row appears.
   test("parsefirstmapping: 2k1b major keeps whole-name genotype (GATE-03)") {
     options "--profile docker"
     when {
@@ -89,24 +109,37 @@ nextflow_process {
       }
     }
     then {
+      // Single-subtype fixture => exactly one neutrally-ranked candidate (D-05).
+      def candLines = path(process.out.candidates.get(0).get(1)).readLines()
       assertAll(
         { assert process.success },
-        // The selected major is the 2k1b reference (helper kept the whole name).
-        { assert process.out.major_mapping.get(0).get(2).toString().contains("2k1b_AB031663_major.fa") },
-        // No valid minor for a single dominant subtype.
-        { assert process.out.minor_mapping.size() == 0 },
+        // The selected first candidate (rank 1) is the 2k1b reference (helper kept the whole name).
+        { assert process.out.candidate_fasta.get(0).get(2).toString().contains("2k1b_AB031663_cand1.fa") },
+        // Single distinct subtype => exactly one candidate FASTA (_cand1.fa) and no
+        // 2nd-rank FASTA (D-05: not a validity-rule block — there simply is no second
+        // subtype to rank).
+        { assert process.out.candidate_fasta.get(0).get(2).toString().contains("_cand1.fa") },
+        { assert !process.out.candidate_fasta.get(0).get(2).toString().contains("_cand2.fa") },
+        { assert candLines[0].contains('candidate_rank') },
+        // header + exactly 1 candidate row
+        { assert candLines.size() == 2 },
         { assert snapshot([
-            csv          : process.out.csv,
-            major_mapping: process.out.major_mapping,
-            minor_mapping: process.out.minor_mapping,
-            versions     : process.out.versions
+            csv           : process.out.csv,
+            candidate_fasta: process.out.candidate_fasta,
+            candidates    : process.out.candidates,
+            versions      : process.out.versions
           ]).match() }
       )
     }
   }
 
-  // GATE-04: when there is no valid minor (single dominant subtype), the
-  // length(minor_ref) > 0 guard must prevent any *_minor.fa from being written.
+  // GATE-04: when the sample maps to a single distinct subtype, the
+  // length(selected_refs) > 1 guard must prevent any 2nd-rank *_cand2.fa from being written.
+  //
+  // D-05 note: with validity filtering removed from selection, "no minor" here
+  // means "no SECOND distinct subtype to rank" (this fixture is 3a-only), not a
+  // rule rejecting an otherwise-valid second candidate. Neutral ranking yields one
+  // candidate; candidate_fasta carries only _cand1.fa and the candidates table has a single row.
   test("parsefirstmapping: no minor FASTA when no valid minor (GATE-04)") {
     options "--profile docker"
     when {
@@ -123,15 +156,22 @@ nextflow_process {
       }
     }
     then {
+      // Single-subtype fixture => exactly one neutrally-ranked candidate (D-05).
+      def candLines = path(process.out.candidates.get(0).get(1)).readLines()
       assertAll(
         { assert process.success },
-        // No *_minor.fa emitted => minor_mapping channel is empty.
-        { assert process.out.minor_mapping.size() == 0 },
+        // Single-subtype fixture => exactly one candidate FASTA (_cand1.fa) and no
+        // 2nd-rank FASTA emitted (no 2nd subtype to rank).
+        { assert process.out.candidate_fasta.get(0).get(2).toString().contains("_cand1.fa") },
+        { assert !process.out.candidate_fasta.get(0).get(2).toString().contains("_cand2.fa") },
+        { assert candLines[0].contains('candidate_rank') },
+        // header + exactly 1 candidate row
+        { assert candLines.size() == 2 },
         { assert snapshot([
-            csv          : process.out.csv,
-            major_mapping: process.out.major_mapping,
-            minor_mapping: process.out.minor_mapping,
-            versions     : process.out.versions
+            csv           : process.out.csv,
+            candidate_fasta: process.out.candidate_fasta,
+            candidates    : process.out.candidates,
+            versions      : process.out.versions
           ]).match() }
       )
     }
@@ -164,6 +204,10 @@ nextflow_process {
       def header   = csvLines[0].split(',', -1) as List
       def row      = csvLines[1].split(',', -1) as List
       def cell     = { name -> row[header.indexOf(name)] }
+      // Two distinct subtypes (3a + 1a) => neutral ranking selects BOTH as
+      // candidates (D-05). The shim still gates: major fails minCov, so no minor
+      // call — but candidate_rank 2 (1a) is present in the long-format table for QC.
+      def candLines = path(process.out.candidates.get(0).get(1)).readLines()
       assertAll(
         { assert process.success },
         // Failing-major reason set; no minor call.
@@ -177,11 +221,14 @@ nextflow_process {
         { assert cell('minor_ref')   == '1a_H77' },
         { assert cell('minor_reads') == '600' },
         { assert cell('minor_cov')   == '60' },
+        // Long-format candidates table carries both ranks (header + 2 rows).
+        { assert candLines[0].contains('candidate_rank') },
+        { assert candLines.size() == 3 },
         { assert snapshot([
-            csv          : process.out.csv,
-            major_mapping: process.out.major_mapping,
-            minor_mapping: process.out.minor_mapping,
-            versions     : process.out.versions
+            csv           : process.out.csv,
+            candidate_fasta: process.out.candidate_fasta,
+            candidates    : process.out.candidates,
+            versions      : process.out.versions
           ]).match() }
       )
     }

@@ -2,11 +2,13 @@ process CONSENSUS_DISTANCE {
     tag "$meta.id"
     label 'process_low'
 
-    // Uses the same container as SUMMARIZE (has r-seqinr)
+    // Environment with Bioconductor Biostrings and pwalign packages. Created using seqera containers.
+    // Docker image:      https://wave.seqera.io/view/builds/bd-d44950715f95ecd3_1
+    // Singularity image: https://wave.seqera.io/view/builds/bd-925b098b091b9464_1
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/2a/2a1764abd77b9638883a202b96952a48f46cb0ee6c4f65874b836b9455a674d1/data':
-        'community.wave.seqera.io/library/r-gridextra_r-png_r-seqinr_r-tidyverse:3536dd50a17de0ab' }"
+        'oras://community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-pwalign:925b098b091b9464':
+        'community.wave.seqera.io/library/bioconductor-biostrings_bioconductor-pwalign:d44950715f95ecd3' }"
 
     input:
     tuple val(meta), path(consensus)
@@ -30,7 +32,8 @@ process CONSENSUS_DISTANCE {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        seqinr: \$(Rscript -e "library(seqinr); cat(as.character(packageVersion('seqinr')))")
+        bioconductor-biostrings: \$(Rscript -e "library(Biostrings); cat(as.character(packageVersion('Biostrings')))")
+        bioconductor-pwalign: \$(Rscript -e "library(pwalign); cat(as.character(packageVersion('pwalign')))")
     END_VERSIONS
     """
 
@@ -45,7 +48,8 @@ EOF
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        seqinr: \$(Rscript -e "library(seqinr); cat(as.character(packageVersion('seqinr')))")
+        bioconductor-biostrings: \$(Rscript -e "library(Biostrings); cat(as.character(packageVersion('Biostrings')))")
+        bioconductor-pwalign: \$(Rscript -e "library(pwalign); cat(as.character(packageVersion('pwalign')))")
     END_VERSIONS
     """
 }

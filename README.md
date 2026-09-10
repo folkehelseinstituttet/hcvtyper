@@ -1,11 +1,12 @@
 # ![folkehelseinstituttet/hcvtyper](docs/images/logo-engelsk-hele-navnet.jpg#gh-light-mode-only) ![folkehelseinstituttet/hcvtyper](docs/images/logo-engelsk-hele-navnet-hvit.png#gh-dark-mode-only)
 
-[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A522.10.1-23aa62.svg)](https://www.nextflow.io/)
+[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A524.04.0-23aa62.svg)](https://www.nextflow.io/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 
 ## Table of Contents
 
 - [About HCVTyper](#about-hcvtyper)
+- [How the pipeline calls strains](#how-the-pipeline-calls-strains)
 - [Requirements](#requirements)
 - [Run the pipeline](#run-the-pipeline)
 - [Test the pipeline](#test-the-pipeline)
@@ -18,6 +19,12 @@
   - [Kraken2 databases](#kraken2-databases)
   - [HCV reference sequences](#hcv-reference-sequences)
   - [Co-infections (major and minor strains)](#co-infections-major-and-minor-strains)
+  - [Candidate selection](#candidate-selection)
+  - [De novo corroboration thresholds](#de-novo-corroboration-thresholds)
+  - [De novo subtype rescue](#de-novo-subtype-rescue)
+  - [Dominance-score weights](#dominance-score-weights)
+  - [Review-flag thresholds](#review-flag-thresholds)
+  - [Cross-sample contamination check](#cross-sample-contamination-check)
 - [Starting and stopping the pipeline](#starting-and-stopping-the-pipeline)
 - [Customizing the pipeline](#customizing-the-pipeline)
 - [Output files](#output-files)
@@ -25,33 +32,83 @@
 
 ## About HCVTyper
 
-**folkehelseinstituttet/hcvtyper** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline will identify the most likely major and minor strain in a sample sequenced with the Illumina platform. It will map the reads to these references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and create consensus sequences. For Hepatitis C Viruses the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
-maps Illumina reads to a reference genome and creates a consensus sequence.
+**folkehelseinstituttet/hcvtyper** is a bioinformatics pipeline used at the [Norwegian Institute of Public Health](https://www.fhi.no/en/) that is designed for highly variable viruses, and viruses that are likely to appear as co-infections between multiple strains, such as Hepatitis C Virus. The pipeline identifies the strains present in a sample sequenced on the Illumina platform, maps the reads to the corresponding references using [Bowtie2](https://bowtie-bio.sourceforge.net/bowtie2/index.shtml), and creates a consensus sequence per strain. For Hepatitis C Virus the pipeline can also run a [GLUE-analysis](http://hcv-glue.cvr.gla.ac.uk/#/home) to identify drug resistance mutations.
+
+Every strain call is cross-checked against an independent line of evidence — _de novo_ assembly ([SPAdes](https://github.com/ablab/spades)) followed by BLAST against the reference panel — and the pipeline reports both **what the data indicate** and **how much to trust it**. Samples that need a human eye are labelled as such, so a marginal call never reads like a clean one.
+
+> [!TIP]
+> For how to read the results and how to confirm a call against the published evidence, see the
+> [results interpretation guide](docs/output_interpretation.md).
+
+## How the pipeline calls strains
+
+Understanding the output is much easier with the shape of the analysis in mind:
+
+1. **Read QC and classification.** Reads are trimmed ([fastp](https://github.com/OpenGene/fastp) or [Cutadapt](https://cutadapt.readthedocs.io/)), classified broadly with [Kraken2](https://github.com/DerrickWood/kraken2) for an overview, then classified against a small HCV-specific database. Only the HCV-classified reads go on to mapping and assembly.
+2. **First mapping — neutral candidate selection.** All HCV-classified reads are mapped against the full reference panel. The top reference per distinct subtype is selected, up to `--n_candidates` (default 2). This step is deliberately **neutral**: candidates are ranked by read recruitment only, with no major/minor semantics yet.
+3. **_De novo_ assembly in parallel.** SPAdes assembles the same reads, the contigs are BLASTed against the reference panel, and the results are rolled up per subtype into an assembly-support table carrying contig length, BLAST identity, alignment length and k-mer coverage.
+4. **_De novo_ subtype rescue.** Where a high-quality contig contradicts a mapped candidate's subtype, the candidate's reference can be **reassigned** before the targeted mapping. Every rescue, nomination and block decision is written to a per-sample audit file.
+5. **Competitive joint mapping.** Rather than mapping to each candidate independently, the reads are mapped **once** against a combined index of all candidate references, deduplicated, and then split per candidate. Reads are therefore assigned to the reference they fit best, instead of being counted several times over — which is what makes cross-mapping artefacts visible.
+6. **Dominance scoring and role classification.** Each candidate gets a dominance score combining mapped reads, coverage breadth, depth evenness and k-mer coverage — with **evenness weighted above raw read count**, so a spiky high-read cross-mapping artefact loses to a genuine even minor. Each candidate is then assigned a `role` (`dominant` / `co-infection` / `background` / `indeterminate`) with a coded reason, and an evidence state (`confirmed` / `probable` / `weak`) computed from its own assembly support.
+7. **Sample call and confidence.** The per-candidate roles roll up into one `overall_sample_call` and one `call_confidence` tier per sample, plus a human-readable `review_flag` naming any specific conflict.
+8. **Consensus, GLUE and reporting.** Consensus sequences are generated per candidate, submitted to HCV-GLUE for genotype/subtype confirmation and drug resistance, and everything is collected into `Summary.csv` and a MultiQC report.
+
+Candidates that are demoted are **never silently dropped** — they appear in the candidate files with the reason they were demoted.
 
 ## Requirements
 
 The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https://www.docker.com/) in order to run. Note that you must be able to run Docker as a non-root user as described [here](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user).
 
 > [!IMPORTANT]
-> HCV-GLUE is currently only available with the Docker profile. We recommend that you always run the pipeline with Docker.
+> **HCV-GLUE is only supported on the `docker` profile.** Unlike every other step, the GLUE analysis is not
+> performed inside the container Nextflow starts for it. Instead it drives the **host's** container runtime to
+> start the `cvrbioinformatics/gluetools-mysql` database and run `cvrbioinformatics/gluetools` against each BAM,
+> which is why the GLUE task needs the host Docker socket bind-mounted into it (see `conf/modules_hcv.config`).
+>
+> This has three practical consequences:
+>
+> - The GLUE step is **not supported under `-profile singularity` or `-profile conda`**, where that bind-mount
+>   does not apply. Run those profiles with `--skip_hcvglue`.
+> - The host running the pipeline must allow **non-root access to the Docker socket** (see the link above) and
+>   must be able to **pull images from Docker Hub at run time**. On sites where either is blocked — many HPC
+>   clusters — use `--skip_hcvglue`.
+> - The `--skip_hcvglue` run is otherwise complete: trimming, classification, candidate selection, assembly,
+>   rescue, mapping, consensus, the review flags and `Summary.csv` all behave normally. Only the GLUE-derived
+>   columns (`GLUE_genotype`, `GLUE_subtype`, the resistance columns, and the GLUE version fields) are reported
+>   as `NA`, and the genotype/subtype call falls back to the mapping-based call.
+>
+> We recommend that you always run the pipeline with Docker.
 
 ## Run the pipeline
 
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 
 ```
-nextflow run folkehelseinstituttet/hcvtyper -r v1.1.3 \
+nextflow run folkehelseinstituttet/hcvtyper -r 2.0.0 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
 
-Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 1.1.3 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.0 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+
+> [!IMPORTANT]
+> **From 2.0.0 the release tags are bare version numbers with no `v` prefix** — `-r 2.0.0`, not
+> `-r v2.0.0` — matching `manifest.version` and nf-core convention. The existing `v1.0`–`v1.2.0`
+> tags are untouched, so `-r v1.1.7` keeps working.
+
+> [!NOTE]
+> The evidence-based classification described in this README (neutral candidate selection, dominance
+> scoring, per-candidate roles, `call_confidence`, _de novo_ rescue and competitive joint mapping) is
+> **new in 2.0.0** and is not available in the 1.x releases. 2.0.0 also changes the per-candidate
+> output filenames (`.major.` / `.minor.` → `.cand1.` / `.cand2.`) and the `Summary.csv` schema, so if
+> you are upgrading from 1.x — or have scripts reading either — read the `Breaking changes` in the
+> [`CHANGELOG.md`](CHANGELOG.md) `2.0.0` section first.
 
 If you want to download a local copy of the pipeline you can run:
 
 ```
-nextflow pull folkehelseinstituttet/hcvtyper -r v1.0.6
+nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.0
 ```
 
 Again, `-r` is optional.
@@ -70,7 +127,7 @@ To run a full test on a real dataset type:
 
 ```
 # First download the test dataset using nf-core/fetchngs
-nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/refs/heads/dev/assets/test_ids.csv' --outdir full_test
+nextflow run nf-core/fetchngs -profile docker --input 'https://raw.githubusercontent.com/folkehelseinstituttet/hcvtyper/master/assets/test_ids.csv' --outdir full_test
 
 # Then run the pipeline on the downloaded dataset
 nextflow run folkehelseinstituttet/hcvtyper -profile docker,test_full
@@ -123,6 +180,12 @@ The output directory is specified using the `--outdir` parameter, e.g.:
 
 The pipeline can be run using different profiles, which will determine how the pipeline is executed. The default profile is `docker`, which uses Docker containers to run the pipeline. You can also use `singularity` or `conda` profiles if you prefer those environments. To set the profile use the `-profile` parameter, e.g.: `-profile docker/singularity/conda`.
 
+> [!IMPORTANT]
+> `docker` is the only profile on which the pipeline runs end to end. The HCV-GLUE step needs access to the
+> host's container runtime and is **not supported** under `singularity` or `conda` — combine those with
+> `--skip_hcvglue`, which leaves the rest of the pipeline fully functional. See
+> [Requirements](#requirements) for what this changes in the output.
+
 ### Provide parameters in a file
 
 The different parameters can be provided in a file using the argument `-params-file path/to/params-file.yml`. The file can be either YAML-formatted:
@@ -157,9 +220,93 @@ The database comes with a provided set of about 200 HCV reference sequences down
 
 ### Co-infections (major and minor strains)
 
-The pipeline will first map all HCV-classified reads against all HCV reference sequences. Then it will identify the reference sequence with the most mapped reads and use the genotype and subtype information from this reference sequence to call major genotype and subtype. To identify a potential co-infection (minor strain), the pipeline will identify the reference that belongs to a different genotype than the major strain (expect for genotypes 1a and 1b which are considered different enough so that we can distinguish them in a co-infection) and has the highest coverage (i.e., percent of the genome covered by 5 or more reads). By default we have set a threshold of minimum 500 reads and 30% genome coverage in order to consider a strain as a minor strain at all. This can be overridden using the parameters `--minRead` and `--minCov`.
+All HCV-classified reads are first mapped against the full reference panel. The best reference per distinct subtype is then selected as a **candidate** (see [Candidate selection](#candidate-selection)), and each candidate is scored and classified independently — there is no fixed "major slot" and "minor slot" during the analysis. The `Major_*` / `Minor_*` columns in `Summary.csv` are the **reported view** of that model: the dominant candidate and the highest-ranked co-infection candidate respectively.
 
-Note that there is a recombinant strain between subtypes 2k and 1b present in the database. If this is detected, the pipeline will not allow for a co-infection with either genotypes 1 or 2.
+A candidate is reported as a genuine co-infection only when it both:
+
+1. **Clears the abundance floor** — more than `--minRead` mapped reads (default 499) and more than `--minCov` percent genome coverage at ≥5× depth (default 29). Below that it is classified `background` with reason `below_floor`.
+2. **Has _de novo_ support** — a contig assembling to the same genotype (or subtype, see `--denovo_match_level`) that clears the corroboration thresholds. Without it the candidate is demoted to `background`, with reason `no_own_assembly` when no such contig exists at all, or `weak_own_assembly_below_floor` when one exists but scores below the band cut. Either way a review note names the candidate and quotes the measured contig values.
+
+Two long-standing exceptions still apply and are unchanged:
+
+- **Genotypes 1a and 1b** are considered distinguishable enough to be reported as a co-infection with each other. All other same-genotype pairs are collapsed — the weaker candidate is demoted with reason `same_genotype_as_dominant`.
+- **The 2k/1b recombinant** present in the reference panel does not permit a co-infection with either genotype 1 or genotype 2 (reason `recombinant_2k1b`).
+
+Demoted candidates are always written to the candidate files with their `role_reason`, so nothing disappears silently. See the [results interpretation guide](docs/output_interpretation.md) for the full role and reason glossary.
+
+### Candidate selection
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--n_candidates` | `2` | Number of neutrally-ranked candidate references to select and map (`cand1`..`candN`). The top reference per distinct subtype is taken. The default of 2 reproduces the classic two-slot major/minor topology. |
+| `--minRead` | `499` | Minimum mapped reads for a candidate to clear the abundance floor. |
+| `--minCov` | `29` | Minimum percent of the reference covered at ≥5× for a candidate to clear the abundance floor. |
+
+### De novo corroboration thresholds
+
+These control when an assembled contig counts as evidence for a candidate.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--denovo_confirm_minor` | `true` | Require orthogonal _de novo_/BLAST evidence before reporting a minor strain. |
+| `--denovo_min_contig_length` | `500` | Minimum contig length (bp) to count as evidence. Validated at 500 to keep genuine short minor contigs. |
+| `--denovo_min_kmer_cov` | `2.0` | Minimum SPAdes k-mer coverage of the contig. |
+| `--denovo_min_blast_identity` | `90` | Minimum BLAST % identity of the contig hit. |
+| `--denovo_match_level` | `genotype` | Whether _de novo_ evidence must match a candidate at `genotype` or `subtype` level. |
+
+> [!NOTE]
+> Assembly support is no longer a pass/fail gate. Each candidate receives a continuous
+> `assembly_support_score` (weighted length, identity and k-mer coverage), so a contig one point below a
+> threshold is no longer discarded outright. The thresholds above set the shape of that score and the
+> floors used for refutation.
+
+### De novo subtype rescue
+
+When a high-quality contig contradicts a mapped candidate's subtype, the candidate's reference can be reassigned before targeted mapping. All four quality floors must be cleared.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--rescue_min_length` | `3000` | Minimum _de novo_ contig length (bp) to trigger a rescue. |
+| `--rescue_min_pident` | `85` | Minimum BLAST % identity of the contig's top hit. |
+| `--rescue_min_aln_length` | `3000` | Minimum BLAST alignment length (bp) of the top hit. |
+| `--rescue_min_kmer_cov` | `2.0` | Minimum SPAdes k-mer coverage of the contig. |
+| `--rescue_1a1b_length` | `5000` | Stricter contig-length floor when both the candidate and the _de novo_ subtype are in {1a, 1b}. |
+| `--rescue_kmer_cov_ratio` | `10` | Block a replacement when the candidate's own-subtype contig k-mer coverage exceeds the rescue target's by at least this factor (cross-mapping-noise guard). `0` disables. |
+| `--rescue_dominant_protect_cov` | `90` | A first-mapping candidate at or above this coverage whose own subtype _is_ assembled is self-confirming and is never replaced. Blank disables. |
+
+A rescue that reassigns the **Major** reference always forces `call_confidence = review` and a review note — it is an automated override of the primary call. The full from/to and trigger for every rescue decision is written to `blastparse/{sample}.rescue_audit.csv`.
+
+### Dominance-score weights
+
+Each candidate's dominance score is a weighted sum over log10(mapped reads), coverage breadth, a CV-of-depth evenness factor, and a bonus-only log(k-mer coverage) term. Evenness deliberately outweighs raw read count so that a high-read but spiky cross-mapping artefact loses to a genuine, evenly covered minor.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--score_weight_evenness` | `3.0` | Weight on the CV-evenness factor — the dominant term. |
+| `--score_weight_reads` | `1.0` | Weight on log10(candidate reads). |
+| `--score_weight_kmercov` | `0.5` | Weight on the bonus-only log(k-mer coverage) term (never penalises). |
+| `--score_evenness_k` | `1.0` | Constant in the evenness transform `1 / (1 + k × CV)`. |
+
+### Review-flag thresholds
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--review_min_offgenotype_contig_length` | `1000` | Minimum contig length (bp) for the monoinfection "_de novo_ assembly found a different-genotype contig" review sentence to fire. Deliberately separate from — and higher than — `--denovo_min_contig_length`: that floor confirms a minor that mapping already supports, whereas here the contig is the _only_ evidence. Validated across 140 samples: with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case. |
+
+### Cross-sample contamination check
+
+An all-vs-all BLAST of the assembled contigs across samples in the run, used to detect index hopping and cross-contamination. Results are published to `contamination_check/`.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--skip_contamination_check` | `false` | Skip the check entirely. |
+| `--contamination_min_length` | `1000` | Minimum contig length (bp) to include. |
+| `--contamination_min_id` | `95` | Minimum BLAST % identity to flag a hit. |
+| `--contamination_min_aln_cov` | `0.9` | Minimum fraction of the shorter contig that must be covered by the alignment. |
+| `--contamination_hop_rate` | `0.001` | Expected index-hopping rate. |
+| `--contamination_min_dir_ratio` | `10.0` | Minimum source/recipient coverage ratio for a direction to be reported. |
+| `--contamination_genome_size` | `9500` | Expected viral genome size (bp), used for the index-hop threshold. |
+| `--contamination_kmer_size` | `127` | SPAdes final k-mer size, used to convert k-mer coverage to read depth. |
 
 ## Starting and stopping the pipeline
 
@@ -181,9 +328,15 @@ withName: 'PROCESS_NAME' {
 
 ### Main output files
 
+> [!TIP]
+> This section is a reference for _what_ each file and column is. For _how to read a call_ — the
+> two-axis call/confidence model, the review-flag triggers, the role glossary and a step-by-step
+> procedure for confirming a call against the evidence — see the
+> [results interpretation guide](docs/output_interpretation.md).
+
 #### Summary.csv
 
-The primary output file containing per-sample genotyping and quality metrics. Key columns include:
+The primary output file (`summary/Summary.csv`) containing one row per sample with genotyping and quality metrics. Key columns include:
 
 **Read statistics:**
 
@@ -194,11 +347,35 @@ The primary output file containing per-sample genotyping and quality metrics. Ke
 - `total_mapped_reads` - Reads mapped to all reference genomes
 - `fraction_mapped_reads_vs_median` - Fraction of mapped reads relative to median across all samples. Useful for identifying outliers in a sequencing batch.
 
+**The call and how much to trust it — read these two first:**
+
+- `overall_sample_call` - What the data indicate: `monoinfection`, `co-infection`, `co-infection (indeterminate dominance)`, `indeterminate`, or `untypable`. Derived from the count of candidates in a `confirmed`/`probable` evidence state, independently of which candidate happens to be dominant.
+- `call_confidence` - How much to trust it: `high` (no conflicting signals — accept), `provisional` (a soft caveat worth noting), `review` (a hard conflict that should block automatic reporting), or `indeterminate` (no actionable call). A sample with a non-empty `review_flag` is never `high`.
+
 **Genotyping results:**
 
-- `Major_genotype_mapping` / `Minor_genotype_mapping` - Identified genotypes (major/minor variants) from the reference mapping
-- `Major_reference` / `Minor_reference` - CLosest references identified in the mapping against all references. These were used for genotyping and re-mapping
-- `major_typable` / `minor_typable` - Whether the sample meets quality thresholds for reliable genotyping (YES/NO)
+- `Major_genotype_mapping` / `Minor_genotype_mapping` - Identified genotypes (major/minor strains) from the reference mapping
+- `Major_reference` / `Minor_reference` - Closest references identified in the mapping against all references. These were used for genotyping and re-mapping
+- `Major_genotype` / `Major_subtype` / `Minor_genotype` / `Minor_subtype` - The final reported genotype and subtype per strain, derived from the role-corrected assignment. `*_genotype` is always in lockstep with `*_subtype` and is 2k/1b-aware.
+- `major_typable` / `minor_typable` - Whether the strain meets quality thresholds for reliable genotyping (YES/NO)
+
+**Per-candidate roles and evidence:**
+
+These columns expose the role model behind the reported major/minor view.
+
+- `Major_role_reference` / `Minor_role_reference` - The reference assigned to each role after classification (which may differ from the first-mapping reference if a _de novo_ rescue fired).
+- `Major_role_subtype` / `Minor_role_subtype` - The subtype of that reference.
+- `Major_dominance_score` / `Minor_dominance_score` - The combined dominance score (reads, breadth, evenness, k-mer coverage).
+- `Major_role_reason` / `Minor_role_reason` - Why the candidate landed in its role: `dominant`, `corroborated`, `no_own_assembly`, `weak_own_assembly_below_floor`, `same_genotype_as_dominant`, `recombinant_2k1b`, `discordant_identity`, `indeterminate_dominance_conflict`.
+- `Major_evidence_state` / `Minor_evidence_state` - The evidence band behind that reason: `confirmed`, `probable` or `weak`. Computed from the candidate's own assembly support and concordance — never forced by another candidate's dominance.
+- `Major_evidence` / `Minor_evidence` - A single compact string summarising the basis for the strain, e.g. `1a_HQ850279 | 97,242 reads (nodup) | 91% breadth@10x | de novo 1a | 99.2% consensus id | ref from first-mapping`. The final token states whether the reference came from first-mapping or was reassigned by the rescue. Empty for monoinfections in the Minor slot.
+- `gate_flag` - First-mapping quality gate status for the dominant strain. `ok` = passed; any other value means the major failed coverage or depth requirements and the genotype call is uncertain.
+
+**De novo rescue:**
+
+- `rescue_flag` - Whether any rescue survived into the final call.
+- `rescue_effect` - Where a surviving rescue landed: `none`, `minor_ref_changed`, or `major_ref_changed`. `major_ref_changed` always forces `call_confidence = review` — it reassigned the dominant strain. Open `blastparse/{sample}.rescue_audit.csv` for the from/to and trigger.
+- `cand_N_rescued_from` / `cand_N_rescue_trigger` - Per candidate slot, the original reference and the trigger, where a rescue applied.
 
 **Mapping statistics (major/minor):**
 
@@ -228,26 +405,49 @@ The primary output file containing per-sample genotyping and quality metrics. Ke
 
 **De novo confirmation columns:**
 
-The pipeline runs de novo assembly (SPAdes) and BLAST in parallel with reference mapping. These columns cross-check the two approaches and flag discrepancies for review.
+The pipeline runs _de novo_ assembly (SPAdes) and BLAST in parallel with reference mapping. These columns cross-check the two approaches and flag discrepancies for review.
 
-- `gate_flag` - Quality gate status for the major strain call. `ok` = passed all thresholds; any other value indicates the major strain failed coverage or depth requirements and the genotype call is uncertain.
-- `minor_denovo_status` - Whether the minor strain candidate is supported by de novo assembly. `confirmed_by_denovo` = a substantial contig BLASTs to the same genotype; `refuted` = de novo evidence argues against a real co-infection (likely cross-mapping artefact); `unconfirmed` = assembly evidence is insufficient to confirm or refute.
-- `coinfection_flag` - Set to `possible_multiple_strains` when de novo assembly finds evidence for a co-infection that was suppressed by the reference-mapping quality gate (i.e. the minor strain may be real but coverage thresholds prevented it from being called).
-- `denovo_major_ref` / `denovo_minor_ref` - Best-matching reference from the de novo BLAST for the major and minor strain respectively.
-- `denovo_major_contig_length` / `denovo_minor_contig_length` - Length (bp) of the supporting contig from de novo assembly.
-- `denovo_major_subtype` / `denovo_minor_subtype` - Subtype extracted from the de novo BLAST hit (first field before `_` in the reference name).
-- `denovo_major_subtype_match` / `denovo_minor_subtype_match` - Whether the de novo subtype agrees with the reference-mapping subtype (`YES` / `NO` / `NA` if one method had no result).
+- `denovo_major_ref` / `denovo_minor_ref` - Best-matching reference from the _de novo_ BLAST for the major and minor strain respectively.
+- `denovo_minor_contig` - Name of the contig that produced `denovo_minor_ref`. This, `denovo_minor_ref` and `denovo_minor_contig_length` all describe **the same contig**.
+- `denovo_major_contig_length` / `denovo_minor_contig_length` - Length (bp) of the supporting contig.
+- `denovo_major_subtype` / `denovo_minor_subtype` - Subtype extracted from the _de novo_ BLAST hit (first field before `_` in the reference name).
+- `denovo_major_subtype_match` / `denovo_minor_subtype_match` - Whether the _de novo_ subtype agrees with the reference-mapping subtype (`YES` / `NO` / `NA` if one method had no result).
+- `cand_N_assembly_support` - Whether candidate slot `N` has matching assembly evidence (`none` when no contig matched).
+- `cand_N_assembly_support_subtype` - Subtype of the supporting contig.
+- `cand_N_assembly_support_best_contig_length` / `_pident` / `_aln_length` / `_kmer_cov` - The four measured metrics of the best supporting contig for that candidate: length (bp), BLAST % identity, BLAST alignment length (bp), and SPAdes k-mer coverage.
 
 **Review flag:**
 
-- `review_flag` - Human-readable summary of any issues worth manual inspection. `NA` when all checks pass. Multiple issues are joined with `|`. Possible messages:
-  - _"Co-infection confirmed, but major/minor assignment uncertain — de novo and mapping disagree on which strain is dominant. Please review."_ — Both methods detect a co-infection but disagree on which strain is the major one, likely because mapping uses read count while de novo uses contig coverage.
-  - _"Major subtype conflict between de novo assembly and mapping — possible reference mismatch or highly divergent strain. Please review."_ — Single-infection sample where de novo and mapping point to different subtypes; may indicate a divergent strain or reference database gap.
-  - _"Minor strain candidate refuted by de novo assembly — likely single infection."_ — The minor strain seen in mapping is not supported by assembled contigs; most likely a cross-mapping artefact.
-  - _"Possible co-infection confirmed by de novo but suppressed by mapping quality gate — minor strain may be present at low abundance. Please review."_ — De novo assembly finds a second strain but the mapping coverage of the minor strain is below the reporting threshold.
-  - _"Major strain failed mapping quality thresholds — genotype call uncertain."_ — The primary genotype call does not meet minimum coverage or depth requirements.
+- `review_flag` - Human-readable summary of any issue worth manual inspection, empty when all checks pass. Multiple issues are joined with ` | `. Each sentence names **the specific candidate** it refers to and carries the **measured value** alongside the floor it missed — e.g. _"…different-genotype contig (6i) — 1620 bp contig, 69 bp aligned (4%), 91.3% identity, k-mer cov 1.0; only 4% of the contig aligns to any reference in the panel, so the subtype assignment is weakly supported"_ — so the flag can be adjudicated without re-running the pipeline. The ten triggers are listed in full in the [results interpretation guide](docs/output_interpretation.md#review_flag--the-human-readable-why).
 
 Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC Results summary table.
+
+**Deprecated columns:**
+
+- `minor_denovo_status` and `coinfection_flag` are no longer populated by the reporting path and remain as NA-filled stubs in 2.0.0, and will be removed in the next release. The information they carried is now in `Major_evidence_state` / `Minor_evidence_state`, `Minor_role_reason` and `overall_sample_call`.
+- The `Major_*` / `Minor_*` columns are aliased in 2.0.0 alongside their `Major_role_*` / `Minor_role_*` equivalents, and will be removed in the next release.
+
+#### candidates.csv
+
+`summary/candidates.csv` is the long-format companion to `Summary.csv`: **one row per candidate per sample**, including candidates that were demoted to `background`. This is where you look when you want to know why a strain was or was not reported. Columns include `candidate_rank`, `candidate_ref`, `candidate_subtype`, `candidate_reads`, `dominance_score`, `role`, `role_reason`, `evidence_state`, all the `assembly_support_*` metrics, and:
+
+- `candidate_cov` - Coverage breadth at ≥5× from the **first mapping**, against the full reference panel and including duplicates. This is the entry measurement the `--minCov` selection threshold reads. It is deliberately empty for a candidate whose reference was reassigned or added by _de novo_ rescue, because the number described the reference that was displaced.
+- `cand_cov_breadth` - Coverage breadth at ≥5× from the **targeted mapping**, after reads have been competitively assigned among this sample's candidates and deduplicated. This is the value the dominance score's breadth term reads. It is empty for a candidate that never reached targeted mapping (`confirmation_status` below threshold). The two columns answer different questions and routinely disagree — a candidate that recruits reads panel-wide can lose most of them once it competes only against the other candidates in its own sample.
+- `evidence_summary` - A plain-language sentence describing the contig corroboration for that candidate.
+- `contig_identity_contribution` / `contig_length_contribution` / `contig_kmer_contribution` - The weighted per-metric contributions to the candidate's `assembly_support_score`, so the score can be reconstructed from the file.
+- `below_floor` - Whether the candidate **clears** the `--minRead` / `--minCov` floor on its targeted numbers (the name is inverted; `TRUE` means it clears). Informational only — it does not gate the role.
+
+#### Per-sample evidence files
+
+| File | Contents |
+| --- | --- |
+| `parsefirstmapping/{sample}.candidates.csv` | The neutrally-ranked candidates as selected from the first mapping, before rescue and classification. |
+| `parsefirstmapping/{sample}_cand*.fa` | The selected candidate reference sequences. |
+| `blastparse/{sample}.assembly_support.csv` | Per-subtype _de novo_ assembly-support roll-up: best contig length, BLAST % identity, alignment length and k-mer coverage. |
+| `blastparse/{sample}.blastparse.csv` | Parsed BLAST hits of the assembled contigs against the reference panel. |
+| `blastparse/{sample}_blast_out.csv` | The raw BLAST output (every HSP). |
+| `blastparse/{sample}.rescued.candidates.csv` | The candidate set after _de novo_ subtype rescue. |
+| `blastparse/{sample}.rescue_audit.csv` | The authoritative ledger of **every** rescue, nomination and block decision, with from/to and trigger — including rescues that fired and were then dropped by genotype collapse or the candidate cap, which leave no trace anywhere else. |
 
 #### MultiQC Report
 
@@ -265,14 +465,21 @@ The MultiQC report provides an interactive overview of all samples and is the re
 
 ### Additional output directories
 
+- `summary/` - `Summary.csv` and `candidates.csv` — the primary results
 - `fastqc/` - Raw and trimmed read quality reports
 - `fastp/` or `cutadapt/` - Read trimming logs and statistics
 - `kraken2/` - Taxonomic classification reports
+- `parsefirstmapping/` - Neutral candidate selection from the first mapping, and the selected reference FASTAs
+- `blastparse/` - Parsed contig BLAST results, assembly support, rescued candidates and the rescue audit
 - `samtools/` - BAM file statistics and mapping metrics
 - `bowtie2/` - Alignment files and indices
-- `spades/` - De novo assembly results (if enabled)
+- `ivar/` - Per-candidate consensus sequences
+- `consensus/` - Consensus-vs-reference distance metrics (`Major/Minor_consensus_similarity_pct`)
+- `spades/` - De novo assembly results
 - `blast/` - BLAST results against reference database
 - `hcvglue/` - HCV-GLUE genotyping and resistance reports (for HCV samples)
+- `contamination_check/` - Cross-sample contamination and index-hopping report
+- `QC/coverage_plots/`, `QC/bam_variation/`, `QC/denovo/`, `QC/insert_size/` - Per-strain coverage and evenness plots, variation grids, assembly plots and insert-size metrics
 - `pipeline_info/` - Execution reports, timeline, and software versions
 
 ## Citations

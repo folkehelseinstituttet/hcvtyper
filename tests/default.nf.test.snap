@@ -1,17 +1,145 @@
 {
     "-profile test": {
         "content": [
-            75,
-            null,
+            87,
+            {
+                "BLASTPARSE": {
+                    "r-base": "4.4.3",
+                    "tidyverse": "2.0.0",
+                    "seqinr": "4.2.36"
+                },
+                "BLAST_BLASTN": {
+                    "blast": "2.17.0+"
+                },
+                "BLAST_BLASTN_CONTIGS": {
+                    "blast": "2.17.0+"
+                },
+                "BLAST_MAKEBLASTDB": {
+                    "blast": "2.17.0+"
+                },
+                "BLAST_MAKEBLASTDB_CONTIGS": {
+                    "blast": "2.17.0+"
+                },
+                "BOWTIE2_ALIGN": {
+                    "bowtie2": "2.5.4",
+                    "samtools": 1.21,
+                    "pigz": 2.8
+                },
+                "BOWTIE2_BUILD": {
+                    "bowtie2": "2.5.4"
+                },
+                "CAT_CANDIDATES": {
+                    "cat": 9.4
+                },
+                "CAT_FILTERED_CONTIGS": {
+                    "cat": 9.4
+                },
+                "CONSENSUS_DISTANCE": {
+                    "r-base": "4.5.3",
+                    "bioconductor-biostrings": "2.78.0",
+                    "bioconductor-pwalign": "1.6.0"
+                },
+                "CONTAMINATION_REPORT": {
+                    "r-base": "4.4.3",
+                    "tidyverse": "2.0.0",
+                    "jsonlite": "2.0.0"
+                },
+                "CONTIG_FILTER_RENAME": {
+                    "awk": "mawk 1.3.4 20240123"
+                },
+                "FASTP": {
+                    "fastp": "1.0.1"
+                },
+                "FASTQC_RAW": {
+                    "fastqc": "0.12.1"
+                },
+                "FASTQC_TRIM": {
+                    "fastqc": "0.12.1"
+                },
+                "IDXSTATS_NODUP": {
+                    "samtools": "1.22.1"
+                },
+                "IDXSTATS_WITHDUP": {
+                    "samtools": "1.22.1"
+                },
+                "INDEX_COMBINED": {
+                    "samtools": "1.22.1"
+                },
+                "INDEX_DEDUP": {
+                    "samtools": "1.22.1"
+                },
+                "INSTRUMENTID": {
+                    "seqkit": "v2.10.0"
+                },
+                "IVAR_CONSENSUS": {
+                    "ivar": "1.4.4"
+                },
+                "KRAKEN2_KRAKEN2": {
+                    "kraken2": "2.1.6",
+                    "pigz": 2.8
+                },
+                "PICARD_COLLECTINSERTSIZEMETRICS": {
+                    "picard": "3.4.0"
+                },
+                "PLOTCOVERAGE": {
+                    "r-base": "4.4.3",
+                    "tidyverse": "2.0.0",
+                    "seqinr": "4.2.36"
+                },
+                "PLOT_BAMVARIATION": {
+                    "r-base": "4.4.2",
+                    "tidyverse": "2.0.0",
+                    "Rsamtools": "2.22.0"
+                },
+                "REHEADER_CANDIDATE": {
+                    "samtools": "1.22.1"
+                },
+                "RESCUE_EVALUATION": {
+                    "r-base": "4.4.3",
+                    "tidyverse": "2.0.0",
+                    "seqinr": "4.2.36"
+                },
+                "SAMPLESHEET_CHECK": {
+                    "python": "3.8.3"
+                },
+                "SAMTOOLS_DEPTH": {
+                    "samtools": "1.22.1"
+                },
+                "SAMTOOLS_SORMADUP": {
+                    "samtools": "1.22.1"
+                },
+                "SAMTOOLS_VIEW": {
+                    "samtools": "1.22.1"
+                },
+                "SPADES": {
+                    "spades": "4.1.0"
+                },
+                "SUMMARIZE": {
+                    "r-base": "4.4.2",
+                    "tidyverse": "2.0.0",
+                    "seqinr": "4.2.36",
+                    "gridExtra": 2.3,
+                    "png": "0.1.8"
+                },
+                "UNTAR_KRAKEN_ALL": {
+                    "untar": 1.34
+                },
+                "UNTAR_KRAKEN_FOCUSED": {
+                    "untar": 1.34
+                },
+                "Workflow": {
+                    "folkehelseinstituttet/hcvtyper": "v2.0.0"
+                }
+            },
             [
                 "QC",
                 "QC/bam_variation",
-                "QC/bam_variation/Test_2.bam_pileup_3a_D17763_major.tsv",
-                "QC/bam_variation/Test_2.bam_variation_3a_D17763_major.tsv",
-                "QC/bam_variation/Test_2.variation_plot_3a_D17763_major.png",
+                "QC/bam_variation/Test_2.bam_pileup_3a_D17763_cand1.tsv",
+                "QC/bam_variation/Test_2.bam_variation_3a_D17763_cand1.tsv",
+                "QC/bam_variation/Test_2.variation_plot_3a_D17763_cand1.png",
                 "QC/bam_variation/Variation_plot_major.png",
                 "QC/coverage_plots",
-                "QC/coverage_plots/Test_2.major.3a_D17763.png",
+                "QC/coverage_plots/Test_2.cand1.3a_D17763.png",
                 "QC/denovo",
                 "QC/denovo/Test_1.alignment_plot.png",
                 "QC/denovo/Test_1.bitscore_plot.png",
@@ -30,20 +158,18 @@
                 "blast/Test_1.txt",
                 "blast/Test_2.txt",
                 "blastparse",
+                "blastparse/Test_1.assembly_support.csv",
                 "blastparse/Test_1.blastparse.csv",
+                "blastparse/Test_1.rescue_audit.csv",
+                "blastparse/Test_1.rescued.candidates.csv",
                 "blastparse/Test_1_blast_out.csv",
+                "blastparse/Test_2.assembly_support.csv",
                 "blastparse/Test_2.blastparse.csv",
+                "blastparse/Test_2.rescue_audit.csv",
+                "blastparse/Test_2.rescued.candidates.csv",
                 "blastparse/Test_2_blast_out.csv",
-                "bowtie2",
-                "bowtie2/bowtie2",
-                "bowtie2/bowtie2/Test_2.3a_D17763_major.1.bt2",
-                "bowtie2/bowtie2/Test_2.3a_D17763_major.2.bt2",
-                "bowtie2/bowtie2/Test_2.3a_D17763_major.3.bt2",
-                "bowtie2/bowtie2/Test_2.3a_D17763_major.4.bt2",
-                "bowtie2/bowtie2/Test_2.3a_D17763_major.rev.1.bt2",
-                "bowtie2/bowtie2/Test_2.3a_D17763_major.rev.2.bt2",
                 "consensus",
-                "consensus/Test_2.major.consensus_distance.tsv",
+                "consensus/Test_2.cand1.consensus_distance.tsv",
                 "contamination_check",
                 "contamination_check/contamination.contamination_direction.tsv",
                 "contamination_check/contamination.contamination_heatmap.png",
@@ -65,25 +191,25 @@
                 "fastqc/Test_1.raw_1_fastqc.zip",
                 "fastqc/Test_1.raw_2_fastqc.html",
                 "fastqc/Test_1.raw_2_fastqc.zip",
-                "fastqc/Test_1.trimmed_1_fastqc.html",
-                "fastqc/Test_1.trimmed_1_fastqc.zip",
-                "fastqc/Test_1.trimmed_2_fastqc.html",
-                "fastqc/Test_1.trimmed_2_fastqc.zip",
+                "fastqc/Test_1_trimmed_1_fastqc.html",
+                "fastqc/Test_1_trimmed_1_fastqc.zip",
+                "fastqc/Test_1_trimmed_2_fastqc.html",
+                "fastqc/Test_1_trimmed_2_fastqc.zip",
                 "fastqc/Test_2.raw_1_fastqc.html",
                 "fastqc/Test_2.raw_1_fastqc.zip",
                 "fastqc/Test_2.raw_2_fastqc.html",
                 "fastqc/Test_2.raw_2_fastqc.zip",
-                "fastqc/Test_2.trimmed_1_fastqc.html",
-                "fastqc/Test_2.trimmed_1_fastqc.zip",
-                "fastqc/Test_2.trimmed_2_fastqc.html",
-                "fastqc/Test_2.trimmed_2_fastqc.zip",
+                "fastqc/Test_2_trimmed_1_fastqc.html",
+                "fastqc/Test_2_trimmed_1_fastqc.zip",
+                "fastqc/Test_2_trimmed_2_fastqc.html",
+                "fastqc/Test_2_trimmed_2_fastqc.zip",
                 "instrumentid",
                 "instrumentid/Neg.sequencerID.tsv",
                 "instrumentid/Test_1.sequencerID.tsv",
                 "instrumentid/Test_2.sequencerID.tsv",
                 "ivar",
-                "ivar/Test_2.major.fa",
-                "ivar/Test_2.major.qual.txt",
+                "ivar/Test_2.cand1.fa",
+                "ivar/Test_2.cand1.qual.txt",
                 "kraken2",
                 "kraken2/Test_1.entireDB.kraken2.report.txt",
                 "kraken2/Test_1.focused.classified_1.fastq.gz",
@@ -159,6 +285,7 @@
                 "multiqc/multiqc_data/multiqc_fastqc.txt",
                 "multiqc/multiqc_data/multiqc_fastqc_fastqc-1.txt",
                 "multiqc/multiqc_data/multiqc_general_stats.txt",
+                "multiqc/multiqc_data/multiqc_glue_resistance_table.txt",
                 "multiqc/multiqc_data/multiqc_kraken-1_kraken-1.txt",
                 "multiqc/multiqc_data/multiqc_kraken.txt",
                 "multiqc/multiqc_data/multiqc_software_versions.txt",
@@ -206,6 +333,7 @@
                 "multiqc/multiqc_plots/pdf/fastqc_sequence_duplication_levels_plot.pdf",
                 "multiqc/multiqc_plots/pdf/fastqc_sequence_length_distribution_plot.pdf",
                 "multiqc/multiqc_plots/pdf/fastqc_top_overrepresented_sequences_table.pdf",
+                "multiqc/multiqc_plots/pdf/glue_resistance_table.pdf",
                 "multiqc/multiqc_plots/pdf/kraken-1-top-n-plot_Class-cnt.pdf",
                 "multiqc/multiqc_plots/pdf/kraken-1-top-n-plot_Class-pct.pdf",
                 "multiqc/multiqc_plots/pdf/kraken-1-top-n-plot_Domain-cnt.pdf",
@@ -284,6 +412,7 @@
                 "multiqc/multiqc_plots/png/fastqc_sequence_duplication_levels_plot.png",
                 "multiqc/multiqc_plots/png/fastqc_sequence_length_distribution_plot.png",
                 "multiqc/multiqc_plots/png/fastqc_top_overrepresented_sequences_table.png",
+                "multiqc/multiqc_plots/png/glue_resistance_table.png",
                 "multiqc/multiqc_plots/png/kraken-1-top-n-plot_Class-cnt.png",
                 "multiqc/multiqc_plots/png/kraken-1-top-n-plot_Class-pct.png",
                 "multiqc/multiqc_plots/png/kraken-1-top-n-plot_Domain-cnt.png",
@@ -362,6 +491,7 @@
                 "multiqc/multiqc_plots/svg/fastqc_sequence_duplication_levels_plot.svg",
                 "multiqc/multiqc_plots/svg/fastqc_sequence_length_distribution_plot.svg",
                 "multiqc/multiqc_plots/svg/fastqc_top_overrepresented_sequences_table.svg",
+                "multiqc/multiqc_plots/svg/glue_resistance_table.svg",
                 "multiqc/multiqc_plots/svg/kraken-1-top-n-plot_Class-cnt.svg",
                 "multiqc/multiqc_plots/svg/kraken-1-top-n-plot_Class-pct.svg",
                 "multiqc/multiqc_plots/svg/kraken-1-top-n-plot_Domain-cnt.svg",
@@ -401,16 +531,20 @@
                 "multiqc/multiqc_plots/svg/summary.svg",
                 "multiqc/multiqc_report.html",
                 "parsefirstmapping",
-                "parsefirstmapping/Test_1.1b_EU781827_minor.fa",
-                "parsefirstmapping/Test_1.2a_AB047639_major.fa",
+                "parsefirstmapping/Test_1.1b_EU781827_cand2.fa",
+                "parsefirstmapping/Test_1.2a_AB047639_cand1.fa",
+                "parsefirstmapping/Test_1.candidates.csv",
                 "parsefirstmapping/Test_1.parsefirstmapping.csv",
-                "parsefirstmapping/Test_2.3a_D17763_major.fa",
-                "parsefirstmapping/Test_2.4k_EU392173_minor.fa",
+                "parsefirstmapping/Test_2.3a_D17763_cand1.fa",
+                "parsefirstmapping/Test_2.3i_JX227955_cand2.fa",
+                "parsefirstmapping/Test_2.candidates.csv",
                 "parsefirstmapping/Test_2.parsefirstmapping.csv",
                 "pipeline_info",
                 "pipeline_info/samplesheet.valid.csv",
                 "pipeline_info/software_mqc_versions.yml",
                 "samtools",
+                "samtools/Test_1.combined.nodup.bam",
+                "samtools/Test_1.combined.nodup.metrics",
                 "samtools/Test_1.firstmapping.nodup.bam",
                 "samtools/Test_1.firstmapping.nodup.bam.bai",
                 "samtools/Test_1.firstmapping.nodup.idxstats",
@@ -418,13 +552,11 @@
                 "samtools/Test_1.firstmapping.nodup.stats",
                 "samtools/Test_1.firstmapping.withdup.sorted.tsv",
                 "samtools/Test_1.firstmapping.withdup.stats",
-                "samtools/Test_2.3a_D17763_major.major.nodup.bam",
-                "samtools/Test_2.3a_D17763_major.major.nodup.bam.bai",
-                "samtools/Test_2.3a_D17763_major.major.nodup.metrics",
-                "samtools/Test_2.3a_D17763_major.major.nodup.stats",
-                "samtools/Test_2.3a_D17763_major.major.nodup.tsv",
-                "samtools/Test_2.3a_D17763_major.major.withdup.stats",
-                "samtools/Test_2.3a_D17763_major.nodup.idxstats",
+                "samtools/Test_1.nodup.idxstats",
+                "samtools/Test_1.withdup.idxstats",
+                "samtools/Test_2.3a_D17763.cand1.nodup.tsv",
+                "samtools/Test_2.combined.nodup.bam",
+                "samtools/Test_2.combined.nodup.metrics",
                 "samtools/Test_2.firstmapping.nodup.bam",
                 "samtools/Test_2.firstmapping.nodup.bam.bai",
                 "samtools/Test_2.firstmapping.nodup.idxstats",
@@ -432,6 +564,8 @@
                 "samtools/Test_2.firstmapping.nodup.stats",
                 "samtools/Test_2.firstmapping.withdup.sorted.tsv",
                 "samtools/Test_2.firstmapping.withdup.stats",
+                "samtools/Test_2.nodup.idxstats",
+                "samtools/Test_2.withdup.idxstats",
                 "samtools/versions.yml",
                 "spades",
                 "spades/Test_1.assembly.gfa.gz",
@@ -444,14 +578,15 @@
                 "spades/Test_2.spades.log",
                 "spades/Test_2.warnings.log",
                 "summary",
-                "summary/Summary.csv"
+                "summary/Summary.csv",
+                "summary/candidates.csv"
             ],
             [
-                "Test_2.bam_pileup_3a_D17763_major.tsv:md5,6049a0f80524c4e9990cb7a42ae47aa0",
-                "Test_2.bam_variation_3a_D17763_major.tsv:md5,3f9bb14d29457ca1d5116517f1274c1e",
-                "Test_2.variation_plot_3a_D17763_major.png:md5,548f208339ce7f6fd48c1a211bd8539a",
-                "Variation_plot_major.png:md5,e19d8e3b61bdcb781ebb43e0328a6af4",
-                "Test_2.major.3a_D17763.png:md5,911f7e53c7287c086124437d3cdfb239",
+                "Test_2.bam_pileup_3a_D17763_cand1.tsv:md5,6049a0f80524c4e9990cb7a42ae47aa0",
+                "Test_2.bam_variation_3a_D17763_cand1.tsv:md5,3f9bb14d29457ca1d5116517f1274c1e",
+                "Test_2.variation_plot_3a_D17763_cand1.png:md5,89ffae32a14b50d0066b513caa63da33",
+                "Variation_plot_major.png:md5,9a92c65519bafb9405b7fdc2ae076cf9",
+                "Test_2.cand1.3a_D17763.png:md5,216c8f5d55e7ff5aa508409d78cb4f60",
                 "Test_1.alignment_plot.png:md5,9b13c5dc862cc2d1b896c0ed05d28868",
                 "Test_1.bitscore_plot.png:md5,a36c33543e0ec8da3013680397ad54af",
                 "Test_1.contig_dot_plot.png:md5,42f971cd76b5b550e176f2ee4bb434cd",
@@ -462,17 +597,17 @@
                 "Test_2.hitlength_plot.png:md5,1016b8016e419db44b0b50b5197539c9",
                 "Test_1.txt:md5,fa6c5bc0319e5926111738ac6fc5b54c",
                 "Test_2.txt:md5,ee87957fb3d6e24986c9cdd5a3250025",
-                "Test_1.blastparse.csv:md5,425af09c76b5dff8ae8fe6c4ce03e19d",
+                "Test_1.assembly_support.csv:md5,5426bcc4e1b699d3e1fe2a63ff751c8a",
+                "Test_1.blastparse.csv:md5,d0578e270c7516fff347df60d46276d4",
+                "Test_1.rescue_audit.csv:md5,dbc6e47533e9dd7f9564f97028823125",
+                "Test_1.rescued.candidates.csv:md5,776d4953e21441a1d8985a595da3b2e4",
                 "Test_1_blast_out.csv:md5,e67194b2923d8f06c3dce719e0786605",
-                "Test_2.blastparse.csv:md5,16aaf9820e0ef8e57e7c20d7ae38d3b2",
+                "Test_2.assembly_support.csv:md5,a682e5e79d968f38eb5970227b442f54",
+                "Test_2.blastparse.csv:md5,485fb4f17a068c94d8ed8147f76935c8",
+                "Test_2.rescue_audit.csv:md5,58f655fe637e0338a4b41a7d197999ec",
+                "Test_2.rescued.candidates.csv:md5,3bd1ef966400d510ea9780658544ae3a",
                 "Test_2_blast_out.csv:md5,f7dcbe58af8c7cc1579602ccd233df6a",
-                "Test_2.3a_D17763_major.1.bt2:md5,81e7a9ac5cc6069a03200df826319cd2",
-                "Test_2.3a_D17763_major.2.bt2:md5,74c13172af8e6a96324bb56e9b2eca68",
-                "Test_2.3a_D17763_major.3.bt2:md5,b179ec8096ef476c90694eee0b80fd31",
-                "Test_2.3a_D17763_major.4.bt2:md5,e0fbb957a1818627570240e3fe55748f",
-                "Test_2.3a_D17763_major.rev.1.bt2:md5,fc4cfc0c761ad743fc447461431209cc",
-                "Test_2.3a_D17763_major.rev.2.bt2:md5,2aefda26d01c7db370b4aef5d4eb9e76",
-                "Test_2.major.consensus_distance.tsv:md5,b1d51ab79db500253f5952f438e4bc96",
+                "Test_2.cand1.consensus_distance.tsv:md5,b1f339762321ae284d1e1c97dff168e2",
                 "contamination.contamination_direction.tsv:md5,194e3cdb4f3e8b29f16f5120a36e0c16",
                 "contamination.contamination_heatmap.png:md5,fe4b52bd4069d087e2809a979fd00f86",
                 "contamination.contamination_mqc.json:md5,62710c84d9ebc74004adfbe675bfcffb",
@@ -482,8 +617,8 @@
                 "Neg.sequencerID.tsv:md5,68b329da9893e34099c7d8ad5cb9c940",
                 "Test_1.sequencerID.tsv:md5,685fe635d9f55633963e5c04d6f04b91",
                 "Test_2.sequencerID.tsv:md5,1badaa24b886757ce8fbda1273726adc",
-                "Test_2.major.fa:md5,d47da689427b43b2f55701a826d9067a",
-                "Test_2.major.qual.txt:md5,a3c535cec51422fcace3a9037b56037d",
+                "Test_2.cand1.fa:md5,3fdbc1fec5bf4bb43cea0f5caeb949aa",
+                "Test_2.cand1.qual.txt:md5,a3c535cec51422fcace3a9037b56037d",
                 "Test_1.entireDB.kraken2.report.txt:md5,968ff21e6c5fc13222becf073e2c04c3",
                 "Test_1.focused.classified_1.fastq.gz:md5,e83d18ff6b840bf6ad2a065188f2f947",
                 "Test_1.focused.classified_2.fastq.gz:md5,04b27442202dddfd44d87f1c5ed15a5b",
@@ -506,17 +641,17 @@
                 "fastp-seq-quality-plot_Read_2_After_filtering.txt:md5,3dd53eed515a715abbcb9d4a0e120ff6",
                 "fastp-seq-quality-plot_Read_2_Before_filtering.txt:md5,281c6e083d469264e028bf523cc4b211",
                 "fastp_filtered_reads_plot.txt:md5,3d49565c5c1e7bf1a21267d1c95d234b",
-                "fastqc-1-status-check-heatmap.txt:md5,6d4cc492e34cc8435aeb91a99e6ea20a",
-                "fastqc-1_adapter_content_plot.txt:md5,125a121a59dc49c244a8362dfe597659",
-                "fastqc-1_overrepresented_sequences_plot.txt:md5,9738fc8a525d8559079f81d2fd10c775",
-                "fastqc-1_per_base_n_content_plot.txt:md5,d391670b59b27d6fce27fbcf67310e20",
-                "fastqc-1_per_base_sequence_quality_plot.txt:md5,03416df4b68c3a0cd216f42352f39037",
-                "fastqc-1_per_sequence_gc_content_plot_Counts.txt:md5,23d84483e719d636bc919f343509dae2",
-                "fastqc-1_per_sequence_gc_content_plot_Percentages.txt:md5,46391afb870aee0b9a9275fd12884801",
-                "fastqc-1_per_sequence_quality_scores_plot.txt:md5,3ec33be7bd6e5df941018cc47c92c9ce",
-                "fastqc-1_sequence_counts_plot.txt:md5,6641f23064aed47743bd4bf2925d16c3",
-                "fastqc-1_sequence_duplication_levels_plot.txt:md5,075b423819e3a862dadec526f85638ae",
-                "fastqc-1_top_overrepresented_sequences_table.txt:md5,9566094ec646d19edeb3ff67fefdf8ba",
+                "fastqc-1-status-check-heatmap.txt:md5,c5d540e0b6a4610cebd6b4c348da5779",
+                "fastqc-1_adapter_content_plot.txt:md5,c17c15efbf1ae38563015ebd2e43740f",
+                "fastqc-1_overrepresented_sequences_plot.txt:md5,577d55a7cd569ac6bf77da0852d3a92e",
+                "fastqc-1_per_base_n_content_plot.txt:md5,628496dc7597e3bba11d1d79a0c2d1d7",
+                "fastqc-1_per_base_sequence_quality_plot.txt:md5,a9bc7ecad6d6a51eecee68ad35dbf354",
+                "fastqc-1_per_sequence_gc_content_plot_Counts.txt:md5,589fe51098efc8ee5341693ff1be0670",
+                "fastqc-1_per_sequence_gc_content_plot_Percentages.txt:md5,38519ed12b96ca7aeba6eb88ce94e655",
+                "fastqc-1_per_sequence_quality_scores_plot.txt:md5,469baf7f810163e54245731b5a1b066e",
+                "fastqc-1_sequence_counts_plot.txt:md5,897867444b7d17450ea1bb9eba6a89a2",
+                "fastqc-1_sequence_duplication_levels_plot.txt:md5,acd0f2072b74053f17e27e08f8f6a16d",
+                "fastqc-1_top_overrepresented_sequences_table.txt:md5,367b5921da45b10e81017c8d34126bcd",
                 "fastqc-status-check-heatmap.txt:md5,30e9413ce60d30158b80915688e10372",
                 "fastqc_adapter_content_plot.txt:md5,3b489af0d3d0db67fdba94df4a51b3f8",
                 "fastqc_overrepresented_sequences_plot.txt:md5,2fbe78e4ab8139ed5db62073373819fd",
@@ -527,7 +662,8 @@
                 "fastqc_per_sequence_quality_scores_plot.txt:md5,b642ac8f5ac389b81fc14239abc95d0e",
                 "fastqc_sequence_counts_plot.txt:md5,d7fba98b743607e92d49922fcaa2f14f",
                 "fastqc_sequence_duplication_levels_plot.txt:md5,b64f21c32027758f4587442d971f5364",
-                "fastqc_sequence_length_distribution_plot.txt:md5,deb39580fc4bde42cb36e8ad60d2df37",
+                "fastqc_sequence_length_distribution_plot.txt:md5,6a585813a943d86224cc446dc9e82523",
+                "fastqc_top_overrepresented_sequences_table.txt:md5,6fc5d3822cd9c608557b5d1ba8030b22",
                 "kraken-1-top-n-plot_Class.txt:md5,ceedd85b21abf552c59e198eac86f032",
                 "kraken-1-top-n-plot_Domain.txt:md5,ef6e9f9079bab721de02ea31eea0604a",
                 "kraken-1-top-n-plot_Family.txt:md5,bad8a479820b50bc75089f68c943ce38",
@@ -549,17 +685,24 @@
                 "multiqc_citations.txt:md5,97f1dcb4348072ce2865c29c5c306a3d",
                 "multiqc_fastp.txt:md5,31a8e4537a4cbab97513fa8321e321b5",
                 "multiqc_fastqc.txt:md5,9f77371c4ef71182fcc964fc08f30401",
-                "multiqc_fastqc_fastqc-1.txt:md5,1d890ded07426fa2fcc1ea0c2ad034b8",
-                "multiqc_general_stats.txt:md5,156d3e8936c907478dd8f5df6e1324c8",
+                "multiqc_fastqc_fastqc-1.txt:md5,ba89a09d4c8f8bf76e577a0942101678",
+                "multiqc_general_stats.txt:md5,bb4ba3f3797fbe402d0905355c0d49f9",
+                "multiqc_glue_resistance_table.txt:md5,a8973b1828a2faec605e62e4dd4ae514",
                 "multiqc_kraken-1_kraken-1.txt:md5,5a253204b192a4d211b35abd5dada86d",
                 "multiqc_kraken.txt:md5,805f856012188fdde796f2049aa46934",
-                "Test_1.1b_EU781827_minor.fa:md5,adfbbbe2888176a86fb06277e29b8b52",
-                "Test_1.2a_AB047639_major.fa:md5,f24df467ce79cd1d1933ce2b9e9968fe",
+                "multiqc_software_versions.txt:md5,a7c4bc197eaf8bd16bac8cf812547b95",
+                "multiqc_summary.txt:md5,dd8ba615b9e5dd4c283a5f86ad263ebd",
+                "Test_1.1b_EU781827_cand2.fa:md5,adfbbbe2888176a86fb06277e29b8b52",
+                "Test_1.2a_AB047639_cand1.fa:md5,f24df467ce79cd1d1933ce2b9e9968fe",
+                "Test_1.candidates.csv:md5,861722f9bf232735a0302aa462a6a2d2",
                 "Test_1.parsefirstmapping.csv:md5,83a2816e22f4742cfaf1df9a46d7aa62",
-                "Test_2.3a_D17763_major.fa:md5,68b1a336e1df07e907e4e6bbf7a6bd0c",
-                "Test_2.4k_EU392173_minor.fa:md5,6c018d8815b2bd6273f947d90a092ec2",
-                "Test_2.parsefirstmapping.csv:md5,4c9266a351c2b5b9552ce1a22884cf1b",
+                "Test_2.3a_D17763_cand1.fa:md5,68b1a336e1df07e907e4e6bbf7a6bd0c",
+                "Test_2.3i_JX227955_cand2.fa:md5,ff33583a6d1713674fceb02cee88e7df",
+                "Test_2.candidates.csv:md5,a147446f0604416f3732f19429c7c768",
+                "Test_2.parsefirstmapping.csv:md5,0eb3300a216d2aafe406d2fac15951ec",
                 "samplesheet.valid.csv:md5,7c754c105d6f02287be32cc2530e4752",
+                "Test_1.combined.nodup.bam:md5,f31826f716b4cdf6f34013a922f8b9ba",
+                "Test_1.combined.nodup.metrics:md5,de82efe1f4a2d2a62eb3b61babbd79a8",
                 "Test_1.firstmapping.nodup.bam:md5,523aaaef302497821eb4ca5228d39c19",
                 "Test_1.firstmapping.nodup.bam.bai:md5,3b362c84ba98c93692a4f592f29d0de1",
                 "Test_1.firstmapping.nodup.idxstats:md5,245b5af0e10b8b7518b47acd33159e42",
@@ -567,13 +710,11 @@
                 "Test_1.firstmapping.nodup.stats:md5,c6d67bae3cbf0e7caedc246ebd215fcf",
                 "Test_1.firstmapping.withdup.sorted.tsv:md5,150e82ede439f5c95352596070410836",
                 "Test_1.firstmapping.withdup.stats:md5,541e47d12f32392bb4ea78862e262402",
-                "Test_2.3a_D17763_major.major.nodup.bam:md5,bfe67fe67d9c4a554dad8f7c3b2994d6",
-                "Test_2.3a_D17763_major.major.nodup.bam.bai:md5,d4013fdca87562fcb6379a4e8831b28a",
-                "Test_2.3a_D17763_major.major.nodup.metrics:md5,19666b1500734c022b21937509dca89c",
-                "Test_2.3a_D17763_major.major.nodup.stats:md5,b23599e25f3c7b171ced7cbe1291681a",
-                "Test_2.3a_D17763_major.major.nodup.tsv:md5,aec7c9f46543fff4e4317d3b98e93cbf",
-                "Test_2.3a_D17763_major.major.withdup.stats:md5,b8a7eeca0a0834c8b47b9c2c0965fe4d",
-                "Test_2.3a_D17763_major.nodup.idxstats:md5,1ef05cc93169700ed30c8a1dce2198df",
+                "Test_1.nodup.idxstats:md5,25a54223bc363aa1ed57226f0d151781",
+                "Test_1.withdup.idxstats:md5,a007e6993af6e57c4b0029a90f17d0a3",
+                "Test_2.3a_D17763.cand1.nodup.tsv:md5,aec7c9f46543fff4e4317d3b98e93cbf",
+                "Test_2.combined.nodup.bam:md5,b79952d2d51d6c8e243761c8937578d4",
+                "Test_2.combined.nodup.metrics:md5,6f656e397c0e087c27b50e79e8145fc5",
                 "Test_2.firstmapping.nodup.bam:md5,64e24ea52e6b038d063bb0c7edb48366",
                 "Test_2.firstmapping.nodup.bam.bai:md5,fbd83ab752f2eacc930668eba38c0da7",
                 "Test_2.firstmapping.nodup.idxstats:md5,8053304e6ec20e056c8c4643c056705f",
@@ -581,19 +722,22 @@
                 "Test_2.firstmapping.nodup.stats:md5,3daacc283eb19c1943aa953f7052a250",
                 "Test_2.firstmapping.withdup.sorted.tsv:md5,4ccb2f0558f9506a1d397ce561f09bf7",
                 "Test_2.firstmapping.withdup.stats:md5,48e5bf826689bd3a7eeccc190188e62d",
+                "Test_2.nodup.idxstats:md5,1ef05cc93169700ed30c8a1dce2198df",
+                "Test_2.withdup.idxstats:md5,265f0e0adf04678951b4dddf92922cfe",
                 "Test_1.assembly.gfa.gz:md5,e1250b2e49368a1b2449bbc2e0fc3a51",
                 "Test_1.contigs.fa.gz:md5,3d823acd845de33f4ee187bb55ef6de1",
                 "Test_1.scaffolds.fa.gz:md5,3d823acd845de33f4ee187bb55ef6de1",
                 "Test_2.assembly.gfa.gz:md5,a06895753c5684cdf8998a643b78c1e5",
                 "Test_2.contigs.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
                 "Test_2.scaffolds.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
-                "Summary.csv:md5,1484595e3c0b1603a921d8ab91a11063"
+                "Summary.csv:md5,ee4d4133cb423a1ec284432cf1c462eb",
+                "candidates.csv:md5,a49a594882afeba00484b67fcc0717b0"
             ]
         ],
+        "timestamp": "2026-09-11T00:16:27.697033442",
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "24.10.5"
-        },
-        "timestamp": "2026-06-07T06:41:26.056956753"
+            "nf-test": "0.9.5",
+            "nextflow": "24.10.1"
+        }
     }
 }

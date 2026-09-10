@@ -10,17 +10,22 @@
                         "2k1b_test.parsefirstmapping.csv:md5,5c42a3496ae2de35cb812517c0742879"
                     ]
                 ],
-                "major_mapping": [
+                "candidate_fasta": [
                     [
                         {
                             "id": "2k1b_test"
                         },
                         "2k1b_test.parsefirstmapping.csv:md5,5c42a3496ae2de35cb812517c0742879",
-                        "2k1b_test.2k1b_AB031663_major.fa:md5,bce1fc9df8925bae4b060661b053ce2e"
+                        "2k1b_test.2k1b_AB031663_cand1.fa:md5,bce1fc9df8925bae4b060661b053ce2e"
                     ]
                 ],
-                "minor_mapping": [
-                    
+                "candidates": [
+                    [
+                        {
+                            "id": "2k1b_test"
+                        },
+                        "2k1b_test.candidates.csv:md5,bfafdc53f032906d42f3811cfae24608"
+                    ]
                 ],
                 "versions": [
                     "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
@@ -28,10 +33,10 @@
             }
         ],
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "24.10.5"
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-06T13:54:34.958681917"
+        "timestamp": "2026-06-14T16:29:24.108597722"
     },
     "parsefirstmapping: no minor FASTA when no valid minor (GATE-04)": {
         "content": [
@@ -44,17 +49,22 @@
                         "no_minor_test.parsefirstmapping.csv:md5,39bc7d5446861bba36c44f1bd78e1146"
                     ]
                 ],
-                "major_mapping": [
+                "candidate_fasta": [
                     [
                         {
                             "id": "no_minor_test"
                         },
                         "no_minor_test.parsefirstmapping.csv:md5,39bc7d5446861bba36c44f1bd78e1146",
-                        "no_minor_test.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
+                        "no_minor_test.3a_D17763_cand1.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
                     ]
                 ],
-                "minor_mapping": [
-                    
+                "candidates": [
+                    [
+                        {
+                            "id": "no_minor_test"
+                        },
+                        "no_minor_test.candidates.csv:md5,6823ae5b6f2a74dfb038a68df611a51d"
+                    ]
                 ],
                 "versions": [
                     "versions.yml:md5,9daace31d09a7f33c621aa047da2bf44"
@@ -62,10 +72,10 @@
             }
         ],
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "24.10.5"
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-06T13:54:46.870975782"
+        "timestamp": "2026-06-14T16:29:38.505412325"
     },
     "parsefirstmapping: failing-major reports stats, no minor call (GATE-02)": {
         "content": [
@@ -78,22 +88,24 @@
                         "ERR1810469_test.parsefirstmapping.csv:md5,10fed8cf50f5833cbfc28a9c62a4e14c"
                     ]
                 ],
-                "major_mapping": [
+                "candidate_fasta": [
                     [
                         {
                             "id": "ERR1810469_test"
                         },
                         "ERR1810469_test.parsefirstmapping.csv:md5,10fed8cf50f5833cbfc28a9c62a4e14c",
-                        "ERR1810469_test.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
+                        [
+                            "ERR1810469_test.1a_H77_cand2.fa:md5,6ae0ea0027c61e64ed288468aa0c3623",
+                            "ERR1810469_test.3a_D17763_cand1.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
+                        ]
                     ]
                 ],
-                "minor_mapping": [
+                "candidates": [
                     [
                         {
                             "id": "ERR1810469_test"
                         },
-                        "ERR1810469_test.parsefirstmapping.csv:md5,10fed8cf50f5833cbfc28a9c62a4e14c",
-                        "ERR1810469_test.1a_H77_minor.fa:md5,6ae0ea0027c61e64ed288468aa0c3623"
+                        "ERR1810469_test.candidates.csv:md5,04c65d8c4ebf173e04826f1524c6b196"
                     ]
                 ],
                 "versions": [
@@ -102,10 +114,10 @@
             }
         ],
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "24.10.5"
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-06T13:53:26.152829414"
+        "timestamp": "2026-06-14T16:29:52.613766133"
     },
     "parsefirstmapping: idxstats + depth + references": {
         "content": [
@@ -118,22 +130,24 @@
                         "Test_2.parsefirstmapping.csv:md5,9e0b388177fb247c47086437dcce0a3e"
                     ]
                 ],
-                "major_mapping": [
+                "candidate_fasta": [
                     [
                         {
                             "id": "Test_2"
                         },
                         "Test_2.parsefirstmapping.csv:md5,9e0b388177fb247c47086437dcce0a3e",
-                        "Test_2.3a_D17763_major.fa:md5,20ca3a85c0fff19e410596de95a7c45f"
+                        [
+                            "Test_2.3a_D17763_cand1.fa:md5,20ca3a85c0fff19e410596de95a7c45f",
+                            "Test_2.4k_EU392173_cand2.fa:md5,379bba7235f582f5ee3d83bc4fa9a4ca"
+                        ]
                     ]
                 ],
-                "minor_mapping": [
+                "candidates": [
                     [
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.parsefirstmapping.csv:md5,9e0b388177fb247c47086437dcce0a3e",
-                        "Test_2.4k_EU392173_minor.fa:md5,379bba7235f582f5ee3d83bc4fa9a4ca"
+                        "Test_2.candidates.csv:md5,6dffac00e04e45be909c883b4125d9a1"
                     ]
                 ],
                 "versions": [
@@ -142,10 +156,10 @@
             }
         ],
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "24.10.5"
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-06T13:54:12.193815953"
+        "timestamp": "2026-06-14T16:29:00.623532535"
     },
     "parsefirstmapping: stub": {
         "content": [
@@ -158,22 +172,24 @@
                         "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93"
                     ]
                 ],
-                "major_mapping": [
+                "candidate_fasta": [
                     [
                         {
                             "id": "Test_2"
                         },
                         "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93",
-                        "Test_2.major.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        [
+                            "Test_2.stubref_cand1.fa:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "Test_2.stubref_cand2.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ]
                     ]
                 ],
-                "minor_mapping": [
+                "candidates": [
                     [
                         {
                             "id": "Test_2"
                         },
-                        "Test_2.parsefirstmapping.csv:md5,656bef5baa2360ade9a1fc17c81d3f93",
-                        "Test_2.minor.fa:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        "Test_2.candidates.csv:md5,1772b674dbe7afe7c05777e834d04656"
                     ]
                 ],
                 "versions": [
@@ -182,9 +198,9 @@
             }
         ],
         "meta": {
-            "nf-test": "0.9.3",
-            "nextflow": "24.10.5"
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.1"
         },
-        "timestamp": "2026-06-06T10:35:28.914737548"
+        "timestamp": "2026-06-14T21:48:11.836821622"
     }
 }

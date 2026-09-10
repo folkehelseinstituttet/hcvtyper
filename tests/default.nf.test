@@ -17,43 +17,46 @@ nextflow_pipeline {
             def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
             // stable_path: All files in ${params.outdir}/ with stable content
             def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
-            assertAll(
-                { assert workflow.success},
-                { assert snapshot(
-                    // Number of successful tasks
-                    workflow.trace.succeeded().size(),
-                    // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
-                    removeNextflowVersion("$outputDir/pipeline_info/hcvtyper_software_mqc_versions.yml"),
-                    // All stable path name, with a relative path
-                    stable_name,
-                    // All files with stable contents
-                    stable_path
-                ).match() }
-            )
-        }
-    }
 
-    test("-profile test --skip_assembly") {
-
-        // PLUMB-02: a no-de-novo run yields NA de novo fields and drops no rows.
-        // BLASTPARSE never runs when assembly is skipped, so the four denovo_* columns
-        // must be NA-filled (via the .ifEmpty([]) collected channel) and the Summary.csv
-        // must still carry one samplesheet-anchored row per sample (no dropped rows).
-        // Uses explicit content assertions (NOT a shared snapshot key) so this case does
-        // not collide with the default case's snapshot.
-
-        when {
-            params {
-                outdir = "$outputDir"
-                skip_assembly = true
+            // Quote-aware field split. Summary.csv carries free-text columns (the
+            // review_flag sentence) that are quoted BECAUSE they contain commas — a
+            // naive row.split(',') yields 141 fields for a 136-column row and every
+            // index past the first quoted field points at the wrong cell.
+            def splitCsv = { String line ->
+                def out = []
+                def cur = new StringBuilder()
+                boolean inQ = false
+                int i = 0
+                while (i < line.length()) {
+                    String ch = line[i]
+                    if (ch == '"') {
+                        if (inQ && i + 1 < line.length() && line[i + 1] == '"') { cur.append('"'); i++ }
+                        else { inQ = !inQ }
+                    } else if (ch == ',' && !inQ) {
+                        out.add(cur.toString()); cur = new StringBuilder()
+                    } else {
+                        cur.append(ch)
+                    }
+                    i++
+                }
+                out.add(cur.toString())
+                return out
             }
-        }
-
-        then {
+            // PLUMB-02 (rehomed): the de novo plumbing assertions used to live in a
+            // second `--skip_assembly` test case. That parameter was removed in Plan
+            // 12-05 (assembly now ALWAYS runs), so the no-assembly condition can no
+            // longer be produced by a flag — the read-empty Neg sample is now the
+            // genuine no-de-novo path. The assertions are kept HERE, named, alongside
+            // the snapshot: the snapshot md5 churns on every legitimate column
+            // addition, whereas these catch the specific regressions (dropped rows,
+            // missing columns, broken NA-fill) and say which one broke.
             def summaryFile = new File("$outputDir/summary/Summary.csv")
             def lines = summaryFile.readLines().findAll { it.trim() }
-            def header = lines[0].split(',', -1) as List
+            def header = splitCsv(lines[0])
             def dataRows = lines.drop(1)
+            def cellsOf = { row -> splitCsv(row) }
+            def rowFor = { name -> dataRows.find { cellsOf(it)[header.indexOf('sampleName')] == name } }
+            def valueIn = { row, col -> cellsOf(row)[header.indexOf(col)] }
 
             // The four additive de novo columns, by name.
             def denovoCols = [
@@ -63,8 +66,27 @@ nextflow_pipeline {
                 'denovo_minor_contig_length'
             ]
 
+            // 260810-dbs: the long candidates table, for the breadth-source guard below.
+            def candidatesFile = new File("$outputDir/summary/candidates.csv")
+            def candLines = candidatesFile.exists() ? candidatesFile.readLines().findAll { it.trim() } : []
+            def candHeader = candLines ? splitCsv(candLines[0]) : []
+
             assertAll(
-                { assert workflow.success },
+                { assert workflow.success},
+                { assert snapshot(
+                    // Number of successful tasks
+                    workflow.trace.succeeded().size(),
+                    // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
+                    // NOTE: the published basename is software_mqc_versions.yml — NOT the
+                    // nf-core template's <pipeline>_software_mqc_versions.yml. The template
+                    // name was never emitted here, so this slot silently snapshotted `null`
+                    // (i.e. tool versions were not covered at all) until it was corrected.
+                    removeNextflowVersion("$outputDir/pipeline_info/software_mqc_versions.yml"),
+                    // All stable path name, with a relative path
+                    stable_name,
+                    // All files with stable contents
+                    stable_path
+                ).match() },
                 // (a) Summary.csv was published.
                 { assert summaryFile.exists() },
                 // (b) All four de novo columns are present in the header.
@@ -73,11 +95,31 @@ nextflow_pipeline {
                 //     The minimal test samplesheet has 3 samples (Test_1, Test_2, Neg),
                 //     all samplesheet-anchored so even read-empty samples get a row.
                 { assert dataRows.size() == 3 : "Expected 3 data rows (no dropped rows), got ${dataRows.size()}" },
-                // (d) The four de novo columns are NA on every data row (no assembly ran).
-                { assert dataRows.every { row ->
-                        def cells = row.split(',', -1) as List
-                        denovoCols.every { col -> cells[header.indexOf(col)] == 'NA' }
-                    } : "Expected all de novo columns NA on every row; rows were: ${dataRows}" }
+                // (d) NA-fill still works on the no-de-novo path: Neg has no reads, so
+                //     it assembles nothing and every de novo column must read NA.
+                { assert rowFor('Neg') != null : "No Summary.csv row for the Neg sample; rows were: ${dataRows}" },
+                { assert denovoCols.every { valueIn(rowFor('Neg'), it) == 'NA' }
+                    : "Expected all de novo columns NA on the Neg row; got: ${rowFor('Neg')}" },
+                // (e) Assembly is load-bearing, not vestigial: the two real samples both
+                //     assemble a contig with a BLAST top hit, so denovo_major_ref must be
+                //     populated. This is the assertion that would have caught the removal
+                //     of skip_assembly silently NA-ing the whole de novo layer.
+                { assert ['Test_1', 'Test_2'].every { s -> valueIn(rowFor(s), 'denovo_major_ref') != 'NA' }
+                    : "Expected a de novo top hit for Test_1 and Test_2; got ${['Test_1','Test_2'].collect { [it, valueIn(rowFor(it), 'denovo_major_ref')] }}" },
+                // (f) 260810-dbs BREADTH-SOURCE WIRING GUARD. score_candidates() prefers
+                //     `cand_cov_breadth` (the targeted second-pass breadth, D-08) and falls
+                //     back to `candidate_cov` (the first-pass all-reference breadth). For the
+                //     whole life of the score NO module emitted cand_cov_breadth, so the
+                //     fallback was the only live path and every candidate was ranked on
+                //     pre-competition breadth — while every rescued/nominated candidate, whose
+                //     candidate_cov is deliberately blanked, scored as if none of its reference
+                //     were covered at all. summarize.R's cov loop now carries the column.
+                //     This is the ONLY test that can catch a silent revert of that wiring:
+                //     bin/tests/test_dominance_breadth_source.R exercises the resolver, which
+                //     stays green whether or not anything populates its preferred input.
+                { assert candidatesFile.exists() : "summary/candidates.csv was not published" },
+                { assert candHeader.contains('cand_cov_breadth')
+                    : "candidates.csv is missing cand_cov_breadth — the dominance score has silently reverted to first-pass breadth; header was: ${candHeader}" }
             )
         }
     }
