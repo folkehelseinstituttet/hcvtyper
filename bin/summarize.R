@@ -1663,7 +1663,7 @@ final <- final %>%
 # chosen from the restricted set of contigs whose OWN top hit is off-genotype. The two
 # grains disagree whenever an on-genotype contig hits the off-genotype reference
 # harder than the off-genotype contig does — the conserved 5'UTR/core case. Sample
-# 2633901: reference and length described NODE_3, the name described NODE_2.
+# SampleSA-1a: reference and length described NODE_3, the name described NODE_2.
 #
 # The major slot keeps its re-derivation and is safe by construction: denovo_major_ref
 # is the globally best hit, so its row is necessarily the top-bitscore row for that

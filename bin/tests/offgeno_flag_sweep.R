@@ -14,22 +14,31 @@
 # file with no arguments; this one needs a data root.
 #
 # Usage:
-#   Rscript bin/tests/offgeno_flag_sweep.R <root> [outdir] [runs] [expected_n]
+#   Rscript bin/tests/offgeno_flag_sweep.R <root> [outdir] [runs] [expected_n] [must_keep]
 #
 #   root        directory containing the run folders (each with summary/Summary.csv)
 #   outdir      default ./offgeno_sweep_out
-#   runs        comma-separated run directory names. Default: the five
-#               v1.3.0-g28a568d routine runs. Pass "" to accept every run under
-#               <root> (and then set expected_n to match, or 0 to disable the check).
-#   expected_n  expected sample count; the script ABORTS on a mismatch. Default 140,
-#               0 disables.
+#   runs        comma-separated run directory names. Default: every run under
+#               <root>. Naming a cohort explicitly is strongly recommended --
+#               see BUG 1 below for what an unfiltered root costs.
+#   expected_n  expected sample count; the script ABORTS on a mismatch. Default 0,
+#               which disables the check. Set it whenever `runs` is given: it is
+#               the guard that catches a cohort silently changing size.
+#   must_keep   comma-separated bare sample ids that MUST survive the floor; the
+#               script ABORTS if any is absent from the flagged set. Default none,
+#               which disables the check. This is the disqualifying criterion --
+#               a sweep run without it cannot tell a good floor from a bad one.
+#
+# The original cohort and must-keep ids were routine diagnostic run and sample
+# identifiers and are not carried in this file; supply them at the command line.
 #
 # Two bugs in the first version of this script, both fixed here, both of which
 # produced plausible output and exit 0:
 #
 #   BUG 1 — the recursive Summary.csv glob picked up every result directory under
-#   the root, not just the cohort: 10 runs / 437 samples instead of 5 / 140,
-#   including benchmark dirs built from different pipeline versions. Fixed by the
+#   the root, not just the cohort: it pulled in twice the intended runs and three
+#   times the samples, including benchmark dirs built from different pipeline
+#   versions. Fixed by the
 #   explicit `runs` allowlist AND a hard abort on the cohort-size check, which
 #   previously only printed the expected value as a comment.
 #
@@ -38,7 +47,7 @@
 #   basename), while the assembly_support prefix does too but was stripped on only
 #   ONE side of the join. The comparison arm silently resolved to zero rows for the
 #   whole cohort, and MUST_KEEP (bare ids) never matched, so must_keep_kept read
-#   0/3 in every sweep row — the disqualifying criterion the exercise hangs on never
+#   zero in every sweep row — the disqualifying criterion the exercise hangs on never
 #   evaluated. Fixed by deriving a bare `sample_id` once and keying everything on it,
 #   plus a hard abort when the must-keep samples are not all found.
 # -------------------------------------------------------------------------
@@ -49,19 +58,19 @@ args       <- commandArgs(trailingOnly = TRUE)
 root       <- if (length(args) >= 1 && nzchar(args[1])) args[1] else "."
 outdir     <- if (length(args) >= 2 && nzchar(args[2])) args[2] else "offgeno_sweep_out"
 runs_arg   <- if (length(args) >= 3) args[3] else NA_character_
-expected_n <- if (length(args) >= 4 && nzchar(args[4])) as.integer(args[4]) else 140L
+expected_n <- if (length(args) >= 4 && nzchar(args[4])) as.integer(args[4]) else 0L
+mk_arg     <- if (length(args) >= 5) args[5] else NA_character_
 dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
 
-DEFAULT_RUNS <- c("NGS_SEQ-20251113-02", "NGS_SEQ-20251212-01", "NGS_SEQ-20260326-01",
-                  "NGS_SEQ-20260521-01", "NGS_SEQ-20260625-02")
-runs_wanted <- if (is.na(runs_arg)) DEFAULT_RUNS else
-  if (nzchar(runs_arg)) trimws(str_split(runs_arg, ",")[[1]]) else character(0)
+runs_wanted <- if (!is.na(runs_arg) && nzchar(runs_arg))
+  trimws(str_split(runs_arg, ",")[[1]]) else character(0)
 
 say  <- function(...) cat(..., "\n", sep = "")
 rule <- function(t) say("\n", strrep("=", 72), "\n", t, "\n", strrep("=", 72))
 die  <- function(...) { say("\n*** ABORT: ", ..., " ***"); quit(status = 1) }
 
-MUST_KEEP <- c("2743986", "2726018", "2714375")
+MUST_KEEP <- if (!is.na(mk_arg) && nzchar(mk_arg))
+  trimws(str_split(mk_arg, ",")[[1]]) else character(0)
 FLOORS    <- c(0, 500, 750, 1000, 1250, 1500, 2000, 2500, 3000)
 TRIG_TEXT <- "different-genotype contig"
 
@@ -157,7 +166,7 @@ if (have_asup) {
            L_asup    = suppressWarnings(as.numeric(best_contig_length)),
            pident    = suppressWarnings(as.numeric(best_contig_pident)),
            kmer_cov  = suppressWarnings(as.numeric(best_contig_kmer_cov)),
-           # Carried through per the results write-up: 2633901 has a 1620 bp contig
+           # Carried through per the results write-up: SampleSA-1a has a 1620 bp contig
            # with a 69 bp alignment (4.3%), which a length-only floor lets through.
            aln_len   = suppressWarnings(as.numeric(best_contig_aln_length))) %>%
     group_by(run, sample_id, subtype) %>%

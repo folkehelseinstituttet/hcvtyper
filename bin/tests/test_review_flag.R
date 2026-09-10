@@ -206,7 +206,7 @@ for (mj in c("1a", "1b", "2c", "2k1b")) {
     fail(sprintf("OGC-2: a %s contig against a 2k1b major must be excluded (is_valid_minor rule 2)", mj))
 }
 # ...but 2k1b against a genotype OUTSIDE {1,2,2k1b} is a real conflict and survives
-# (observed: 2610361, a 1116 bp 2k1b contig against a 3a major).
+# (observed: Sample2K-3a, a 1116 bp 2k1b contig against a 3a major).
 if (!ogc("2k1b", "3a")) fail("OGC-2: a 2k1b contig against a 3a major must still fire")
 if (!ogc("3a", "2k1b")) fail("OGC-2: a 3a contig against a 2k1b major must still fire")
 ok("OGC-2: 2k1b pairs excluded against genotype {1,2,2k1b} only, both directions")
@@ -284,7 +284,7 @@ if (!is.na(srm_mono(NA_character_)))
 # The 2k1b leg is applied INSIDE the helper: 2k1b vs a 1b major is suppressed...
 if (!is.na(srm_mono("2k1b", maj = "1b")))
   fail("OGC-7: a 2k1b contig against a 1b major must emit no sentence (pair rule)")
-# ...while 2k1b vs a 3a major is a real conflict and still fires (sample 2610361).
+# ...while 2k1b vs a 3a major is a real conflict and still fires (Sample2K-3a).
 if (is.na(srm_mono("2k1b", maj = "3a")))
   fail("OGC-7: a 2k1b contig against a 3a major must still emit the sentence")
 ok("OGC-7: sample_review_message() honours the masked slot, the pair rule, and still fires on a real conflict")
@@ -294,7 +294,7 @@ ok("OGC-7: sample_review_message() honours the masked slot, the pair rule, and s
 
 ocn <- contig_evidence_note
 
-# 2633901: 1620 bp contig, 69 bp aligned (4%). Independently confirmed against nt —
+# SampleSA-1a: 1620 bp contig, 69 bp aligned (4%). Independently confirmed against nt —
 # the contig's only HCV-like region is a ~212 bp tail closest to 1a, the same
 # genotype as the major, so there is no second strain and the 6i label is an
 # artefact of a short anchor.
@@ -309,7 +309,7 @@ if (grepl("possible missed co-infection", note_junk, fixed = TRUE))
   fail(sprintf("OGC-8: a 4%%-aligned contig must NOT assert a possible co-infection, got: %s", note_junk))
 ok("OGC-8: a poorly-aligned contig carries all four metrics and is described as weakly supported")
 
-# 2743986: 4467 bp contig, 4448 bp aligned (100%) — a genuine co-infection signal.
+# SampleFL-1a: 4467 bp contig, 4448 bp aligned (100%) — a genuine co-infection signal.
 note_real <- ocn(contig_length = 4467, aln_length = 4448, pident = 91.93, kmer_cov = 1.42)
 if (!grepl("(100%)", note_real, fixed = TRUE))
   fail(sprintf("OGC-9: a fully-aligned contig must report 100%%, got: %s", note_real))

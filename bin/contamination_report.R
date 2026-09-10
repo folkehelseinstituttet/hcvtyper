@@ -222,7 +222,7 @@ extract_ras <- function(f) {
 }
 
 # Filename pattern: {sampleID}.{subtype}_{ref}_major.major.nodup.json
-# e.g. 2665137-HCV.1b_EU781827_major.major.nodup.json  ->  2665137-HCV
+# e.g. SAMPLE01-HCV.1b_EU781827_major.major.nodup.json  ->  SAMPLE01-HCV
 get_sample_from_glue <- function(f) {
     sub("\\.[^.]+_[^.]+_major\\.major\\.nodup\\.json$", "", basename(f))
 }

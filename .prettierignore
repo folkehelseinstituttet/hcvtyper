@@ -10,7 +10,6 @@ testing/
 testing*
 *.pyc
 bin/
-contamination_runs/
 # nf-test fixtures: GLUE emits DEBUG log lines before its JSON payload, so these
 # are not valid standalone JSON. The parser strips the noise (bin/GLUE_json_parser.R);
 # keep the fixtures byte-for-byte real rather than reformatting them.
