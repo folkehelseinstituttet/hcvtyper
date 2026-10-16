@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Deprecated`
 
+## 2.0.1 - 2026.10.16
+
+Patch release. Fixes the index-hopping threshold in the cross-sample contamination report. Strain calls and `Summary.csv` are unchanged.
+
+### `Fixed`
+
+- **The contamination report's index-hopping threshold was ~150× too high.** `bin/contamination_report.R` compares SPAdes contig k-mer coverage against the read depth expected from index hopping. k-mer coverage relates to read depth as `depth × (L − k + 1) / L`, but the conversion multiplied by `(L − k + 1)` only, with the read length L hard-coded to 150 bp — so the k-mer threshold was overstated by a factor of L and nearly every cross-sample pair was reported as `flag_index_hopping = TRUE`. L is now the reads-weighted mean post-filter read length from the fastp JSONs, the conversion divides by L, and when L is shorter than k the flag is reported as NA instead of a meaningless TRUE/FALSE. `n_above_hop_threshold` in `contamination_direction.tsv` is likewise NA rather than 0 when the threshold cannot be converted. The main pipeline does not currently pass fastp JSONs to the contamination check, so its output is unaffected; the flag was only live when the script or subworkflow was called with them.
+- **`--contamination_kmer_size` documentation** claimed "150 bp reads → k = 127 → multiplier 24". SPAdes `--rnaviral` picks k from read length — final k = 49 for 2×100, 73 for 2×150 and 127 for 2×300 reads — so the default of 127 fits 2×300 data, and the parameter should be set to match other read lengths. `nextflow_schema.json`, `nextflow.config` and `README.md` now say so.
+
+### `Added`
+
+- **`bin/tests/test_contamination_report.R`** (CR-1..5): runs the contamination report end to end on a two-sample fixture and checks the read-depth threshold, the flag on either side of the corrected k-mer threshold, the reads-weighted read length, the L < k guard, and unchanged behaviour without fastp JSONs. Fails against the pre-fix script.
+
 ## 2.0.0 - 2026.09.11
 
 Major release. The major/minor strain model is replaced end to end by a neutral, evidence-first candidate model: references are ranked without dominance semantics, each candidate is corroborated against an independent _de novo_ assembly, and roles (`dominant` / `co-infection` / `background`) are assigned only at the reporting step. Output filenames and the `Summary.csv` schema change accordingly — see `Breaking changes`.
