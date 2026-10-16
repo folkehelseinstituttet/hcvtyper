@@ -11,11 +11,15 @@
 #   the BLAST alignment to retain the hit.  E.g. 0.9 means the alignment must
 #   span ≥90% of whichever of the two contigs is shorter.  Hits that are short
 #   partial matches are excluded.  Default: 0.9.
-#   SPAdes reports k-mer coverage (not read depth) in contig headers.
-#   The conversion is: read_depth = kmer_cov / (read_length - kmer_size + 1)
-#   For Illumina 150 bp reads the default SPAdes final k is 127, giving a
-#   multiplier of 24. This value is used to scale the hop threshold into the
-#   same k-mer coverage units before comparison. Default: 127.
+#
+# kmer_size: SPAdes final k-mer size. SPAdes reports k-mer coverage (not read
+#   depth) in contig headers; the two relate as
+#       kmer_cov = read_depth * (read_length - kmer_size + 1) / read_length
+#   This is used to scale the read-depth hop threshold into k-mer coverage units
+#   before comparison. read_length is the measured mean post-filter read length
+#   from the fastp JSONs. SPAdes --rnaviral picks k automatically from read
+#   length (final k = 49 for 2x100, 73 for 2x150, 127 for 2x300 reads), so set
+#   kmer_size to match the data. Default: 127.
 #
 # Optional inputs auto-detected in working directory:
 #   fastp/   *.fastp.json                    - per-sample fastp JSON files
@@ -26,7 +30,7 @@ library(jsonlite)
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 2) {
-    stop("Usage: contamination_report.R <blast_txt> <prefix> [hop_rate] [min_dir_ratio] [genome_size]")
+    stop("Usage: contamination_report.R <blast_txt> <prefix> [hop_rate] [min_dir_ratio] [genome_size] [kmer_size] [min_aln_cov]")
 }
 
 blast_file    <- args[1]
@@ -36,8 +40,8 @@ min_dir_ratio <- if (length(args) >= 4 && nchar(args[4]) > 0) as.numeric(args[4]
 genome_size   <- if (length(args) >= 5 && nchar(args[5]) > 0) as.numeric(args[5]) else 9500
 # SPAdes k-mer size: used to convert the read-depth hop threshold into k-mer
 # coverage units so that both sides of the flag_index_hopping comparison are
-# in the same units. Formula: kmer_cov = read_depth * (read_length - kmer_size + 1)
-kmer_size     <- if (length(args) >= 6 && nchar(args[6]) > 0) as.numeric(args[6]) else 127
+# in the same units. Formula: kmer_cov = read_depth * (read_length - kmer_size + 1) / read_length
+kmer_size    <- if (length(args) >= 6 && nchar(args[6]) > 0) as.numeric(args[6]) else 127
 min_aln_cov   <- if (length(args) >= 7 && nchar(args[7]) > 0) as.numeric(args[7]) else 0.9
 
 # Column names matching the BLAST -outfmt used in the subworkflow:
@@ -133,33 +137,56 @@ if (length(fastp_files) > 0) {
     fastp_data <- tibble(path = fastp_files) %>%
         mutate(
             sample_id   = sub("\\.fastp\\.json$", "", basename(path)),
-            total_reads = map_dbl(path, function(f) {
-                d <- tryCatch(fromJSON(f), error = function(e) NULL)
-                if (is.null(d)) NA_real_
-                else d[["summary"]][["after_filtering"]][["total_reads"]]
+            json        = map(path, function(f) tryCatch(fromJSON(f), error = function(e) NULL)),
+            total_reads = map_dbl(json, function(d) {
+                v <- d[["summary"]][["after_filtering"]][["total_reads"]]
+                if (is.null(v)) NA_real_ else as.numeric(v)
+            }),
+            read1_len   = map_dbl(json, function(d) {
+                v <- d[["summary"]][["after_filtering"]][["read1_mean_length"]]
+                if (is.null(v)) NA_real_ else as.numeric(v)
             })
         ) %>%
+        select(-json) %>%
         filter(!is.na(total_reads))
 
     n_samples           <- nrow(fastp_data)
     run_reads           <- sum(fastp_data$total_reads)
+    # Mean post-filter read length across the run, weighted by each sample's reads.
+    # Read length sets both the depth one read contributes and the k-mer conversion
+    # below, so it is measured rather than assumed (FHI data are 2x300, trimmed).
+    len_ok              <- !is.na(fastp_data$read1_len) & fastp_data$total_reads > 0
+    read_length         <- if (any(len_ok))
+                               weighted.mean(fastp_data$read1_len[len_ok], fastp_data$total_reads[len_ok])
+                           else {
+                               message("[fastp] read1_mean_length missing from fastp JSONs; assuming 150 bp reads")
+                               150
+                           }
     # Expected coverage of index-hopped reads reaching a single recipient sample:
     # total run reads * hop_rate = reads that can hop to any well;
-    # divide by n_samples for per-well share, convert to coverage with 150bp reads.
+    # divide by n_samples for per-well share, convert to depth with the read length.
     # hop_cov_threshold is in READ DEPTH units:
     #   (total_run_reads * hop_rate * read_length) / (n_samples * genome_size)
-    # SPAdes contig coverage is K-MER coverage, not read depth.
-    # To compare them directly we scale up to k-mer units:
-    #   kmer_hop_threshold = read_depth_threshold * (read_length - kmer_size + 1)
-    read_length         <- 150
-    kmer_multiplier     <- read_length - kmer_size + 1      # e.g. 24 for k=127
+    # SPAdes contig coverage is K-MER coverage, not read depth. A read of length L
+    # contributes L - k + 1 k-mers but L bases, so:
+    #   kmer_cov = read_depth * (L - k + 1) / L
+    # e.g. 0.16 for L = 150, k = 127. When L < k no read yields a k-mer and the
+    # conversion is undefined, so the flag is reported as NA rather than guessed.
     hop_cov_threshold   <- (run_reads * hop_rate * read_length) / (n_samples * genome_size)
+    kmer_multiplier     <- (read_length - kmer_size + 1) / read_length
+    if (kmer_multiplier <= 0) {
+        message(sprintf(
+            "[fastp] mean read length %.1f bp is shorter than k = %d; cannot convert the hop threshold to k-mer coverage, flag_index_hopping set to NA. Set contamination_kmer_size to the SPAdes final k for this data.",
+            read_length, as.integer(kmer_size)
+        ))
+        kmer_multiplier <- NA_real_
+    }
     hop_kmer_threshold  <- hop_cov_threshold * kmer_multiplier
     has_fastp           <- TRUE
     message(sprintf(
-        "[fastp] %d samples | %s total reads | index-hop threshold: %.3fx read-depth | %.1fx k-mer (k=%d, multiplier=%d, hop_rate=%.3f%%)",
-        n_samples, format(run_reads, big.mark = ","),
-        hop_cov_threshold, hop_kmer_threshold, kmer_size, kmer_multiplier, hop_rate * 100
+        "[fastp] %d samples | %s total reads | mean read length %.1f bp | index-hop threshold: %.3fx read-depth | %.3fx k-mer (k=%d, multiplier=%.4f, hop_rate=%.3f%%)",
+        n_samples, format(run_reads, big.mark = ","), read_length,
+        hop_cov_threshold, hop_kmer_threshold, as.integer(kmer_size), kmer_multiplier, hop_rate * 100
     ))
 } else {
     fastp_data          <- tibble(sample_id = character(), total_reads = numeric())
@@ -273,7 +300,7 @@ if (nrow(cross) > 0) {
         group_by(source_sample, recipient_sample) %>%
         summarise(
             n_contig_pairs           = n(),
-            n_above_hop_threshold    = if (has_fastp)
+            n_above_hop_threshold    = if (has_fastp && !is.na(hop_kmer_threshold))
                                            sum(!flag_index_hopping, na.rm = TRUE)
                                        else NA_integer_,
             median_cov_ratio         = median(cov_ratio),
