@@ -84,13 +84,13 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 
 ```
-nextflow run folkehelseinstituttet/hcvtyper -r 2.0.0 \
+nextflow run folkehelseinstituttet/hcvtyper -r 2.0.1 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
 
-Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.0 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.1 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
 
 > [!IMPORTANT]
 > **From 2.0.0 the release tags are bare version numbers with no `v` prefix** — `-r 2.0.0`, not
@@ -108,7 +108,7 @@ Nextflow will pull the pipeline from the GitHub repo automatically when it is la
 If you want to download a local copy of the pipeline you can run:
 
 ```
-nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.0
+nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.1
 ```
 
 Again, `-r` is optional.
@@ -306,7 +306,7 @@ An all-vs-all BLAST of the assembled contigs across samples in the run, used to 
 | `--contamination_hop_rate` | `0.001` | Expected index-hopping rate. |
 | `--contamination_min_dir_ratio` | `10.0` | Minimum source/recipient coverage ratio for a direction to be reported. |
 | `--contamination_genome_size` | `9500` | Expected viral genome size (bp), used for the index-hop threshold. |
-| `--contamination_kmer_size` | `127` | SPAdes final k-mer size, used to convert k-mer coverage to read depth. |
+| `--contamination_kmer_size` | `127` | SPAdes final k-mer size, used to convert the index-hop read-depth threshold to k-mer coverage (`kmer_cov = depth × (L − k + 1) / L`, with L the mean read length from fastp). SPAdes `--rnaviral` picks k from read length: 49 for 2×100, 73 for 2×150 and 127 for 2×300 reads. |
 
 ## Starting and stopping the pipeline
 
