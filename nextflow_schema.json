@@ -301,7 +301,7 @@
         "contamination_kmer_size": {
             "type": "integer",
             "default": 127,
-            "description": "SPAdes final k-mer size; used to convert k-mer coverage to read depth (150 bp reads, k=127, multiplier=24)."
+            "description": "SPAdes final k-mer size, used to convert the index-hop read-depth threshold to k-mer coverage (kmer_cov = depth * (L - k + 1) / L, L = mean read length from fastp). SPAdes --rnaviral picks k from read length: 49 for 2x100, 73 for 2x150, 127 for 2x300 reads."
         },
         "contamination_min_aln_cov": {
             "type": "number",

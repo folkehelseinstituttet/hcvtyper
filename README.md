@@ -306,7 +306,7 @@ An all-vs-all BLAST of the assembled contigs across samples in the run, used to 
 | `--contamination_hop_rate` | `0.001` | Expected index-hopping rate. |
 | `--contamination_min_dir_ratio` | `10.0` | Minimum source/recipient coverage ratio for a direction to be reported. |
 | `--contamination_genome_size` | `9500` | Expected viral genome size (bp), used for the index-hop threshold. |
-| `--contamination_kmer_size` | `127` | SPAdes final k-mer size, used to convert k-mer coverage to read depth. |
+| `--contamination_kmer_size` | `127` | SPAdes final k-mer size, used to convert the index-hop read-depth threshold to k-mer coverage (`kmer_cov = depth × (L − k + 1) / L`, with L the mean read length from fastp). SPAdes `--rnaviral` picks k from read length: 49 for 2×100, 73 for 2×150 and 127 for 2×300 reads. |
 
 ## Starting and stopping the pipeline
 
