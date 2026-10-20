@@ -24,6 +24,7 @@
   - [De novo subtype rescue](#de-novo-subtype-rescue)
   - [Dominance-score weights](#dominance-score-weights)
   - [Review-flag thresholds](#review-flag-thresholds)
+  - [Background signals for co-infection minors](#background-signals-for-co-infection-minors)
   - [Cross-sample contamination check](#cross-sample-contamination-check)
 - [Starting and stopping the pipeline](#starting-and-stopping-the-pipeline)
 - [Customizing the pipeline](#customizing-the-pipeline)
@@ -293,6 +294,20 @@ Each candidate's dominance score is a weighted sum over log10(mapped reads), cov
 | ---------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--review_min_offgenotype_contig_length` | `1000`  | Minimum contig length (bp) for the monoinfection "_de novo_ assembly found a different-genotype contig" review sentence to fire. Deliberately separate from — and higher than — `--denovo_min_contig_length`: that floor confirms a minor that mapping already supports, whereas here the contig is the _only_ evidence. Validated across 140 samples: with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case. |
 
+### Background signals for co-infection minors
+
+Probe-capture runs reach very high depth, so a few tenths of a percent of reads bled in from another sample (index hopping, demultiplexing bleed, carry-over) easily clears absolute floors such as `--minRead` and assembles into long contigs. Two signals mark a co-infection minor that looks like such background. Neither needs another sample of the run, and **neither changes the call**: they add columns and a `review_flag` sentence that points to `contamination_check/`.
+
+- **Read fraction** — the minor's share of the sample's candidate reads. Bleed is roughly a constant fraction of reads, so this is the depth-invariant quantity.
+- **Duplicate discordance** — the PCR-duplicate rate of the minor's contigs against the dominant genotype's. Each sample's reads are mapped back to its own contigs (`contig_duplicates/`). A genuine minor is amplified in the same library and shares its duplicate rate; reads from another library are almost all unique. Contamination that entered *before* library PCR looks concordant and is not caught.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `--minor_min_read_fraction` | `0.05` | Flag a co-infection minor holding less than this fraction of the sample's candidate reads (joint mapping, duplicates included). |
+| `--dup_min_library_rate` | `0.5` | The dominant genotype's contigs must be at least this duplicated for the duplicate test to have power. Unsaturated libraries give `NA`. |
+| `--dup_min_fragments` | `20` | Minimum read pairs on the minor's contigs for the duplicate test. |
+| `--dup_max_ratio` | `0.5` | Flag when the minor's duplicate rate is at most this fraction of the dominant genotype's. |
+
 ### Cross-sample contamination check
 
 An all-vs-all BLAST of the assembled contigs across samples in the run, used to detect index hopping and cross-contamination. Results are published to `contamination_check/`.
@@ -416,9 +431,15 @@ The pipeline runs _de novo_ assembly (SPAdes) and BLAST in parallel with referen
 - `cand_N_assembly_support_subtype` - Subtype of the supporting contig.
 - `cand_N_assembly_support_best_contig_length` / `_pident` / `_aln_length` / `_kmer_cov` - The four measured metrics of the best supporting contig for that candidate: length (bp), BLAST % identity, BLAST alignment length (bp), and SPAdes k-mer coverage.
 
+**Background signals** (see [Background signals for co-infection minors](#background-signals-for-co-infection-minors)):
+
+- `Minor_read_fraction` - The Minor slot's share of the sample's candidate reads (0–1).
+- `Minor_dup_rate` / `Major_dup_rate` - PCR-duplicate rate of the contigs of the Minor's and the Major's genotype (0–1). `Major_dup_rate` is the library's own level.
+- `Minor_dup_discordant` - `TRUE` when the Minor's contigs are far less duplicated than the Major's (`--dup_max_ratio`), `FALSE` when they are not, `NA` when the test has no power (unsaturated library, too few read pairs, no contigs) or the Minor is the Major's genotype.
+
 **Review flag:**
 
-- `review_flag` - Human-readable summary of any issue worth manual inspection, empty when all checks pass. Multiple issues are joined with `|`. Each sentence names **the specific candidate** it refers to and carries the **measured value** alongside the floor it missed — e.g. _"…different-genotype contig (6i) — 1620 bp contig, 69 bp aligned (4%), 91.3% identity, k-mer cov 1.0; only 4% of the contig aligns to any reference in the panel, so the subtype assignment is weakly supported"_ — so the flag can be adjudicated without re-running the pipeline. The ten triggers are listed in full in the [results interpretation guide](docs/output_interpretation.md#review_flag--the-human-readable-why).
+- `review_flag` - Human-readable summary of any issue worth manual inspection, empty when all checks pass. Multiple issues are joined with ` | `. Each sentence names **the specific candidate** it refers to and carries the **measured value** alongside the floor it missed — e.g. _"…different-genotype contig (6i) — 1620 bp contig, 69 bp aligned (4%), 91.3% identity, k-mer cov 1.0; only 4% of the contig aligns to any reference in the panel, so the subtype assignment is weakly supported"_ — so the flag can be adjudicated without re-running the pipeline. The triggers are listed in full in the [results interpretation guide](docs/output_interpretation.md#review_flag--the-human-readable-why).
 
 Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC Results summary table.
 
@@ -435,6 +456,9 @@ Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC 
 - `cand_cov_breadth` - Coverage breadth at ≥5× from the **targeted mapping**, after reads have been competitively assigned among this sample's candidates and deduplicated. This is the value the dominance score's breadth term reads. It is empty for a candidate that never reached targeted mapping (`confirmation_status` below threshold). The two columns answer different questions and routinely disagree — a candidate that recruits reads panel-wide can lose most of them once it competes only against the other candidates in its own sample.
 - `evidence_summary` - A plain-language sentence describing the contig corroboration for that candidate.
 - `contig_identity_contribution` / `contig_length_contribution` / `contig_kmer_contribution` - The weighted per-metric contributions to the candidate's `assembly_support_score`, so the score can be reconstructed from the file.
+- `candidate_read_fraction` - The candidate's share of the sample's candidate reads on the competitive joint mapping, duplicates included.
+- `candidate_dup_rate` / `candidate_dup_fragments` / `library_dup_rate` / `dup_ratio` / `dup_discordant` - The duplicate-discordance test for this candidate: its genotype's contig duplicate rate and read pairs, the dominant genotype's rate, their ratio, and the verdict.
+- `background_note` - The review sentence for a co-infection candidate when either background signal fires.
 - `below_floor` - Whether the candidate **clears** the `--minRead` / `--minCov` floor on its targeted numbers (the name is inverted; `TRUE` means it clears). Informational only — it does not gate the role.
 
 #### Per-sample evidence files
@@ -479,6 +503,7 @@ The MultiQC report provides an interactive overview of all samples and is the re
 - `blast/` - BLAST results against reference database
 - `hcvglue/` - HCV-GLUE genotyping and resistance reports (for HCV samples)
 - `contamination_check/` - Cross-sample contamination and index-hopping report
+- `contig_duplicates/` - Per-contig read-pair and PCR-duplicate counts of each sample's reads mapped to its own contigs (input to the duplicate-discordance signal)
 - `QC/coverage_plots/`, `QC/bam_variation/`, `QC/denovo/`, `QC/insert_size/` - Per-strain coverage and evenness plots, variation grids, assembly plots and insert-size metrics
 - `pipeline_info/` - Execution reports, timeline, and software versions
 
