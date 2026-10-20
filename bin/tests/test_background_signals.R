@@ -12,7 +12,9 @@
 #   BS-3  candidate_dup_signal(): TRUE for that 2b; FALSE when concordant; NA
 #         (never FALSE) when the test has no power — unsaturated library, too few
 #         fragments, no contigs — or the candidate is the dominant genotype
-#   BS-4  background_note(): sentence carries the numbers; NA when nothing fires
+#   BS-4  background_note(): sentence carries the numbers and the duplicate
+#         verdict; a concordant low-share minor (IVT 1:50) never reads as
+#         background; NA when nothing fires
 #   BS-5  empty inputs give typed-empty frames
 # -------------------------------------------------------------------------
 
@@ -97,18 +99,27 @@ if (!identical(unname(got), unname(want)))
 ok("BS-3 concordant -> FALSE; unsaturated / few fragments / same genotype / no contigs -> NA")
 
 # ── BS-4 ──────────────────────────────────────────────────────────────────────
-n_both <- background_note(2L, "2b_D10988", 0.0123, 0.018, 0.909, TRUE, 0.05)
-if (!str_detect(n_both, "Co-infection candidate 2 \\(2b_D10988\\) holds 1.23% of the sample's HCV reads \\(below 5.00%\\)") ||
-    !str_detect(n_both, "1.80% PCR duplicates against 90.9% for the dominant genotype") ||
+# discordant (+ low share): background wording
+n_both <- background_note(2L, "2b_D10988", 0.0123, 0.018, 0.909, TRUE, 0.02)
+if (!str_detect(n_both, "Co-infection candidate 2 \\(2b_D10988\\) holds 1.23% of the sample's HCV reads \\(below 2.00%") ||
+    !str_detect(n_both, "1.80% PCR duplicates against 90.9% for the dominant genotype, so its reads did not go through this library's PCR") ||
     !str_detect(n_both, "check contamination_check/"))
-  fail(paste("BS-4 sentence wrong:", n_both))
-n_frac <- background_note(2L, "2b_D10988", 0.0123, 0.85, 0.9, FALSE, 0.05)
-if (!str_detect(n_frac, "holds 1.23%") || str_detect(n_frac, "PCR duplicates")) fail("BS-4 fraction-only sentence wrong")
-n_dup <- background_note(2L, "1a_HQ850279", 0.21, 0.02, 0.96, TRUE, 0.05)
-if (str_detect(n_dup, "holds") || !str_detect(n_dup, "PCR duplicates")) fail("BS-4 duplicate-only sentence wrong")
-if (!is.na(background_note(2L, "3a_D17763", 0.3, 0.8, 0.9, FALSE, 0.05))) fail("BS-4 nothing fired must be NA")
-if (!is.na(background_note(2L, "3a_D17763", NA, NA, NA, NA, 0.05))) fail("BS-4 all-NA must be NA")
-ok("BS-4 sentence variants")
+  fail(paste("BS-4 discordant sentence wrong:", n_both))
+# discordant only (share above the floor, e.g. ERR1810469 at 17.5 %)
+n_dup <- background_note(2L, "1a_HQ850279", 0.175, 0.027, 0.96, TRUE, 0.02)
+if (str_detect(n_dup, "holds") || !str_detect(n_dup, "\\(1a_HQ850279\\): its contigs are 2.70% PCR duplicates") ||
+    !str_detect(n_dup, "did not go through")) fail(paste("BS-4 duplicate-only sentence wrong:", n_dup))
+# low share, concordant (IVT5: genuine 1:50 at 1.95 %): must NOT read as background
+n_conc <- background_note(2L, "2a_AB047639", 0.0195, 0.972, 0.987, FALSE, 0.02)
+if (!str_detect(n_conc, "holds 1.95%") || !str_detect(n_conc, "went through this library's PCR") ||
+    str_detect(n_conc, "did not go through") || str_detect(n_conc, "consistent with background"))
+  fail(paste("BS-4 concordant low-share sentence wrong:", n_conc))
+# low share, untested
+n_na <- background_note(2L, "3a_D17763", 0.01, NA, 0.3, NA, 0.02)
+if (!str_detect(n_na, "the duplicate test was not informative")) fail(paste("BS-4 untested sentence wrong:", n_na))
+if (!is.na(background_note(2L, "3a_D17763", 0.3, 0.8, 0.9, FALSE, 0.02))) fail("BS-4 nothing fired must be NA")
+if (!is.na(background_note(2L, "3a_D17763", NA, NA, NA, NA, 0.02))) fail("BS-4 all-NA must be NA")
+ok("BS-4 sentence variants: discordant, duplicate-only, concordant low share, untested, none")
 
 # ── BS-5 ──────────────────────────────────────────────────────────────────────
 if (nrow(candidate_read_fractions(reads[0, ])) != 0) fail("BS-5 empty reads")

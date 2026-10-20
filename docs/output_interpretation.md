@@ -77,22 +77,28 @@ demultiplexing bleed, carry-over — to clear absolute floors like `--minRead` a
 long contigs that corroborate a minor. Two signals, computed within the sample alone, mark such a
 minor. They never change the call; they add a sentence such as
 
-> Co-infection candidate 2 (2b_D10988) holds 1.23% of the sample's HCV reads (below 5.00%), and its
-> contigs are 1.80% PCR duplicates against 90.9% for the dominant genotype, so its reads did not go
-> through this library's PCR — consistent with background reads from another sample (index hopping
-> or carry-over); check contamination_check/ before reporting.
+> Co-infection candidate 2 (2b_D10988) holds 1.23% of the sample's HCV reads (below 2.00%, the range
+> of cross-sample background), and its contigs are 1.80% PCR duplicates against 90.9% for the dominant
+> genotype, so its reads did not go through this library's PCR — consistent with background reads from
+> another sample (index hopping or carry-over); check contamination_check/ before reporting.
 
 **Read fraction** (`Minor_read_fraction`, `--minor_min_read_fraction`). Bleed is roughly a constant
 fraction of a run's reads, so a minor's *share* of the sample's reads is comparable across depths in a
-way a read count is not. A low share is not proof — genuine low-level co-infections exist — which is
-why this only asks for a look.
+way a read count is not. A low share is not proof: in the IVT dilution series the genuine 1:50 minors
+hold 1.95 % and 2.7 % of reads, overlapping the 0.17–1.7 % of the background minors in the Thomson
+MiSeq run. So the sentence always says what the duplicate test found — a low-share minor that went
+through the library's PCR reads as "a genuine low-level strain, or contamination before library
+preparation", not as background.
 
 **Duplicate discordance** (`Minor_dup_rate`, `Major_dup_rate`, `Minor_dup_discordant`). Each sample's
 reads are mapped back to its own contigs and PCR duplicates are marked. Within one library every
 molecule is amplified and sequenced alike, so a genuine minor carries the library's duplicate rate.
 Reads that arrived from another library after its PCR are a sparse random draw from a large pool and
 are almost all unique. A minor at a small fraction of the dominant's duplicate rate therefore did not
-go through this sample's library preparation. This is the stronger of the two signals, with limits:
+go through this sample's library preparation. This is the stronger of the two signals: in the IVT
+dilution series every genuine minor (1:1 to 1:50) was duplicated like its dominant (96.9–98.2 % vs
+97.8–98.7 %), while every background minor in the Thomson run was far below its library (1.8–8.6 % vs
+91–96 %). Its limits:
 
 - **One-directional.** Contamination that entered *before* library PCR (sample handling, extraction)
   is amplified with the sample and looks concordant. `FALSE` means "not shown to be foreign", not

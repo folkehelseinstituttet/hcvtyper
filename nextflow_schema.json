@@ -258,10 +258,10 @@
         },
         "minor_min_read_fraction": {
             "type": "number",
-            "default": 0.05,
+            "default": 0.02,
             "minimum": 0,
             "maximum": 1,
-            "description": "Add a review sentence for a co-infection minor that holds less than this fraction of the sample's candidate reads (joint mapping, duplicates included). Background bleed is roughly a constant fraction of reads, so this is depth-invariant where minRead is not. Flag only; the call is unchanged."
+            "description": "Add a review sentence for a co-infection minor that holds less than this fraction of the sample's candidate reads (joint mapping, duplicates included). Background bleed is roughly a constant fraction of reads, so this is depth-invariant where minRead is not. Background minors were observed at 0.17-1.7 % of reads; a genuine 1:50 mixture is about 2 %. Flag only; the call is unchanged."
         },
         "dup_min_library_rate": {
             "type": "number",

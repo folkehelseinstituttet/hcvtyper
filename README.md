@@ -303,7 +303,7 @@ Probe-capture runs reach very high depth, so a few tenths of a percent of reads 
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `--minor_min_read_fraction` | `0.05` | Flag a co-infection minor holding less than this fraction of the sample's candidate reads (joint mapping, duplicates included). |
+| `--minor_min_read_fraction` | `0.02` | Flag a co-infection minor holding less than this fraction of the sample's candidate reads (joint mapping, duplicates included). Background minors were observed at 0.17–1.7 % of reads and a genuine 1:50 mixture at about 2 %, so the two overlap: the sentence always reports the duplicate test, which is what separates them. |
 | `--dup_min_library_rate` | `0.5` | The dominant genotype's contigs must be at least this duplicated for the duplicate test to have power. Unsaturated libraries give `NA`. |
 | `--dup_min_fragments` | `20` | Minimum read pairs on the minor's contigs for the duplicate test. |
 | `--dup_max_ratio` | `0.5` | Flag when the minor's duplicate rate is at most this fraction of the dominant genotype's. |
