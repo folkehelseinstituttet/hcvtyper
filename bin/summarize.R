@@ -1039,8 +1039,16 @@ candidate_support <- candidate_support %>%
       background_note(rank, ref, frac, dup, lib, disc, minor_min_read_fraction)
     }
   )) %>%
-  # The sentence only concerns candidates reported as a co-infection.
-  mutate(background_note = if_else(role == "co-infection", background_note, NA_character_))
+  # The sentence concerns a second strain that is being reported: a co-infection
+  # candidate, or the non-Major candidate of a "co-infection (indeterminate
+  # dominance)" call (role indeterminate). The Major slot itself never gets it.
+  left_join(slot_major_src %>% transmute(sampleName, .major_rank = candidate_rank),
+            by = "sampleName") %>%
+  mutate(background_note = if_else(
+    role %in% c("co-infection", "indeterminate") &
+      (is.na(.major_rank) | candidate_rank != .major_rank),
+    background_note, NA_character_)) %>%
+  select(-.major_rank)
 
 write_csv(candidate_support, file = "candidates.csv")
 
