@@ -76,9 +76,9 @@ run_summarize <- function(case, sampleName, cands,
   wd <- tempfile(paste0("compat_", case, "_")); dir.create(wd)
   old <- getwd(); setwd(wd); on.exit(setwd(old), add = TRUE)
 
-  # summarize.R source()s these five helpers cwd-relative (bin/summarize.R L10-25).
+  # summarize.R source()s these six helpers cwd-relative (bin/summarize.R L10-28).
   for (h in c("genotype_utils.R", "denovo_confirm.R", "denovo_layer.R",
-              "assembly_support_join.R", "classify_roles.R")) {
+              "assembly_support_join.R", "classify_roles.R", "background_signals.R")) {
     file.copy(file.path(bin_dir, h), file.path(wd, h), overwrite = TRUE)
   }
 

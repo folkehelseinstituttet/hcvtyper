@@ -32,6 +32,7 @@ process SUMMARIZE {
     path(denovo_layer)
     path(assembly_support_join)
     path(classify_roles)
+    path(background_signals)
 
     output:
     path 'Summary.csv'      , emit: summary
