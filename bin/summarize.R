@@ -80,7 +80,7 @@ review_min_offgenotype_contig_length <-
 # after args[16], for the same positional reason. They only add columns and a review
 # sentence; no call depends on them.
 minor_min_read_fraction <-
-  if (length(args) >= 17 && nchar(args[17]) > 0) as.numeric(args[17]) else 0.05
+  if (length(args) >= 17 && nchar(args[17]) > 0) as.numeric(args[17]) else 0.02
 dup_min_library_rate    <-
   if (length(args) >= 18 && nchar(args[18]) > 0) as.numeric(args[18]) else 0.5
 dup_min_fragments       <-
