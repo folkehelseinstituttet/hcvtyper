@@ -1,7 +1,7 @@
 {
     "-profile test": {
         "content": [
-            87,
+            89,
             {
                 "BLASTPARSE": {
                     "r-base": "4.4.3",
@@ -43,6 +43,10 @@
                     "r-base": "4.4.3",
                     "tidyverse": "2.0.0",
                     "jsonlite": "2.0.0"
+                },
+                "CONTIG_DUPLICATES": {
+                    "bowtie2": "2.5.4",
+                    "samtools": 1.21
                 },
                 "CONTIG_FILTER_RENAME": {
                     "awk": "mawk 1.3.4 20240123"
@@ -128,7 +132,7 @@
                     "untar": 1.34
                 },
                 "Workflow": {
-                    "folkehelseinstituttet/hcvtyper": "v2.0.2"
+                    "folkehelseinstituttet/hcvtyper": "v2.1.0dev"
                 }
             },
             [
@@ -175,6 +179,9 @@
                 "contamination_check/contamination.contamination_heatmap.png",
                 "contamination_check/contamination.contamination_mqc.json",
                 "contamination_check/contamination.contamination_pairs.tsv",
+                "contig_duplicates",
+                "contig_duplicates/Test_1.contig_dups.tsv",
+                "contig_duplicates/Test_2.contig_dups.tsv",
                 "fastp",
                 "fastp/Test_1.fastp.html",
                 "fastp/Test_1.fastp.json",
@@ -612,6 +619,8 @@
                 "contamination.contamination_heatmap.png:md5,fe4b52bd4069d087e2809a979fd00f86",
                 "contamination.contamination_mqc.json:md5,62710c84d9ebc74004adfbe675bfcffb",
                 "contamination.contamination_pairs.tsv:md5,e34e96daf763caaf46b5c3326990c70c",
+                "Test_1.contig_dups.tsv:md5,565cbe5d154c5bc6eec52f1ca9f3879e",
+                "Test_2.contig_dups.tsv:md5,69a6ba1cc748b56468872ccbdb527d88",
                 "Test_1.fastp.json:md5,4aa9de7ad400868af84034190632759b",
                 "Test_2.fastp.json:md5,374e5babff0b4314f4b9f77c1ef16edc",
                 "Neg.sequencerID.tsv:md5,68b329da9893e34099c7d8ad5cb9c940",
@@ -690,6 +699,7 @@
                 "multiqc_glue_resistance_table.txt:md5,a8973b1828a2faec605e62e4dd4ae514",
                 "multiqc_kraken-1_kraken-1.txt:md5,5a253204b192a4d211b35abd5dada86d",
                 "multiqc_kraken.txt:md5,805f856012188fdde796f2049aa46934",
+                "multiqc_software_versions.txt:md5,0cf8efd0e2ef29ea50a0efa657633f1f",
                 "multiqc_summary.txt:md5,dd8ba615b9e5dd4c283a5f86ad263ebd",
                 "Test_1.1b_EU781827_cand2.fa:md5,adfbbbe2888176a86fb06277e29b8b52",
                 "Test_1.2a_AB047639_cand1.fa:md5,f24df467ce79cd1d1933ce2b9e9968fe",
@@ -729,11 +739,11 @@
                 "Test_2.assembly.gfa.gz:md5,a06895753c5684cdf8998a643b78c1e5",
                 "Test_2.contigs.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
                 "Test_2.scaffolds.fa.gz:md5,5b3fec92c4c30705e3d4706ea8b9f853",
-                "Summary.csv:md5,795a9e48bb25c3a9405a951c90b24b11",
-                "candidates.csv:md5,a49a594882afeba00484b67fcc0717b0"
+                "Summary.csv:md5,99e13870d266a82582cc85ae684cebf1",
+                "candidates.csv:md5,c3766e7356c3f81d841c191c27d047a4"
             ]
         ],
-        "timestamp": "2026-10-22T08:30:07.853506398",
+        "timestamp": "2026-10-20T20:15:40.421057061",
         "meta": {
             "nf-test": "0.9.5",
             "nextflow": "24.10.1"
