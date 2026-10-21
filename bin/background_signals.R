@@ -136,8 +136,8 @@ candidate_dup_signal <- function(candidates, dominant, geno_dups,
 # genuine low-level strain from bleed: in the IVT dilution series the genuine 1:50
 # minors (1.95 % and 2.7 % of reads) overlap the Thomson background minors
 # (0.17-1.7 %) on read share, but are duplicated like their dominant (97 % vs 98 %).
-#   discordant           -> "did not go through this library's PCR" — background
-#   low share, concordant -> "went through this library's PCR" — genuine low-level
+#   discordant           -> "probably did not go through this library's PCR" — background
+#   low share, concordant -> "probably went through this library's PCR" — genuine low-level
 #                            strain or contamination before library preparation
 #   low share, untested   -> says the duplicate test was not informative
 background_note <- function(candidate_rank, candidate_ref, read_fraction,
@@ -154,10 +154,10 @@ background_note <- function(candidate_rank, candidate_ref, read_fraction,
             sprintf("its contigs are %s PCR duplicates against %s for the dominant genotype",
                     pct(dup_rate), pct(library_dup_rate)) else NA_character_
   if (discord) {
-    sprintf("%s%s%s, so its reads did not go through this library's PCR — consistent with background reads from another sample (index hopping or carry-over); check contamination_check/ before reporting.",
+    sprintf("%s%s%s, so its reads probably did not go through this library's PCR — consistent with background reads from another sample (index hopping or carry-over); check contamination_check/ before reporting.",
             head, share, if (low_frac) paste0(", and ", dups) else paste0(": ", dups))
   } else if (isFALSE(dup_discordant)) {
-    sprintf("%s%s; %s, so its reads went through this library's PCR — a genuine low-level strain, or contamination before library preparation; check contamination_check/ before reporting.",
+    sprintf("%s%s; %s, so its reads probably went through this library's PCR — a genuine low-level strain, or contamination before library preparation; check contamination_check/ before reporting.",
             head, share, dups)
   } else {
     sprintf("%s%s; the duplicate test was not informative (unsaturated library or too few reads on its contigs); check contamination_check/ before reporting.",

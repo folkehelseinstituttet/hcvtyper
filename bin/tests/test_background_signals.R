@@ -102,7 +102,7 @@ ok("BS-3 concordant -> FALSE; unsaturated / few fragments / same genotype / no c
 # discordant (+ low share): background wording
 n_both <- background_note(2L, "2b_D10988", 0.0123, 0.018, 0.909, TRUE, 0.02)
 if (!str_detect(n_both, "Co-infection candidate 2 \\(2b_D10988\\) holds 1.23% of the sample's HCV reads \\(below 2.00%") ||
-    !str_detect(n_both, "1.80% PCR duplicates against 90.9% for the dominant genotype, so its reads did not go through this library's PCR") ||
+    !str_detect(n_both, "1.80% PCR duplicates against 90.9% for the dominant genotype, so its reads probably did not go through this library's PCR") ||
     !str_detect(n_both, "check contamination_check/"))
   fail(paste("BS-4 discordant sentence wrong:", n_both))
 # discordant only (share above the floor, e.g. ERR1810469 at 17.5 %)
@@ -111,7 +111,7 @@ if (str_detect(n_dup, "holds") || !str_detect(n_dup, "\\(1a_HQ850279\\): its con
     !str_detect(n_dup, "did not go through")) fail(paste("BS-4 duplicate-only sentence wrong:", n_dup))
 # low share, concordant (IVT5: genuine 1:50 at 1.95 %): must NOT read as background
 n_conc <- background_note(2L, "2a_AB047639", 0.0195, 0.972, 0.987, FALSE, 0.02)
-if (!str_detect(n_conc, "holds 1.95%") || !str_detect(n_conc, "went through this library's PCR") ||
+if (!str_detect(n_conc, "holds 1.95%") || !str_detect(n_conc, "probably went through this library's PCR") ||
     str_detect(n_conc, "did not go through") || str_detect(n_conc, "consistent with background"))
   fail(paste("BS-4 concordant low-share sentence wrong:", n_conc))
 # low share, untested

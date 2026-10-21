@@ -79,7 +79,7 @@ minor. They never change the call; they add a sentence such as
 
 > Co-infection candidate 2 (2b_D10988) holds 1.23% of the sample's HCV reads (below 2.00%, the range
 > of cross-sample background), and its contigs are 1.80% PCR duplicates against 90.9% for the dominant
-> genotype, so its reads did not go through this library's PCR — consistent with background reads from
+> genotype, so its reads probably did not go through this library's PCR — consistent with background reads from
 > another sample (index hopping or carry-over); check contamination_check/ before reporting.
 
 **Read fraction** (`Minor_read_fraction`, `--minor_min_read_fraction`). Bleed is roughly a constant

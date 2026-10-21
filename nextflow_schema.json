@@ -279,7 +279,7 @@
             "type": "number",
             "default": 0.5,
             "minimum": 0,
-            "description": "Duplicate-discordance test: add a review sentence when the minor's contig duplicate rate is at most this fraction of the dominant genotype's — its reads did not go through this library's PCR. Flag only; the call is unchanged."
+            "description": "Duplicate-discordance test: add a review sentence when the minor's contig duplicate rate is at most this fraction of the dominant genotype's — its reads probably did not go through this library's PCR. Flag only; the call is unchanged."
         },
         "n_candidates": {
             "type": "integer",
