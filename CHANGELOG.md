@@ -9,15 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Changed`
 
-- The linting workflow pins `nf-core==4.1.0`, so a new nf-core/tools release cannot turn lint red on its own.
-
 ### `Fixed`
-
-- The nf-core lint and Prettier checks pass again; both had failed since August. The MultiQC `meta.yml` now carries upstream's `containers:` block so its patch reverses unambiguously, and `.nf-core.yml` lists the template parts the pipeline deliberately omits. Strain calls and `Summary.csv` are unchanged.
 
 ### `Dependencies`
 
 ### `Deprecated`
+
+## 2.0.2 - 2026.10.22
+
+Patch release. Makes the lint and pipeline-test CI checks pass again; the pipeline itself is unchanged, and strain calls and `Summary.csv` are identical apart from the embedded pipeline version.
+
+### `Fixed`
+
+- **The nf-core lint and Prettier checks pass again**; both had failed since August. The MultiQC `meta.yml` now carries upstream's `containers:` block. Before, the module's patch had to delete that block, and the only context for the deletion was the identical `authors:` and `maintainers:` lists, so nf-core applied the patch in reverse at the wrong place and reported the local copy as modified. `.nf-core.yml` now lists the template parts the pipeline deliberately omits (the template docs pages, the nf-core institutional config, and the per-architecture container configs) and exempts the Docker format strings in `bin/run_hcvglue.sh` from the Jinja check. `README.md`, `docs/output_interpretation.md` and `assets/multiqc_config.yml` are reformatted with Prettier; this closes the gap in the `review_flag` trigger list (the De-novo rescue trigger is now 9).
+- **The CI `nf-test pipeline snapshot` job passes again**; it had failed since August. `multiqc_software_versions.txt` records the Nextflow version, and CI runs Nextflow 24.04.0 while the snapshot was recorded on 24.10.1, so its md5 could never match. The file is now in `tests/.nftignore`; tool and pipeline versions are still snapshotted through `software_mqc_versions.yml`, which has the Nextflow version removed.
+
+### `Changed`
+
+- The linting workflow pins `nf-core==4.1.0`, so a new nf-core/tools release cannot turn lint red on its own.
 
 ## 2.0.1 - 2026.10.16
 
