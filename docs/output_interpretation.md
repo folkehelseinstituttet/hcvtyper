@@ -67,10 +67,10 @@ in a prompt to review. The triggers:
 6. **Indeterminate dominance** — read-count and k-mer rankings disagree.
 7. **No candidate eligible to be called dominant** — no candidate combines measurable coverage with a mapping identity that agrees with GLUE; call indeterminate.
 8. **Major strain failed mapping quality thresholds.**
-10. **De-novo rescue overrode the Major reference** — the primary call was reassigned automatically; confirm against `rescue_audit.csv` before reporting.
-11. **Co-infection minor looks like background reads** — the minor holds a small share of the reads and/or its contigs are far less PCR-duplicated than the dominant genotype's (see below). The call is unchanged; check `contamination_check/`.
+9. **De-novo rescue overrode the Major reference** — the primary call was reassigned automatically; confirm against `rescue_audit.csv` before reporting.
+10. **Co-infection minor looks like background reads** — the minor holds a small share of the reads and/or its contigs are far less PCR-duplicated than the dominant genotype's (see below). The call is unchanged; check `contamination_check/`.
 
-### Trigger 11: a co-infection minor that looks like background
+### Trigger 10: a co-infection minor that looks like background
 
 High-depth probe-capture runs make it easy for reads bled in from another sample — index hopping,
 demultiplexing bleed, carry-over — to clear absolute floors like `--minRead` and to assemble into
@@ -83,7 +83,7 @@ minor. They never change the call; they add a sentence such as
 > another sample (index hopping or carry-over); check contamination_check/ before reporting.
 
 **Read fraction** (`Minor_read_fraction`, `--minor_min_read_fraction`). Bleed is roughly a constant
-fraction of a run's reads, so a minor's *share* of the sample's reads is comparable across depths in a
+fraction of a run's reads, so a minor's _share_ of the sample's reads is comparable across depths in a
 way a read count is not. A low share is not proof: in the IVT dilution series the genuine 1:50 minors
 hold 1.95 % and 2.7 % of reads, overlapping the 0.17–1.7 % of the background minors in the Thomson
 MiSeq run. So the sentence always says what the duplicate test found — a low-share minor that went
@@ -100,7 +100,7 @@ dilution series every genuine minor (1:1 to 1:50) was duplicated like its domina
 97.8–98.7 %), while every background minor in the Thomson run was far below its library (1.8–8.6 % vs
 91–96 %). Its limits:
 
-- **One-directional.** Contamination that entered *before* library PCR (sample handling, extraction)
+- **One-directional.** Contamination that entered _before_ library PCR (sample handling, extraction)
   is amplified with the sample and looks concordant. `FALSE` means "not shown to be foreign", not
   "genuine".
 - **Needs a saturated library.** If the dominant genotype's contigs are barely duplicated
