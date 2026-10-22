@@ -690,7 +690,6 @@
                 "multiqc_glue_resistance_table.txt:md5,a8973b1828a2faec605e62e4dd4ae514",
                 "multiqc_kraken-1_kraken-1.txt:md5,5a253204b192a4d211b35abd5dada86d",
                 "multiqc_kraken.txt:md5,805f856012188fdde796f2049aa46934",
-                "multiqc_software_versions.txt:md5,a7c4bc197eaf8bd16bac8cf812547b95",
                 "multiqc_summary.txt:md5,dd8ba615b9e5dd4c283a5f86ad263ebd",
                 "Test_1.1b_EU781827_cand2.fa:md5,adfbbbe2888176a86fb06277e29b8b52",
                 "Test_1.2a_AB047639_cand1.fa:md5,f24df467ce79cd1d1933ce2b9e9968fe",
