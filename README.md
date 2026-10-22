@@ -84,13 +84,13 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 
 ```
-nextflow run folkehelseinstituttet/hcvtyper -r 2.0.1 \
+nextflow run folkehelseinstituttet/hcvtyper -r 2.0.2 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
 
-Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.1 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.2 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
 
 > [!IMPORTANT]
 > **From 2.0.0 the release tags are bare version numbers with no `v` prefix** — `-r 2.0.0`, not
@@ -108,7 +108,7 @@ Nextflow will pull the pipeline from the GitHub repo automatically when it is la
 If you want to download a local copy of the pipeline you can run:
 
 ```
-nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.1
+nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.2
 ```
 
 Again, `-r` is optional.
@@ -236,23 +236,23 @@ Demoted candidates are always written to the candidate files with their `role_re
 
 ### Candidate selection
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `--n_candidates` | `2` | Number of neutrally-ranked candidate references to select and map (`cand1`..`candN`). The top reference per distinct subtype is taken. The default of 2 reproduces the classic two-slot major/minor topology. |
-| `--minRead` | `499` | Minimum mapped reads for a candidate to clear the abundance floor. |
-| `--minCov` | `29` | Minimum percent of the reference covered at ≥5× for a candidate to clear the abundance floor. |
+| Parameter        | Default | Description                                                                                                                                                                                                   |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--n_candidates` | `2`     | Number of neutrally-ranked candidate references to select and map (`cand1`..`candN`). The top reference per distinct subtype is taken. The default of 2 reproduces the classic two-slot major/minor topology. |
+| `--minRead`      | `499`   | Minimum mapped reads for a candidate to clear the abundance floor.                                                                                                                                            |
+| `--minCov`       | `29`    | Minimum percent of the reference covered at ≥5× for a candidate to clear the abundance floor.                                                                                                                 |
 
 ### De novo corroboration thresholds
 
 These control when an assembled contig counts as evidence for a candidate.
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `--denovo_confirm_minor` | `true` | Require orthogonal _de novo_/BLAST evidence before reporting a minor strain. |
-| `--denovo_min_contig_length` | `500` | Minimum contig length (bp) to count as evidence. Validated at 500 to keep genuine short minor contigs. |
-| `--denovo_min_kmer_cov` | `2.0` | Minimum SPAdes k-mer coverage of the contig. |
-| `--denovo_min_blast_identity` | `90` | Minimum BLAST % identity of the contig hit. |
-| `--denovo_match_level` | `genotype` | Whether _de novo_ evidence must match a candidate at `genotype` or `subtype` level. |
+| Parameter                     | Default    | Description                                                                                            |
+| ----------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ |
+| `--denovo_confirm_minor`      | `true`     | Require orthogonal _de novo_/BLAST evidence before reporting a minor strain.                           |
+| `--denovo_min_contig_length`  | `500`      | Minimum contig length (bp) to count as evidence. Validated at 500 to keep genuine short minor contigs. |
+| `--denovo_min_kmer_cov`       | `2.0`      | Minimum SPAdes k-mer coverage of the contig.                                                           |
+| `--denovo_min_blast_identity` | `90`       | Minimum BLAST % identity of the contig hit.                                                            |
+| `--denovo_match_level`        | `genotype` | Whether _de novo_ evidence must match a candidate at `genotype` or `subtype` level.                    |
 
 > [!NOTE]
 > Assembly support is no longer a pass/fail gate. Each candidate receives a continuous
@@ -264,15 +264,15 @@ These control when an assembled contig counts as evidence for a candidate.
 
 When a high-quality contig contradicts a mapped candidate's subtype, the candidate's reference can be reassigned before targeted mapping. All four quality floors must be cleared.
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `--rescue_min_length` | `3000` | Minimum _de novo_ contig length (bp) to trigger a rescue. |
-| `--rescue_min_pident` | `85` | Minimum BLAST % identity of the contig's top hit. |
-| `--rescue_min_aln_length` | `3000` | Minimum BLAST alignment length (bp) of the top hit. |
-| `--rescue_min_kmer_cov` | `2.0` | Minimum SPAdes k-mer coverage of the contig. |
-| `--rescue_1a1b_length` | `5000` | Stricter contig-length floor when both the candidate and the _de novo_ subtype are in {1a, 1b}. |
-| `--rescue_kmer_cov_ratio` | `10` | Block a replacement when the candidate's own-subtype contig k-mer coverage exceeds the rescue target's by at least this factor (cross-mapping-noise guard). `0` disables. |
-| `--rescue_dominant_protect_cov` | `90` | A first-mapping candidate at or above this coverage whose own subtype _is_ assembled is self-confirming and is never replaced. Blank disables. |
+| Parameter                       | Default | Description                                                                                                                                                               |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--rescue_min_length`           | `3000`  | Minimum _de novo_ contig length (bp) to trigger a rescue.                                                                                                                 |
+| `--rescue_min_pident`           | `85`    | Minimum BLAST % identity of the contig's top hit.                                                                                                                         |
+| `--rescue_min_aln_length`       | `3000`  | Minimum BLAST alignment length (bp) of the top hit.                                                                                                                       |
+| `--rescue_min_kmer_cov`         | `2.0`   | Minimum SPAdes k-mer coverage of the contig.                                                                                                                              |
+| `--rescue_1a1b_length`          | `5000`  | Stricter contig-length floor when both the candidate and the _de novo_ subtype are in {1a, 1b}.                                                                           |
+| `--rescue_kmer_cov_ratio`       | `10`    | Block a replacement when the candidate's own-subtype contig k-mer coverage exceeds the rescue target's by at least this factor (cross-mapping-noise guard). `0` disables. |
+| `--rescue_dominant_protect_cov` | `90`    | A first-mapping candidate at or above this coverage whose own subtype _is_ assembled is self-confirming and is never replaced. Blank disables.                            |
 
 A rescue that reassigns the **Major** reference always forces `call_confidence = review` and a review note — it is an automated override of the primary call. The full from/to and trigger for every rescue decision is written to `blastparse/{sample}.rescue_audit.csv`.
 
@@ -280,33 +280,33 @@ A rescue that reassigns the **Major** reference always forces `call_confidence =
 
 Each candidate's dominance score is a weighted sum over log10(mapped reads), coverage breadth, a CV-of-depth evenness factor, and a bonus-only log(k-mer coverage) term. Evenness deliberately outweighs raw read count so that a high-read but spiky cross-mapping artefact loses to a genuine, evenly covered minor.
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `--score_weight_evenness` | `3.0` | Weight on the CV-evenness factor — the dominant term. |
-| `--score_weight_reads` | `1.0` | Weight on log10(candidate reads). |
-| `--score_weight_kmercov` | `0.5` | Weight on the bonus-only log(k-mer coverage) term (never penalises). |
-| `--score_evenness_k` | `1.0` | Constant in the evenness transform `1 / (1 + k × CV)`. |
+| Parameter                 | Default | Description                                                          |
+| ------------------------- | ------- | -------------------------------------------------------------------- |
+| `--score_weight_evenness` | `3.0`   | Weight on the CV-evenness factor — the dominant term.                |
+| `--score_weight_reads`    | `1.0`   | Weight on log10(candidate reads).                                    |
+| `--score_weight_kmercov`  | `0.5`   | Weight on the bonus-only log(k-mer coverage) term (never penalises). |
+| `--score_evenness_k`      | `1.0`   | Constant in the evenness transform `1 / (1 + k × CV)`.               |
 
 ### Review-flag thresholds
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `--review_min_offgenotype_contig_length` | `1000` | Minimum contig length (bp) for the monoinfection "_de novo_ assembly found a different-genotype contig" review sentence to fire. Deliberately separate from — and higher than — `--denovo_min_contig_length`: that floor confirms a minor that mapping already supports, whereas here the contig is the _only_ evidence. Validated across 140 samples: with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case. |
+| Parameter                                | Default | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--review_min_offgenotype_contig_length` | `1000`  | Minimum contig length (bp) for the monoinfection "_de novo_ assembly found a different-genotype contig" review sentence to fire. Deliberately separate from — and higher than — `--denovo_min_contig_length`: that floor confirms a minor that mapping already supports, whereas here the contig is the _only_ evidence. Validated across 140 samples: with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case. |
 
 ### Cross-sample contamination check
 
 An all-vs-all BLAST of the assembled contigs across samples in the run, used to detect index hopping and cross-contamination. Results are published to `contamination_check/`.
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `--skip_contamination_check` | `false` | Skip the check entirely. |
-| `--contamination_min_length` | `1000` | Minimum contig length (bp) to include. |
-| `--contamination_min_id` | `95` | Minimum BLAST % identity to flag a hit. |
-| `--contamination_min_aln_cov` | `0.9` | Minimum fraction of the shorter contig that must be covered by the alignment. |
-| `--contamination_hop_rate` | `0.001` | Expected index-hopping rate. |
-| `--contamination_min_dir_ratio` | `10.0` | Minimum source/recipient coverage ratio for a direction to be reported. |
-| `--contamination_genome_size` | `9500` | Expected viral genome size (bp), used for the index-hop threshold. |
-| `--contamination_kmer_size` | `127` | SPAdes final k-mer size, used to convert the index-hop read-depth threshold to k-mer coverage (`kmer_cov = depth × (L − k + 1) / L`, with L the mean read length from fastp). SPAdes `--rnaviral` picks k from read length: 49 for 2×100, 73 for 2×150 and 127 for 2×300 reads. |
+| Parameter                       | Default | Description                                                                                                                                                                                                                                                                     |
+| ------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--skip_contamination_check`    | `false` | Skip the check entirely.                                                                                                                                                                                                                                                        |
+| `--contamination_min_length`    | `1000`  | Minimum contig length (bp) to include.                                                                                                                                                                                                                                          |
+| `--contamination_min_id`        | `95`    | Minimum BLAST % identity to flag a hit.                                                                                                                                                                                                                                         |
+| `--contamination_min_aln_cov`   | `0.9`   | Minimum fraction of the shorter contig that must be covered by the alignment.                                                                                                                                                                                                   |
+| `--contamination_hop_rate`      | `0.001` | Expected index-hopping rate.                                                                                                                                                                                                                                                    |
+| `--contamination_min_dir_ratio` | `10.0`  | Minimum source/recipient coverage ratio for a direction to be reported.                                                                                                                                                                                                         |
+| `--contamination_genome_size`   | `9500`  | Expected viral genome size (bp), used for the index-hop threshold.                                                                                                                                                                                                              |
+| `--contamination_kmer_size`     | `127`   | SPAdes final k-mer size, used to convert the index-hop read-depth threshold to k-mer coverage (`kmer_cov = depth × (L − k + 1) / L`, with L the mean read length from fastp). SPAdes `--rnaviral` picks k from read length: 49 for 2×100, 73 for 2×150 and 127 for 2×300 reads. |
 
 ## Starting and stopping the pipeline
 
@@ -418,7 +418,7 @@ The pipeline runs _de novo_ assembly (SPAdes) and BLAST in parallel with referen
 
 **Review flag:**
 
-- `review_flag` - Human-readable summary of any issue worth manual inspection, empty when all checks pass. Multiple issues are joined with ` | `. Each sentence names **the specific candidate** it refers to and carries the **measured value** alongside the floor it missed — e.g. _"…different-genotype contig (6i) — 1620 bp contig, 69 bp aligned (4%), 91.3% identity, k-mer cov 1.0; only 4% of the contig aligns to any reference in the panel, so the subtype assignment is weakly supported"_ — so the flag can be adjudicated without re-running the pipeline. The ten triggers are listed in full in the [results interpretation guide](docs/output_interpretation.md#review_flag--the-human-readable-why).
+- `review_flag` - Human-readable summary of any issue worth manual inspection, empty when all checks pass. Multiple issues are joined with `|`. Each sentence names **the specific candidate** it refers to and carries the **measured value** alongside the floor it missed — e.g. _"…different-genotype contig (6i) — 1620 bp contig, 69 bp aligned (4%), 91.3% identity, k-mer cov 1.0; only 4% of the contig aligns to any reference in the panel, so the subtype assignment is weakly supported"_ — so the flag can be adjudicated without re-running the pipeline. The ten triggers are listed in full in the [results interpretation guide](docs/output_interpretation.md#review_flag--the-human-readable-why).
 
 Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC Results summary table.
 
@@ -439,15 +439,15 @@ Samples with a non-empty `review_flag` are highlighted in orange in the MultiQC 
 
 #### Per-sample evidence files
 
-| File | Contents |
-| --- | --- |
-| `parsefirstmapping/{sample}.candidates.csv` | The neutrally-ranked candidates as selected from the first mapping, before rescue and classification. |
-| `parsefirstmapping/{sample}_cand*.fa` | The selected candidate reference sequences. |
-| `blastparse/{sample}.assembly_support.csv` | Per-subtype _de novo_ assembly-support roll-up: best contig length, BLAST % identity, alignment length and k-mer coverage. |
-| `blastparse/{sample}.blastparse.csv` | Parsed BLAST hits of the assembled contigs against the reference panel. |
-| `blastparse/{sample}_blast_out.csv` | The raw BLAST output (every HSP). |
-| `blastparse/{sample}.rescued.candidates.csv` | The candidate set after _de novo_ subtype rescue. |
-| `blastparse/{sample}.rescue_audit.csv` | The authoritative ledger of **every** rescue, nomination and block decision, with from/to and trigger — including rescues that fired and were then dropped by genotype collapse or the candidate cap, which leave no trace anywhere else. |
+| File                                         | Contents                                                                                                                                                                                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parsefirstmapping/{sample}.candidates.csv`  | The neutrally-ranked candidates as selected from the first mapping, before rescue and classification.                                                                                                                                     |
+| `parsefirstmapping/{sample}_cand*.fa`        | The selected candidate reference sequences.                                                                                                                                                                                               |
+| `blastparse/{sample}.assembly_support.csv`   | Per-subtype _de novo_ assembly-support roll-up: best contig length, BLAST % identity, alignment length and k-mer coverage.                                                                                                                |
+| `blastparse/{sample}.blastparse.csv`         | Parsed BLAST hits of the assembled contigs against the reference panel.                                                                                                                                                                   |
+| `blastparse/{sample}_blast_out.csv`          | The raw BLAST output (every HSP).                                                                                                                                                                                                         |
+| `blastparse/{sample}.rescued.candidates.csv` | The candidate set after _de novo_ subtype rescue.                                                                                                                                                                                         |
+| `blastparse/{sample}.rescue_audit.csv`       | The authoritative ledger of **every** rescue, nomination and block decision, with from/to and trigger — including rescues that fired and were then dropped by genotype collapse or the candidate cap, which leave no trace anywhere else. |
 
 #### MultiQC Report
 

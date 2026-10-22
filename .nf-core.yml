@@ -1,4 +1,5 @@
 lint:
+  container_configs: False
   files_exist:
     - CODE_OF_CONDUCT.md
     - .github/ISSUE_TEMPLATE/config.yml
@@ -8,6 +9,11 @@ lint:
     - .github/actions/get-shards/action.yml
     - .github/actions/nf-test/action.yml
     - conf/igenomes.config
+    - .github/workflows/pr-comment.yml
+    - docs/CONTRIBUTING.md
+    - docs/README.md
+    - docs/output.md
+    - docs/usage.md
   files_unchanged:
     - CODE_OF_CONDUCT.md
     - .github/ISSUE_TEMPLATE/bug_report.yml
@@ -16,8 +22,11 @@ lint:
   nextflow_config:
     - manifest.name
     - manifest.homePage
+    - custom_config
   readme:
     - nextflow_badge
+  template_strings:
+    - bin/run_hcvglue.sh
 repository_type: pipeline
 template:
   prefix: folkehelseinstituttet
