@@ -14,6 +14,10 @@ multiqc/multiqc_data/multiqc.log
 multiqc/multiqc_data/multiqc.parquet
 multiqc/multiqc_data/multiqc_data.json
 multiqc/multiqc_data/multiqc_sources.txt
+# Carries the Nextflow version (the Workflow row), and CI runs 24.04.0 while snapshots are
+# often recorded on a newer Nextflow, so its md5 can never match across the two. Tool and
+# pipeline versions stay covered by the removeNextflowVersion(software_mqc_versions.yml) slot.
+multiqc/multiqc_data/multiqc_software_versions.txt
 multiqc/multiqc_plots/{svg,pdf,png}/*.{svg,pdf,png}
 multiqc/multiqc_report.html
 # FastQC outputs

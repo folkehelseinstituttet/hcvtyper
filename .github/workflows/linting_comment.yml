@@ -5,16 +5,29 @@ name: nf-core linting comment
 on:
   workflow_run:
     workflows: ["nf-core linting"]
+    # Without a types filter this also fires when the lint run is requested and
+    # in progress, before its artifact exists.
+    types: [completed]
+
+# The repository's default GITHUB_TOKEN is read-only, so commenting must be granted here.
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Pushes to dev/master also run linting, but there is no PR to comment on.
+    if: github.event.workflow_run.event == 'pull_request'
     steps:
       - name: Download lint results
         uses: dawidd6/action-download-artifact@v6
         with:
-          workflow: linting.yml
-          workflow_conclusion: completed
+          # The lint run that triggered this one, not the latest completed run of any branch.
+          run_id: ${{ github.event.workflow_run.id }}
+          name: linting-logs
+          path: linting-logs
 
       - name: Get PR number
         id: pr_number
