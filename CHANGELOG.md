@@ -27,6 +27,7 @@ Patch release. Makes the lint and pipeline-test CI checks pass again; the pipeli
 ### `Changed`
 
 - The linting workflow pins `nf-core==4.1.0`, so a new nf-core/tools release cannot turn lint red on its own.
+- **The lint-results PR comment is posted again.** `linting_comment.yml` now requests `pull-requests: write` (the repository's default workflow token is read-only, so every PR comment failed with "Resource not accessible by integration"), runs only when the triggering lint run has completed on a pull request (it fired three times per push), and downloads the artifact of that exact lint run instead of the latest completed one from any branch. Like any `workflow_run` workflow it runs from the default branch, so it takes effect once this release is on `master`.
 
 ## 2.0.1 - 2026.10.16
 
