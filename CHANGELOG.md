@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Changed`
 
+- The linting workflow pins `nf-core==4.1.0`, so a new nf-core/tools release cannot turn lint red on its own.
+
 ### `Fixed`
+
+- The nf-core lint and Prettier checks pass again; both had failed since August. The MultiQC `meta.yml` now carries upstream's `containers:` block so its patch reverses unambiguously, and `.nf-core.yml` lists the template parts the pipeline deliberately omits. Strain calls and `Summary.csv` are unchanged.
 
 ### `Dependencies`
 
