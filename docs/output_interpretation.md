@@ -21,10 +21,10 @@ Read these two columns together first. Everything else is supporting detail.
 | `overall_sample_call` (**Final call**) | _What do the data indicate?_  | `monoinfection`, `co-infection`, `co-infection (indeterminate dominance)`, `indeterminate`, `untypable` |
 | `call_confidence` (**Confidence**)     | _How much should I trust it?_ | `high`, `provisional`, `review`, `indeterminate`                                                        |
 
-`call_confidence` is not new biology — it is an explicit roll-up of signals that are
+`call_confidence` is an explicit roll-up of signals that are
 otherwise scattered across `review_flag`, `gate_flag`, `rescue_effect`, the
 subtype-match columns and the per-candidate roles. Its whole purpose is so you do not
-have to reconstruct confidence in your head.
+have to reconstruct confidence yourself.
 
 ### Final call vocabulary
 
