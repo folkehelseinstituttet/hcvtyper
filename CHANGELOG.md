@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+### `Changed`
+
+### `Fixed`
+
+### `Dependencies`
+
+### `Deprecated`
+
+## 2.1.0 - 2026.10.23
+
+Minor release. Adds two background signals that mark a co-infection minor which looks like reads from another sample, with new columns in `Summary.csv` and `candidates.csv`, a new `contig_duplicates/` output and four new parameters. No strain call or role changes.
+
+### `Added`
+
 - **Background signals for co-infection minors (review trigger 10).** Probe-capture runs reach depths where a few tenths of a percent of reads bled in from another sample clear `--minRead` and assemble into long contigs, which over-calls co-infections. Two signals that need no other sample of the run — so replicate samples, mixed runs and sources outside the run do not matter — now mark a co-infection minor that looks like such background. **Neither changes a call**; they add columns and a `review_flag` sentence pointing to `contamination_check/`, which caps `call_confidence` at `provisional`.
   - **Read fraction** — the minor's share of the sample's candidate reads on the competitive joint mapping (`--minor_min_read_fraction`, default 0.02).
   - **Duplicate discordance** — a new `CONTIG_DUPLICATES` step maps each sample's reads back to its own contigs and marks PCR duplicates. A genuine minor is amplified in the same library and shares its duplicate rate; reads from another library are almost all unique (`--dup_min_library_rate` 0.5, `--dup_min_fragments` 20, `--dup_max_ratio` 0.5). `NA` when the test has no power.
@@ -16,11 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Changed`
 
-### `Fixed`
-
-### `Dependencies`
-
-### `Deprecated`
+- **`call_confidence` can be lower than in 2.0.x.** A sample whose co-infection minor gets the background sentence has a non-empty `review_flag`, which caps `call_confidence` at `provisional` (the existing rule). The call itself is unchanged.
 
 ## 2.0.2 - 2026.10.22
 

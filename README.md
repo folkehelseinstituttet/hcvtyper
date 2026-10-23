@@ -85,13 +85,13 @@ The pipeline only requires [Nextflow](https://nextflow.io/) and [Docker](https:/
 The pipeline does not require any installation, only an internet connection. The pipeline is typically run with the following command:
 
 ```
-nextflow run folkehelseinstituttet/hcvtyper -r 2.0.2 \
+nextflow run folkehelseinstituttet/hcvtyper -r 2.1.0 \
     --input samplesheet.csv \
     --outdir <OUTDIR> \
     -profile docker
 ```
 
-Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.0.2 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
+Nextflow will pull the pipeline from the GitHub repo automatically when it is launched. Here, the version of the 2.1.0 release is downloaded and run. You can omit `-r` and the code from the master branch will be used. But we always recommend that you specify either branch or release using `-r`.
 
 > [!IMPORTANT]
 > **From 2.0.0 the release tags are bare version numbers with no `v` prefix** — `-r 2.0.0`, not
@@ -109,7 +109,7 @@ Nextflow will pull the pipeline from the GitHub repo automatically when it is la
 If you want to download a local copy of the pipeline you can run:
 
 ```
-nextflow pull folkehelseinstituttet/hcvtyper -r 2.0.2
+nextflow pull folkehelseinstituttet/hcvtyper -r 2.1.0
 ```
 
 Again, `-r` is optional.
