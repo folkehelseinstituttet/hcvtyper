@@ -256,6 +256,31 @@
             "default": 1000,
             "description": "Minimum de novo contig length (bp) for the monoinfection 'de novo assembly found a different-genotype contig' review sentence to fire. Deliberately separate from, and higher than, denovo_min_contig_length: that floor confirms a minor that mapping already supports, whereas here the contig is the ONLY evidence. Validated on 140 samples — with no floor the flag fired on 51% of samples (median contig 606 bp); at 1000 bp it fires on 12% while retaining every genuine case."
         },
+        "minor_min_read_fraction": {
+            "type": "number",
+            "default": 0.02,
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Add a review sentence for a co-infection minor that holds less than this fraction of the sample's candidate reads (joint mapping, duplicates included). Background bleed is roughly a constant fraction of reads, so this is depth-invariant where minRead is not. Background minors were observed at 0.17-1.7 % of reads; a genuine 1:50 mixture is about 2 %. Flag only; the call is unchanged."
+        },
+        "dup_min_library_rate": {
+            "type": "number",
+            "default": 0.5,
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Duplicate-discordance test: the dominant genotype's contigs must be at least this PCR-duplicated for the test to have power (an unsaturated library shows no duplication either way)."
+        },
+        "dup_min_fragments": {
+            "type": "integer",
+            "default": 20,
+            "description": "Duplicate-discordance test: minimum read pairs on the minor's contigs."
+        },
+        "dup_max_ratio": {
+            "type": "number",
+            "default": 0.5,
+            "minimum": 0,
+            "description": "Duplicate-discordance test: add a review sentence when the minor's contig duplicate rate is at most this fraction of the dominant genotype's — its reads probably did not go through this library's PCR. Flag only; the call is unchanged."
+        },
         "n_candidates": {
             "type": "integer",
             "default": 2,

@@ -66,6 +66,7 @@ include { RESCUE_EVALUATION                  } from '../modules/local/rescueeval
 include { GLUEPARSE as HCV_GLUE_PARSER       } from '../modules/local/glueparse/main'
 include { HCVGLUE                            } from '../modules/local/hcvglue/main'
 include { SUMMARIZE                          } from '../modules/local/summarize/main'
+include { CONTIG_DUPLICATES                  } from '../modules/local/contig_duplicates/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -301,6 +302,17 @@ workflow HCVTYPER {
     ch_versions = ch_versions.mix(BLASTPARSE.out.versions.first())
 
     //
+    // MODULE: Per-contig PCR-duplicate rate of each sample's own reads (261020-q6v).
+    // A genuine minor shares its library's duplicate rate; reads from another library
+    // are near-unique. summarize.R compares the minor's rate with the dominant's.
+    // Only samples with a non-empty contig set (ch_blastn) are mapped.
+    //
+    CONTIG_DUPLICATES (
+        ch_blastn.join(KRAKEN2_FOCUSED.out.classified_reads_fastq)
+    )
+    ch_versions = ch_versions.mix(CONTIG_DUPLICATES.out.versions.first())
+
+    //
     // SUBWORKFLOW: Detect cross-sample contamination via all-vs-all BLAST
     //
     if (!params.skip_contamination_check) {
@@ -512,7 +524,8 @@ workflow HCVTYPER {
     // contig (empty denovo/ staging dir -> NA de novo columns + no dropped rows).
     // Phase 7 (ASUP-02): also stage the per-subtype *.assembly_support.csv into
     // denovo/ so summarize.R can join it to candidates at genotype level.
-    ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).mix(BLASTPARSE.out.support.collect({it[1]})).collect().ifEmpty([])
+    // 261020-q6v: also stage the per-contig duplicate counts (*.contig_dups.tsv).
+    ch_denovo = BLASTPARSE.out.csv.collect({it[1]}).mix(BLASTPARSE.out.blast_res.collect({it[1]})).mix(BLASTPARSE.out.support.collect({it[1]})).mix(CONTIG_DUPLICATES.out.tsv.collect({it[1]})).collect().ifEmpty([])
     if (params.agens == "HCV" && !params.skip_hcvglue) {
         ch_glue = HCV_GLUE_PARSER.out.GLUE_summary
     } else {
@@ -541,6 +554,7 @@ workflow HCVTYPER {
         file("${projectDir}/bin/denovo_layer.R"),
         file("${projectDir}/bin/assembly_support_join.R"),
         file("${projectDir}/bin/classify_roles.R"),
+        file("${projectDir}/bin/background_signals.R"),
     )
     ch_versions = ch_versions.mix(SUMMARIZE.out.versions)
 

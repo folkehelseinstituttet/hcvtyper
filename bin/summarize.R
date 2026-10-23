@@ -23,6 +23,9 @@ source("assembly_support_join.R")
 # retained so the staged files still load cleanly, but apply_denovo_layer() is no
 # longer called.
 source("classify_roles.R")
+# 261020-q6v: sample-level background signals for co-infection minors (read fraction,
+# duplicate discordance). Sourced AFTER genotype_utils.R (uses genotype_from_subtype()).
+source("background_signals.R")
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -73,6 +76,17 @@ score_evenness_k      <- if (length(args) >= 15 && nchar(args[15]) > 0) as.numer
 # re-maps every later index. Default mirrors nextflow.config.
 review_min_offgenotype_contig_length <-
   if (length(args) >= 16 && nchar(args[16]) > 0) as.numeric(args[16]) else 1000
+# Background signals for co-infection minors (261020-q6v). APPENDED at args[17..20],
+# after args[16], for the same positional reason. They only add columns and a review
+# sentence; no call depends on them.
+minor_min_read_fraction <-
+  if (length(args) >= 17 && nchar(args[17]) > 0) as.numeric(args[17]) else 0.02
+dup_min_library_rate    <-
+  if (length(args) >= 18 && nchar(args[18]) > 0) as.numeric(args[18]) else 0.5
+dup_min_fragments       <-
+  if (length(args) >= 19 && nchar(args[19]) > 0) as.numeric(args[19]) else 20
+dup_max_ratio           <-
+  if (length(args) >= 20 && nchar(args[20]) > 0) as.numeric(args[20]) else 0.5
 
 script_name_version <- if (!is.na(pipeline_version) && nzchar(trimws(pipeline_version))) {
   paste(pipeline_name, pipeline_version)
@@ -377,6 +391,12 @@ tmp_df <- tmp_df %>%
   mutate(candidate_rank = suppressWarnings(as.integer(candidate_rank)))
 
 # Add number of raw and trimmed reads - needed for calculation of percentages
+# 261020-q6v: raw (with-duplicates) reads per candidate on the competitive joint-mapping
+# BAM, kept per candidate for the read-fraction background signal.
+targeted_withdup_per_cand <- tmp_df %>%
+  filter(!is.na(candidate_rank)) %>%
+  distinct(sampleName, candidate_rank, .keep_all = TRUE) %>%
+  select(sampleName, candidate_rank, reads_withdup = trimmed_reads_withdups_mapped)
 tmp_df <- left_join(tmp_df, trimmed_df, by = "sampleName")
 
 # Add number of classified reads from Kraken2 -  - needed for calculation of percentages
@@ -995,7 +1015,68 @@ candidate_support <- candidate_support %>%
 # wide Summary.csv below only carries the dominant + corroborated co-infection
 # slots. Empty-batch safe: classify_roles() returns a typed zero-row frame, so a
 # no-candidate run writes a header-only candidates.csv (never aborts, T-08-01).
+# Background signals (261020-q6v). Two numbers per candidate that need no other sample:
+# its share of the sample's candidate reads, and its contigs' PCR-duplicate rate
+# against the dominant genotype's (CONTIG_DUPLICATES, staged into denovo/). Neither
+# changes a role or call; they feed the columns below and a review sentence.
+geno_dups <- genotype_dup_rates(read_contig_dups(path_denovo), df_blast_out)
+dup_signal <- candidate_dup_signal(
+  candidates      = candidate_support %>% select(sampleName, candidate_rank, candidate_ref),
+  dominant        = slot_major_src %>% transmute(sampleName, dominant_ref = candidate_ref),
+  geno_dups       = geno_dups,
+  min_library_dup = dup_min_library_rate,
+  min_fragments   = dup_min_fragments,
+  max_ratio       = dup_max_ratio
+)
+candidate_support <- candidate_support %>%
+  left_join(candidate_read_fractions(targeted_withdup_per_cand),
+            by = c("sampleName", "candidate_rank")) %>%
+  left_join(dup_signal, by = c("sampleName", "candidate_rank")) %>%
+  mutate(background_note = pmap_chr(
+    list(candidate_rank, candidate_ref, candidate_read_fraction,
+         candidate_dup_rate, library_dup_rate, dup_discordant),
+    function(rank, ref, frac, dup, lib, disc) {
+      background_note(rank, ref, frac, dup, lib, disc, minor_min_read_fraction)
+    }
+  )) %>%
+  # The sentence concerns a second strain that is being reported: a co-infection
+  # candidate, or the non-Major candidate of a "co-infection (indeterminate
+  # dominance)" call (role indeterminate). The Major slot itself never gets it.
+  left_join(slot_major_src %>% transmute(sampleName, .major_rank = candidate_rank),
+            by = "sampleName") %>%
+  mutate(background_note = if_else(
+    role %in% c("co-infection", "indeterminate") &
+      (is.na(.major_rank) | candidate_rank != .major_rank),
+    background_note, NA_character_)) %>%
+  select(-.major_rank)
+
 write_csv(candidate_support, file = "candidates.csv")
+
+# Sample-level view of the background signals: the Minor slot's read fraction,
+# duplicate rate and discordance, the Major slot's (= library) duplicate rate, and
+# every co-infection candidate's sentence collapsed with " | ". Joined into `final`
+# just before review_flag is assembled.
+background_by_sample <- candidate_support %>%
+  group_by(sampleName) %>%
+  summarise(background_note = {
+              n <- background_note[!is.na(background_note)]
+              if (length(n) == 0) NA_character_ else paste(n, collapse = " | ")
+            }, .groups = "drop") %>%
+  left_join(slot_minor_src %>% select(sampleName, candidate_rank) %>%
+              left_join(candidate_support %>%
+                          select(sampleName, candidate_rank,
+                                 Minor_read_fraction  = candidate_read_fraction,
+                                 Minor_dup_rate       = candidate_dup_rate,
+                                 Minor_dup_discordant = dup_discordant),
+                        by = c("sampleName", "candidate_rank")) %>%
+              select(-candidate_rank),
+            by = "sampleName") %>%
+  left_join(slot_major_src %>% select(sampleName, candidate_rank) %>%
+              left_join(candidate_support %>%
+                          select(sampleName, candidate_rank, Major_dup_rate = candidate_dup_rate),
+                        by = c("sampleName", "candidate_rank")) %>%
+              select(-candidate_rank),
+            by = "sampleName")
 
 # Map the per-candidate roles into the wide one-row-per-sample layout (D-16). The
 # `dominant` candidate fills the role_* major slot and the first corroborated
@@ -2059,6 +2140,16 @@ final <- final %>%
     ),
     sample_review_message
   )) %>%
+  # 261020-q6v: background signals. The columns are emitted; the sentence is appended
+  # to review_flag and then dropped. A non-empty review_flag caps call_confidence at
+  # `provisional` below — the call itself is unchanged.
+  left_join(background_by_sample, by = "sampleName") %>%
+  mutate(review_flag = case_when(
+    is.na(background_note) ~ review_flag,
+    is.na(review_flag)     ~ background_note,
+    TRUE                   ~ paste(review_flag, background_note, sep = " | ")
+  )) %>%
+  select(-background_note) %>%
   # call_confidence (evidence-tier axis) — an EXPLICIT rollup of the confidence
   # signals that are otherwise scattered across review_flag / gate_flag /
   # rescue_effect / subtype-match / role columns. It does NOT introduce new science:
